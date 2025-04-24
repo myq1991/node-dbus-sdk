@@ -1,10 +1,10 @@
 import {Duplex} from 'node:stream'
-import {IDBusBufferOptions} from './types/IDBusBufferOptions'
-import {DBusBuffer} from './lib/DBusBuffer'
-import {IType} from './types/IType'
-import {IDBusMessage} from './types/IDBusMessage'
-import {endianness, fieldSignature, headerTypeId, headerTypeName, messageType, protocolVersion} from './lib/Constants'
-import {marshall} from './lib/Marshall'
+import {IDBusBufferOptions} from '../types/IDBusBufferOptions'
+import {DBusBuffer} from './DBusBuffer'
+import {IType} from '../types/IType'
+import {IDBusMessage} from '../types/IDBusMessage'
+import {endianness, fieldSignature, headerTypeId, headerTypeName, messageType, protocolVersion} from './Constants'
+import {marshall} from './Marshall'
 
 export class MessageParser {
     protected readonly headerSignature: IType[] = [

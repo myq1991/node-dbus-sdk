@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.1",
+    "@types/xml2js": "^0.4.14",
     "@typescript-eslint/eslint-plugin": "^8.31.0",
     "@typescript-eslint/parser": "^8.31.0",
     "eslint": "^8.56.0",
@@ -38,6 +39,7 @@
   },
   "dependencies": {
     "@homebridge/long": "^5.2.1",
-    "@homebridge/put": "^0.0.8"
+    "@homebridge/put": "^0.0.8",
+    "xml2js": "^0.6.2"
   }
 }
