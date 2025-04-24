@@ -1,0 +1,43 @@
+{
+  "name": "nodedbus",
+  "version": "1.0.0",
+  "description": "Node DBus",
+  "main": "index.js",
+  "scripts": {
+    "clean": "shx rm -rf ./build",
+    "build": "tsc",
+    "rebuild": "npm run clean && npm run build",
+    "test": "npm run rebuild && node ./build/tests/Test.spec.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/myq1991/nodedbus.git"
+  },
+  "keywords": [
+    "DBus"
+  ],
+  "author": "alex.ma",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/myq1991/nodedbus/issues"
+  },
+  "homepage": "https://github.com/myq1991/nodedbus#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "@typescript-eslint/eslint-plugin": "^8.31.0",
+    "@typescript-eslint/parser": "^8.31.0",
+    "eslint": "^8.56.0",
+    "reflect-metadata": "^0.2.2",
+    "shx": "^0.4.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@homebridge/long": "^5.2.1",
+    "@homebridge/put": "^0.0.8"
+  }
+}

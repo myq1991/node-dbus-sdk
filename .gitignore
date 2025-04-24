@@ -1,0 +1,30 @@
+# compiled output
+node_modules
+/dist
+/build
+/bindings
+
+# local env files
+.env.local
+.env.*.local
+
+# Log files
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+package-lock.json
