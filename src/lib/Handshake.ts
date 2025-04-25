@@ -6,6 +6,7 @@ import * as constants from './Constants'
 import {BinaryLike, Hash} from 'node:crypto'
 import {Duplex} from 'node:stream'
 import {Stats} from 'node:fs'
+import {IHandshakeOptions} from '../types/IHandshakeOptions'
 
 function sha1(input: BinaryLike): string {
     let sha1: Hash = createHash('sha1')
@@ -48,14 +49,7 @@ function hexlify(input: string | number): string {
     return Buffer.from(input.toString(), 'ascii').toString('hex')
 }
 
-export interface Opts {
-    authMethods?: string[]
-    uid?: number
-    // Set false to enable more verbose objects
-    simple?: boolean
-}
-
-export async function clientHandshake(stream: Duplex, opts?: Opts): Promise<string> {
+export async function clientHandshake(stream: Duplex, opts?: IHandshakeOptions): Promise<string> {
     let authMethods: string[] = opts?.authMethods || constants.defaultAuthMethods
     stream.write('\0')
     let uid: number = opts?.uid!

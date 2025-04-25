@@ -2,6 +2,9 @@ import {EventEmitter} from 'node:events'
 import {Duplex} from 'node:stream'
 import {IDBusMessage} from './types/IDBusMessage'
 import {MessageParser} from './lib/MessageParser'
+import {IDBusConnectionOptions} from './types/IDBusConnectionOptions'
+import {IHandshakeOptions} from './types/IHandshakeOptions'
+import {clientHandshake} from './lib/Handshake'
 
 export enum DBusConnectionState {
     DISCONNECTED = 'DISCONNECTED',
@@ -10,7 +13,9 @@ export enum DBusConnectionState {
 
 export class DBusConnection extends EventEmitter {
 
-    #stream: Duplex
+    readonly #stream: Duplex
+
+    #guid: string | void
 
     #messageHandler: (msg: IDBusMessage) => void
 
@@ -41,6 +46,17 @@ export class DBusConnection extends EventEmitter {
         if (typeof (<any>this.#stream).setNoDelay === 'function') {
             (<any>this.#stream).setNoDelay()
         }
+    }
+
+    public async init(options?: IDBusConnectionOptions & IHandshakeOptions): Promise<void> {
+        if (this.#guid) return
+        this.#guid = await clientHandshake(this.#stream, options)
+        this.emit('connect')
+        this.#messageParser.parse(this.#stream, (msg: IDBusMessage): boolean => this.emit('message', msg), options)
+    }
+
+    public message(msg: IDBusMessage): void {
+        this.#messageHandler(msg)
     }
 
     public write(chunk: any): boolean {
