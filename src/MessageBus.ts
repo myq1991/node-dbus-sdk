@@ -4,13 +4,14 @@ import {IDBusMessage} from './types/IDBusMessage'
 import {messageType} from './lib/Constants'
 import {stdDbusIfaces} from './lib/StandardInterfaces'
 import {IObject} from './types/IObject'
+import {IHandshakeOptions} from './types/IHandshakeOptions'
 
 type Cookies = {
     [serial: number]: [(res?: any) => void, (err?: any) => void]
 }
 
 export class MessageBus {
-    #connection: DBusConnection
+    readonly #connection: DBusConnection
     #cookies: Cookies = {}
     #methodCallHandlers: Record<string, (...args: any) => any> = {}
     #signals: EventEmitter = new EventEmitter()
@@ -31,9 +32,13 @@ export class MessageBus {
         return this.#exportedObjects
     }
 
-    constructor(connection: DBusConnection) {
+    constructor(connection: DBusConnection, options: IHandshakeOptions = {}) {
         this.#connection = connection
         this.#connection.on('message', (msg: IDBusMessage): void => this.onMessage(msg))
+        // register name
+        if (options.direct !== true) {
+            this.invokeDBus({member: 'Hello'}).then((name: string): string => [this.#name] = name)
+        }
     }
 
     protected onMessage(msg: IDBusMessage): void {
@@ -259,18 +264,4 @@ export class MessageBus {
         }
         // TODO: emit ObjectManager's InterfaceAdded
     }
-
-    public getService() {
-        //TODO
-    }
-
-    public getObject() {
-        //TODO
-    }
-
-    public getInterface() {
-        //TODO
-    }
-
-
 }

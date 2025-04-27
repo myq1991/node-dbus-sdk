@@ -15,3 +15,11 @@
 export function isValidObjectPath(path: string): boolean {
     return /^(\/$)|(\/[A-Za-z0-9_]+)+$/.test(path)
 }
+
+export function uniqueArray<T>(arr: T[]): T[] {
+    return Array.from(new Set(arr))
+}
+
+export function As<T = any>(inp: any): T {
+    return inp as T
+}

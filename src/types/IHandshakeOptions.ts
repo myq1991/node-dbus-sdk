@@ -3,4 +3,5 @@ export interface IHandshakeOptions {
     uid?: number
     // Set false to enable more verbose objects
     simple?: boolean
+    direct?: boolean
 }
