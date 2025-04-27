@@ -42,16 +42,8 @@ export class DBus {
     }
 
     public async getServices(): Promise<string[]> {
-        const dbusObject:DBusObject=await this.getService('org.freedesktop.DBus').getObject('/org/freedesktop/DBus')
-        console.log('!!!!!',await dbusObject.getInterface('org.freedesktop.DBus').methods.ListNames.call())
-        let serviceNames: string[]
-        [serviceNames] = await this.bus.invoke({
-            type: messageType.methodCall,
-            member: 'ListNames',
-            path: '/org/freedesktop/DBus',
-            destination: 'org.freedesktop.DBus',
-            interface: 'org.freedesktop.DBus'
-        })
+        const dbusObject: DBusObject = await this.getService('org.freedesktop.DBus').getObject('/org/freedesktop/DBus')
+        const serviceNames: string[] = await dbusObject.getInterface('org.freedesktop.DBus').methods.ListNames.call()
         return serviceNames.filter((serviceName: string): boolean => !serviceName.startsWith(':'))
     }
 
