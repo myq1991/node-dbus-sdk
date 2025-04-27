@@ -10,16 +10,16 @@ export class DBusProperty {
 
     public readonly name: string
 
-    public readonly signature: string
+    public readonly type: string
 
     public readonly bus: MessageBus
 
-    constructor(service: string, objectPath: string, iface: string, property: string, signature: string, bus: MessageBus) {
+    constructor(service: string, objectPath: string, iface: string, property: string, type: string, bus: MessageBus) {
         this.service = service
         this.objectPath = objectPath
         this.interface = iface
         this.name = property
-        this.signature = signature
+        this.type = type
         this.bus = bus
     }
 
@@ -49,7 +49,7 @@ export class DBusProperty {
             interface: 'org.freedesktop.DBus.Properties',
             member: 'Set',
             signature: 'ssv',
-            body: [this.interface, this.name, [this.signature, value]]
+            body: [this.interface, this.name, [this.type, value]]
         })
     }
 }
