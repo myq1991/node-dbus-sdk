@@ -46,6 +46,7 @@ export class DBusMethod {
             message.signature = this.inputSignature
             message.body = args
         }
-        return await this.bus.invoke(message)
+        const result: any = await this.bus.invoke(message)
+        return Array.isArray(result) && result.length == 1 ? result[0] : result
     }
 }
