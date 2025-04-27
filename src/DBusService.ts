@@ -2,8 +2,10 @@ import {MessageBus} from './MessageBus'
 import {messageType} from './lib/Constants'
 import {parseStringPromise as parseXMLString} from 'xml2js'
 import {As, uniqueArray} from './lib/Helpers'
+import {DBusObject} from './DBusObject'
 
 export class DBusService {
+
     public readonly name: string
 
     public readonly bus: MessageBus
@@ -11,11 +13,6 @@ export class DBusService {
     constructor(service: string, bus: MessageBus) {
         this.name = service
         this.bus = bus
-    }
-
-    public async init(): Promise<this> {
-        await this.getServiceObjectPaths()
-        return this
     }
 
     protected async getServiceObjectPaths(): Promise<string[]> {
@@ -51,5 +48,13 @@ export class DBusService {
         const allObjectPaths: string[] = uniqueArray(await getSubNodes())
         if (!allObjectPaths.includes('/')) allObjectPaths.push('/')//将根路径加入列表
         return allObjectPaths.concat(emptyObjectPaths).filter(v => !allObjectPaths.includes(v) || !emptyObjectPaths.includes(v))
+    }
+
+    public async listObjects(): Promise<string[]> {
+        return await this.getServiceObjectPaths()
+    }
+
+    public async getObject(name: string): Promise<DBusObject> {
+        return await new DBusObject(this.name, name, this.bus).init()
     }
 }

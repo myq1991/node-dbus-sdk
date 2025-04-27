@@ -1,52 +1,19 @@
 import {MessageBus} from './MessageBus'
-import {messageType} from './lib/Constants'
-import {parseStringPromise as parseXMLString} from 'xml2js'
 import {As} from './lib/Helpers'
 import {DBusMethod} from './DBusMethod'
 import {DBusProperty} from './DBusProperty'
 import {DBusMethodArgumentDirection, IDBusMethodArgument} from './types/IDBusMethodArgument'
 import {DBusSignal} from './DBusSignal'
 import {IDBusSignalArgument} from './types/IDBusSignalArgument'
+import {
+    IntrospectInterface,
+    IntrospectInterfaceMethod,
+    IntrospectInterfaceMethodArg,
+    IntrospectInterfaceProperty,
+    IntrospectInterfaceSignal,
+    IntrospectInterfaceSignalArg
+} from './types/IntrospectTypes'
 
-type IntrospectInterface = {
-    $: { name: string }
-    method?: IntrospectInterfaceMethod[]
-    signal?: IntrospectInterfaceSignal[]
-    property?: IntrospectInterfaceProperty[]
-}
-
-type IntrospectInterfaceMethod = {
-    $: { name: string }
-    arg?: IntrospectInterfaceMethodArg[]
-}
-
-type IntrospectInterfaceMethodArg = {
-    $: {
-        type: string
-        name: string
-        direction: string
-    }
-}
-
-type IntrospectInterfaceSignal = {
-    $: { name: string }
-    arg?: IntrospectInterfaceSignalArg[]
-}
-
-type IntrospectInterfaceSignalArg = {
-    $: {
-        type: string
-        name: string
-    }
-}
-
-type IntrospectInterfaceProperty = {
-    $: {
-        type: string
-        name: string
-        access: string
-    }
-}
 
 export class DBusInterface {
 
@@ -77,29 +44,11 @@ export class DBusInterface {
         return Object.fromEntries(this.#signals)
     }
 
-    constructor(service: string, objectPath: string, iface: string, bus: MessageBus) {
+    constructor(service: string, objectPath: string, iface: string, introspectInterface: IntrospectInterface, bus: MessageBus) {
         this.service = service
         this.objectPath = objectPath
         this.name = iface
         this.bus = bus
-    }
-
-    public async init(): Promise<this> {
-        await this.reload()
-        return this
-    }
-
-    protected async reload(): Promise<void> {
-        let introspectXML: string
-        [introspectXML] = await this.bus.invoke({
-            type: messageType.methodCall,
-            member: 'Introspect',
-            path: this.objectPath,
-            destination: this.service,
-            interface: 'org.freedesktop.DBus.Introspectable'
-        })
-        const introspectObject: any = await parseXMLString(introspectXML)
-        const introspectInterface: IntrospectInterface | undefined = As<IntrospectInterface[]>(introspectObject.node.interface).find((iface: IntrospectInterface): boolean => iface.$.name === this.name)
         this.#methods.clear()
         this.#properties.clear()
         this.#signals.clear()
