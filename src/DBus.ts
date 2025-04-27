@@ -56,6 +56,7 @@ export class DBus {
     }
 
     protected async init(): Promise<this> {
+        //TODO 初始化函数需要做的事情
         this.bus.signals.on(this.bus.mangle({
             path: '/slot1/port4/stc',
             interface: 'org.freedesktop.DBus.Properties',
