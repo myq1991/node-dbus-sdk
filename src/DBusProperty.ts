@@ -12,14 +12,17 @@ export class DBusProperty {
 
     public readonly type: string
 
+    public readonly access: string
+
     public readonly bus: MessageBus
 
-    constructor(service: string, objectPath: string, iface: string, property: string, type: string, bus: MessageBus) {
+    constructor(service: string, objectPath: string, iface: string, property: string, type: string, access: string, bus: MessageBus) {
         this.service = service
         this.objectPath = objectPath
         this.interface = iface
         this.name = property
         this.type = type
+        this.access = access
         this.bus = bus
     }
 
