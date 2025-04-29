@@ -70,15 +70,15 @@ setImmediate(async () => {
     // ))
 
     console.log(await obj.getInterface('pad.stc').methods.sdsSetEntryVec.call([
-        [{index: 1}],
-        [{sid: 1}],
-        [{seqno: 1}],
-        [{enable: true}],
-        [{stcsig: true}],
-        [{pktsig: 1}],
-        [{type: 0}],
-        [{loop: 0}],
-        [{delay: 0}],
-        [{packet: Buffer.from('AQzNAQH/ABEiM0RVgQCgzIi4EjQAcwAAAABhaYASRGV2MS9MTE4wJEdPJGdjYjAxgQEUghFEZXYxL0xMTjAkRGF0U2V0MYMIR1NfZ2NiMDGECAAAAAAAAAAAhQEAhgEAhwEAiAEBiQEAigEDqxeFAQuiC4MBAYkGESIzRFVmhwUIwEhfww==', 'base64')}]
+        // [{index: 1}],
+        // [{sid: 1}],
+        // [{seqno: 1}],
+        // [{enable: true}],
+        // [{stcsig: true}],
+        // [{pktsig: 1}],
+        // [{type: 0}],
+        // [{loop: 0}],
+        // [{delay: 0}],
+        // [{packet: Buffer.from('AQzNAQH/ABEiM0RVgQCgzIi4EjQAcwAAAABhaYASRGV2MS9MTE4wJEdPJGdjYjAxgQEUghFEZXYxL0xMTjAkRGF0U2V0MYMIR1NfZ2NiMDGECAAAAAAAAAAAhQEAhgEAhwEAiAEBiQEAigEDqxeFAQuiC4MBAYkGESIzRFVmhwUIwEhfww==', 'base64')}]
     ]))
 })
