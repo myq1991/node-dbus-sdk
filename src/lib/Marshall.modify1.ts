@@ -61,12 +61,7 @@ export function marshall(signature: string, data: any, offset?: number): Buffer 
     }
     let putstream: Put = put()
     putstream._offset = offset
-    try {
-        return writeStruct(putstream, tree, data).buffer()
-    } catch (error) {
-        console.error('Marshalling failed:', error)
-        throw error // Re-throw for debugging, can be adjusted to return a default or handle gracefully
-    }
+    return writeStruct(putstream, tree, data).buffer()
 }
 
 function align(ps: Put, n: number) {
@@ -130,129 +125,104 @@ function inferVariantValue(value: any): [string, any] {
         } else {
             return ['d', value] // Double for floating-point
         }
+    } else if (Array.isArray(value)) {
+        // Basic support for arrays - assume array of bytes if Buffer, otherwise throw
+        throw new Error('Arrays in variants are not automatically inferred yet, except for Buffer')
     } else if (Buffer.isBuffer(value)) {
         // Handle Buffer as array of bytes (ay)
-        return ['ay', value] // Pass Buffer directly, handle in writeSimple or write for 'ay'
-    } else if (Array.isArray(value)) {
-        // Infer array type based on first element (if non-empty)
-        if (value.length === 0) {
-            return ['ai', value] // Default to array of integers for empty arrays
-        }
-        const firstElementSig = inferVariantValue(value[0])[0]
-        // Assume all elements are of the same type as the first for simplicity
-        return [`a${firstElementSig}`, value]
+        return ['ay', value]
     } else if (typeof value === 'object' && value !== null) {
-        // Treat objects as dictionaries with string keys and variant values (a{sv})
-        return ['a{sv}', value]
+        throw new Error('Objects in variants are not automatically inferred yet')
     } else {
         throw new Error(`Unsupported type for variant inference: ${typeof value}`)
     }
 }
 
 function write(ps: Put, ele: IType, data: any) {
-    try {
-        switch (ele.type) {
-            case '(':
-            case '{':
-                align(ps, 8)
-                if (ele.type === '{') {
-                    // Dictionary (key-value pairs)
-                    if (!ele.child || ele.child.length !== 2) {
-                        throw new Error('Dictionary signature must have exactly 2 children (key and value)')
-                    }
-                    writeHash(ps, ele.child[0], ele.child[1], data)
-                } else {
-                    // Struct
-                    writeStruct(ps, ele.child!, data)
+    switch (ele.type) {
+        case '(':
+        case '{':
+            align(ps, 8)
+            if (ele.type === '{') {
+                // Dictionary (key-value pairs)
+                if (!ele.child || ele.child.length !== 2) {
+                    throw new Error('Dictionary signature must have exactly 2 children (key and value)')
                 }
-                break
-            case 'a':
-                // Array serialisation:
-                let arrPut = put()
-                arrPut._offset = ps._offset
-                let _offset = arrPut._offset
-                writeSimple(arrPut, 'u', 0) // Array length placeholder
-                let lengthOffset = arrPut._offset - 4 - _offset
-                // Align if first body element needs 8-byte alignment
-                if (ele.child && ele.child.length > 0 && ['x', 't', 'd', '{', '('].indexOf(ele.child[0].type) !== -1) {
-                    align(arrPut, 8)
-                }
-                let startOffset = arrPut._offset
-                for (let i = 0; i < data.length; ++i) {
-                    write(arrPut, ele.child![0], data[i])
-                }
-                let arrBuff = arrPut.buffer()
-                let length = arrPut._offset - startOffset
-                arrBuff.writeUInt32LE(length, lengthOffset)
-                ps.put(arrBuff)
-                ps._offset += arrBuff.length
-                break
-            case 'v':
-                // Variant serialization: Write signature and then the data
-                if (!Array.isArray(data)) {
-                    data = inferVariantValue(data)
-                }
-                if (data.length !== 2) {
-                    throw new Error('Variant data should be [signature, data]')
-                }
-                let signatureEle = {
-                    type: 'g',
-                    child: []
-                }
-                write(ps, signatureEle as IType, data[0])
-                let tree = Signature.parseSignature(data[0])
-                if (tree.length !== 1) {
-                    throw new Error('Variant data should contain exactly 1 item')
-                }
-                write(ps, tree[0], data[1])
-                break
-            default:
-                return writeSimple(ps, ele.type, data)
-        }
-        return ps
-    } catch (error) {
-        console.error(`Error writing data for type ${ele.type}:`, error)
-        throw error
+                writeHash(ps, ele.child[0], ele.child[1], data)
+            } else {
+                // Struct
+                writeStruct(ps, ele.child!, data)
+            }
+            break
+        case 'a':
+            // Array serialisation:
+            let arrPut = put()
+            arrPut._offset = ps._offset
+            let _offset = arrPut._offset
+            writeSimple(arrPut, 'u', 0) // Array length placeholder
+            let lengthOffset = arrPut._offset - 4 - _offset
+            // Align if first body element needs 8-byte alignment
+            if (ele.child && ele.child.length > 0 && ['x', 't', 'd', '{', '('].indexOf(ele.child[0].type) !== -1) {
+                align(arrPut, 8)
+            }
+            let startOffset = arrPut._offset
+            for (let i = 0; i < data.length; ++i) {
+                write(arrPut, ele.child![0], data[i])
+            }
+            let arrBuff = arrPut.buffer()
+            let length = arrPut._offset - startOffset
+            arrBuff.writeUInt32LE(length, lengthOffset)
+            ps.put(arrBuff)
+            ps._offset += arrBuff.length
+            break
+        case 'v':
+            // Variant serialization: Write signature and then the data
+            // If data is a simple type (not an array of [signature, value]), infer the signature
+            if (!Array.isArray(data)) {
+                data = inferVariantValue(data)
+            }
+            if (data.length !== 2) {
+                throw new Error('Variant data should be [signature, data]')
+            }
+            let signatureEle = {
+                type: 'g',
+                child: []
+            }
+            write(ps, signatureEle as IType, data[0])
+            let tree = Signature.parseSignature(data[0])
+            if (tree.length !== 1) {
+                throw new Error('Variant data should contain exactly 1 item')
+            }
+            write(ps, tree[0], data[1])
+            break
+        default:
+            return writeSimple(ps, ele.type, data)
     }
+    return ps
 }
 
 let stringTypes = ['g', 'o', 's']
 
 function writeSimple(ps: Put, type: string, data: any) {
-    try {
-        if (typeof data === 'undefined') {
-            throw new Error('Serialisation of JS \'undefined\' type is not supported by d-bus')
-        }
-        if (data === null) {
-            throw new Error('Serialisation of null value is not supported by d-bus')
-        }
-
-        // Do not convert Buffer to string here; handle it based on type (e.g., 'y' for bytes in array)
-        if (stringTypes.indexOf(type) !== -1 && typeof data !== 'string') {
-            throw new Error(
-                `Expected string or buffer argument, got ${JSON.stringify(
-                    data
-                )} of type '${type}'`
-            )
-        }
-
-        // Special handling for 'y' (byte) in arrays of bytes (ay)
-        if (type === 'y' && typeof data === 'number') {
-            if (data < 0 || data > 255) {
-                throw new Error(`Byte value out of range (0-255): ${data}`)
-            }
-            ps.word8(data)
-            ps._offset++
-            return ps
-        }
-
-        let simpleMarshaller = MakeSimpleMarshaller(type)
-        simpleMarshaller.marshall(ps, data)
-        return ps
-    } catch (error) {
-        console.error(`Error in writeSimple for type ${type}:`, error)
-        throw error
+    if (typeof data === 'undefined') {
+        throw new Error('Serialisation of JS \'undefined\' type is not supported by d-bus')
     }
+    if (data === null) {
+        throw new Error('Serialisation of null value is not supported by d-bus')
+    }
+
+    if (Buffer.isBuffer(data)) data = data.toString()
+    if (stringTypes.indexOf(type) !== -1 && typeof data !== 'string') {
+        throw new Error(
+            `Expected string or buffer argument, got ${JSON.stringify(
+                data
+            )} of type '${type}'`
+        )
+    }
+
+    let simpleMarshaller = MakeSimpleMarshaller(type)
+    simpleMarshaller.marshall(ps, data)
+    return ps
 }
 
 /**
@@ -376,7 +346,7 @@ export function MakeSimpleMarshaller(signature: string) {
                 this.check(data)
                 align(ps, 2)
                 const buff = Buffer.alloc(2)
-                buff.writeInt16LE(parseInt(data as any), 0)
+                buff.writeInt16LE(parseInt(data.toString()), 0)
                 ps.put(buff)
                 ps._offset += 2
             }
@@ -402,7 +372,7 @@ export function MakeSimpleMarshaller(signature: string) {
                 this.check(data)
                 align(ps, 4)
                 const buff = Buffer.alloc(4)
-                buff.writeInt32LE(parseInt(data as any), 0)
+                buff.writeInt32LE(parseInt(data.toString()), 0)
                 ps.put(buff)
                 ps._offset += 4
             }
@@ -455,7 +425,7 @@ export function MakeSimpleMarshaller(signature: string) {
                 this.check(data)
                 align(ps, 8)
                 const buff = Buffer.alloc(8)
-                buff.writeDoubleLE(parseFloat(data as any), 0)
+                buff.writeDoubleLE(parseFloat(data.toString()), 0)
                 ps.put(buff)
                 ps._offset += 8
             }

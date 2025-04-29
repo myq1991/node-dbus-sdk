@@ -28,7 +28,7 @@ export class DBusMethod {
         this.inputSignature = this.args
             .filter((arg: IDBusMethodArgument): boolean => arg.direction === DBusMethodArgumentDirection.IN)
             .map((arg: IDBusMethodArgument): string => arg.type)
-            .join()
+            .join('')
     }
 
     /**

@@ -73,7 +73,6 @@ export class DBus {
             signature: 's',
             body: ['type=signal'] // 匹配所有信号类型
         })
-        console.log(await this.getServices())
         return this
     }
 
