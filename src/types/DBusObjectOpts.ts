@@ -1,5 +1,5 @@
-import {DBusService} from '../DBusService'
+import {DBusServiceOpts} from './DBusServiceOpts'
 
-export interface DBusObjectOpts extends DBusService {
+export interface DBusObjectOpts extends DBusServiceOpts {
     readonly objectPath: string
 }
