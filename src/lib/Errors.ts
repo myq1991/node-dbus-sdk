@@ -1,3 +1,8 @@
+export class TimeoutError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1000
+    code: string = 'E_TIMEOUT'
+}
+
 export class UnknownBusAddressError extends Error implements NodeJS.ErrnoException {
     errno: number = 1001
     code: string = 'E_UNKNOWN_BUS_ADDR'

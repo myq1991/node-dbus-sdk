@@ -5,7 +5,7 @@ import {ConnectOpts} from '../types/ConnectOpts'
 import {
     AuthError,
     CreateStreamFailedError,
-    NotEnoughParamsError,
+    NotEnoughParamsError, TimeoutError,
     UnknownBusAddressError,
     UnknownBusTypeError,
     UserPermissionError
@@ -16,10 +16,14 @@ import {Stats} from 'node:fs'
 import {readFile, stat} from 'node:fs/promises'
 import {HandshakeOpts} from '../types/HandshakeOpts'
 import EventEmitter from 'node:events'
+import {Socket} from 'node:net'
+import {NetConnectOpts} from 'net'
 
 export class DBusConnection extends EventEmitter {
 
     protected static defaultAuthMethods: string[] = ['EXTERNAL', 'DBUS_COOKIE_SHA1', 'ANONYMOUS']
+
+    protected static defaultConnectTimeout: number = 20000
 
     /**
      * Sha1 hash
@@ -153,24 +157,63 @@ export class DBusConnection extends EventEmitter {
     }
 
     /**
+     * Create duplex stream
+     * @param opts
+     * @protected
+     */
+    protected static async createDuplexStream(opts: NetConnectOpts): Promise<Duplex> {
+        return new Promise((resolve, reject) => {
+            const socket: Socket = net.createConnection(opts)
+            const clean: (callback: () => void) => void = (callback: () => void): void => {
+                socket
+                    .off('timeout', timeoutHandler)
+                    .off('error', errorHandler)
+                    .off('connect', connectHandler)
+                return callback()
+            }
+            const createResolve: () => void = (): void => clean((): void => resolve(socket))
+            const createReject: (error: Error) => void = (error: Error): void => clean((): void => reject(error))
+            const timeoutHandler: () => void = (): void => {
+                socket.destroy()
+                return createReject(new TimeoutError(`Connect timeout after ${opts.timeout} seconds`))
+            }
+            const errorHandler: (error: Error) => void = (error: Error): void => createReject(error)
+            const connectHandler: () => void = (): void => createResolve()
+            socket
+                .once('timeout', timeoutHandler)
+                .once('error', errorHandler)
+                .once('connect', connectHandler)
+        })
+    }
+
+    /**
      * Create TCP stream
+     * @param timeout
      * @param port
      * @param host
      * @protected
      */
-    protected static createTCPStream(port: number | string, host?: string): Duplex {
+    protected static async createTCPStream(timeout: number, port: number | string, host?: string): Promise<Duplex> {
         port = parseInt(port.toString())
         host = host ? host : 'localhost'
-        return net.createConnection(port, host)
+        return await this.createDuplexStream({
+            port: port,
+            host: host,
+            timeout: timeout
+        })
     }
 
     /**
      * Create Unix stream
+     * @param timeout
      * @param addr
      * @protected
      */
-    protected static createUnixStream(addr: string): Duplex {
-        return net.createConnection(addr)
+    protected static async createUnixStream(timeout: number, addr: string): Promise<Duplex> {
+        return this.createDuplexStream({
+            path: addr,
+            timeout: timeout
+        })
     }
 
     /**
@@ -178,21 +221,21 @@ export class DBusConnection extends EventEmitter {
      * @param opts
      * @protected
      */
-    protected static createStream(opts?: ConnectOpts): Duplex {
+    protected static async createStream(opts?: ConnectOpts): Promise<Duplex> {
         opts = opts ? opts : {}
         if ('stream' in opts) {
             return opts.stream
         }
         if ('socket' in opts) {
-            return this.createUnixStream(opts.socket)
+            return this.createUnixStream(opts.timeout ? opts.timeout : this.defaultConnectTimeout, opts.socket)
         }
         if ('port' in opts) {
-            return this.createTCPStream(opts.port, opts.host)
+            return this.createTCPStream(opts.timeout ? opts.timeout : this.defaultConnectTimeout, opts.port, opts.host)
         }
         const busAddress: string | undefined = opts.busAddress || process.env.DBUS_SESSION_BUS_ADDRESS
         if (!busAddress) throw new UnknownBusAddressError('Unknown bus address')
         const addresses: string[] = busAddress.split(';')
-        const addressConnectErrorHandler: (e: Error, isLastAddress: boolean) => void = (e: Error, isLastAddress: boolean): void => {
+        const connectErrorHandler: (e: Error, isLastAddress: boolean) => void = (e: Error, isLastAddress: boolean): void => {
             if (isLastAddress) throw e
             console.warn(e.message)
         }
@@ -205,12 +248,12 @@ export class DBusConnection extends EventEmitter {
             familyParams[1].split(',').map((param: string): string[] => param.split('=')).forEach(([key, value]): string => params[key] = value)
             switch (family) {
                 case 'tcp':
-                    return this.createTCPStream(params.port, params.host)
+                    return this.createTCPStream(opts.timeout ? opts.timeout : this.defaultConnectTimeout, params.port, params.host)
                 case 'unix':
-                    if (!params.socket && !params.path) addressConnectErrorHandler(new NotEnoughParamsError('Not enough parameters for \'unix\' connection - you need to specify \'socket\' or \'path\' parameter'), isLastAddress)
-                    return this.createUnixStream(params.socket || params.path)
+                    if (!params.socket && !params.path) connectErrorHandler(new NotEnoughParamsError('Not enough parameters for \'unix\' connection - you need to specify \'socket\' or \'path\' parameter'), isLastAddress)
+                    return this.createUnixStream(opts.timeout ? opts.timeout : this.defaultConnectTimeout, params.socket || params.path)
                 default:
-                    addressConnectErrorHandler(new UnknownBusTypeError(`Unknown address type: ${family}`), isLastAddress)
+                    connectErrorHandler(new UnknownBusTypeError(`Unknown address type: ${family}`), isLastAddress)
             }
         }
         throw new CreateStreamFailedError('Create stream failed')
@@ -222,7 +265,7 @@ export class DBusConnection extends EventEmitter {
      */
     public static async createConnection(opts?: CreateConnectOpts): Promise<DBusConnection> {
         opts = opts ? opts : {}
-        const stream: Duplex = this.createStream(opts)
+        const stream: Duplex = await this.createStream(opts)
         const [authMethod, uid, guid] = await this.handshake(stream, opts)
         return new DBusConnection(stream, authMethod, uid, guid)
     }
@@ -288,7 +331,6 @@ export class DBusConnection extends EventEmitter {
         //TODO
         if ('setNoDelay' in this.#stream && typeof this.#stream.setNoDelay === 'function') this.#stream.setNoDelay()
     }
-
 
 
     /**
