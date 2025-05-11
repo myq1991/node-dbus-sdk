@@ -32,3 +32,8 @@ export class AuthError extends Error implements NodeJS.ErrnoException {
     errno: number = 1006
     code: string = 'E_AUTH'
 }
+
+export class SignatureError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1007
+    code: string = 'E_SIGNATURE'
+}

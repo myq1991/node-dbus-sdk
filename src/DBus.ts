@@ -6,6 +6,8 @@ import {DBusConnection} from './lib/DBusConnection'
 
 export class DBus {
 
+    #connection: DBusConnection
+
     /**
      * Connect to DBus
      * @param opts
@@ -19,6 +21,7 @@ export class DBus {
      * @param connection
      */
     constructor(connection: DBusConnection) {
+        this.#connection = connection
         //TODO
     }
 

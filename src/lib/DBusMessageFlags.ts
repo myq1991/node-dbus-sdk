@@ -1,0 +1,6 @@
+export enum DBusMessageFlags {
+    REPLY_EXPECTED = 0x00,
+    NO_REPLY_EXPECTED = 0x01,
+    NO_AUTO_START = 0x02,
+    ALLOW_INTERACTIVE_AUTH = 0x04
+}

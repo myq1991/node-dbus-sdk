@@ -18,6 +18,8 @@ import {HandshakeOpts} from '../types/HandshakeOpts'
 import EventEmitter from 'node:events'
 import {Socket} from 'node:net'
 import {NetConnectOpts} from 'net'
+import {Key} from 'node:readline'
+import {DBusMessage} from './DBusMessage'
 
 export class DBusConnection extends EventEmitter {
 
@@ -328,10 +330,35 @@ export class DBusConnection extends EventEmitter {
         this.#authMethod = authMethod
         this.#uid = parseInt(uid)
         this.#guid = guid
-        //TODO
+        let state: boolean = false // false: header, true: fields + body
+        let header: Buffer
+        let fieldsAndBody: Buffer
+        let fieldsLength: number
+        let fieldsLengthPadded: number
+        let fieldsAndBodyLength: number = 0
+        let bodyLength: number = 0
+        this.#stream.on('close', (): boolean => this.emit('close'))
+            .on('error', (error: Error): boolean => this.emit('error', error))
+            .on('readable', (): void => {
+                while (true) {
+                    if (!state) {
+                        header = stream.read(16)
+                        if (!header) break
+                        state = true
+                        fieldsLength = header.readUInt32LE(12)
+                        fieldsLengthPadded = ((fieldsLength + 7) >> 3) << 3
+                        bodyLength = header.readUInt32LE(4)
+                        fieldsAndBodyLength = fieldsLengthPadded + bodyLength
+                    } else {
+                        fieldsAndBody = stream.read(fieldsAndBodyLength)
+                        if (!fieldsAndBody) break
+                        state = false
+                        this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength))
+                    }
+                }
+            })
         if ('setNoDelay' in this.#stream && typeof this.#stream.setNoDelay === 'function') this.#stream.setNoDelay()
     }
-
 
     /**
      * Write data
@@ -346,6 +373,24 @@ export class DBusConnection extends EventEmitter {
      */
     public end(): this {
         this.#stream.end()
+        return this
+    }
+
+    public on(eventName: 'message', listener: (message: DBusMessage) => void): this
+    public on(eventName: 'close', listener: () => void): this
+    public on(eventName: 'error', listener: (error: Error) => void): this
+    public on(eventName: string, listener: (...args: any[]) => void): this
+    public on(eventName: string, listener: (...args: any[]) => void): this {
+        super.on(eventName, listener)
+        return this
+    }
+
+    public once(eventName: 'message', listener: (message: DBusMessage) => void): this
+    public once(eventName: 'close', listener: () => void): this
+    public once(eventName: 'error', listener: (error: Error) => void): this
+    public once(eventName: string, listener: (...args: any[]) => void): this
+    public once(eventName: string, listener: (...args: any[]) => void): this {
+        super.once(eventName, listener)
         return this
     }
 }
