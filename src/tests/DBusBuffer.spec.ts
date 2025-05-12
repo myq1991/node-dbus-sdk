@@ -13,7 +13,7 @@ function DBusBufferSpecTest(signature: string, data: any): void {
         const readData = reader.read(signature)
         console.log('Read Data:', JSON.stringify(readData, null, 2))
     } catch (error: any) {
-        console.error('Error:', error.message)
+        console.error('Error:', error)
     } finally {
         console.log('\n')
     }
@@ -106,3 +106,45 @@ export function runDBusBufferTestSet(): void {
     TestSet.forEach(testData => DBusBufferSpecTest(testData.signature, testData.data))
 }
 
+export function runDBusBufferReadArrayTestSet() {
+    // const rawBuf: Buffer = Buffer.from([6, 1, 115, 0, 5, 0, 0, 0, 58, 49, 46, 55, 51, 0, 0, 0, 5, 1, 117, 0, 1, 0, 0, 0, 8, 1, 103, 0, 1, 115, 0, 0, 7, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 5, 0, 0, 0, 58, 49, 46, 55, 51, 0])
+    // const eleType = {
+    //     type: '(',
+    //     child: [{type: 'y', child: []}, {type: 'v', child: []}]
+    // }
+    //
+    // new DBusBuffer(rawBuf).readArray(eleType as any,71)
+
+
+    const rawBuf: Buffer = Buffer.from([108, 2, 1, 1, 10, 0, 0, 0, 1, 0, 0, 0, 61, 0, 0, 0, 6, 1, 115, 0, 5, 0, 0, 0, 58, 49, 46, 55, 57, 0, 0, 0, 5, 1, 117, 0, 1, 0, 0, 0, 8, 1, 103, 0, 1, 115, 0, 0, 7, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 5, 0, 0, 0, 58, 49, 46, 55, 57, 0])
+    const reader = new DBusBuffer(rawBuf)
+
+    const message = reader.readMessage()
+    console.log('Parsed Message:', JSON.stringify(message, null, 2))
+
+// // 解析消息头的基本字段
+//     const endianness = reader.readInt8() // 字节序，0x6C ('l') 表示小端序
+//     const messageType = reader.readInt8() // 消息类型，0x02 (METHOD_RETURN)
+//     const flags = reader.readInt8() // 标志，0x01
+//     const protocolVersion = reader.readInt8() // 协议版本，0x01
+//     const bodyLength = reader.readInt32() // 消息体长度，10 字节
+//     const serial = reader.readInt32() // 序列号，1
+//     const headerFieldsLength = reader.readInt32() // 头部字段数组长度，61 字节
+//
+//     console.log('Header Info:', {
+//         endianness: String.fromCharCode(endianness),
+//         messageType,
+//         flags,
+//         protocolVersion,
+//         bodyLength,
+//         serial,
+//         headerFieldsLength
+//     })
+//
+// // 读取头部字段数组 (a(yv))
+//     const headerFields = reader.readArray(
+//         {type: '(', child: [{type: 'y', child: []}, {type: 'v', child: []}]},
+//         headerFieldsLength
+//     )
+//     console.log('Header Fields:', JSON.stringify(headerFields, null, 2))
+}

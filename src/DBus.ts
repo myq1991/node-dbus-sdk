@@ -3,6 +3,7 @@ import {DBusObject} from './DBusObject'
 import {DBusInterface} from './DBusInterface'
 import {ConnectOpts} from './types/ConnectOpts'
 import {DBusConnection} from './lib/DBusConnection'
+import {DBusMessage} from './lib/DBusMessage'
 
 export class DBus {
 
@@ -16,12 +17,42 @@ export class DBus {
         return new DBus(await DBusConnection.createConnection(opts))
     }
 
+    public write() {
+        // const buf=new DBusMessage({
+        //     serial: 1,
+        //     destination: 'org.ptswitch.pad',
+        //     path: '/slot1/port1/stc',
+        //     interfaceName: 'pad.stc',
+        //     member: 'portGetSpeed'
+        // }).toBuffer()
+
+        // const buf = new DBusMessage({
+        //     serial: 1,
+        //     type: 1,
+        //     destination: 'org.freedesktop.DBus',
+        //     path: '/org/freedesktop/DBus',
+        //     interfaceName: 'org.freedesktop.DBus',
+        //     member: 'Hello'
+        // }).toBuffer()
+        const buf = DBusMessage.encode({
+            serial: 1,
+            type: 1,
+            destination: 'org.freedesktop.DBus',
+            path: '/org/freedesktop/DBus',
+            interfaceName: 'org.freedesktop.DBus',
+            member: 'Hello'
+        })
+        this.#connection.write(buf)
+        // this.#connection.write(Buffer.from([108,1,0,1,0,0,0,0,1,0,0,0,109,0,0,0,1,1,111,0,21,0,0,0,47,111,114,103,47,102,114,101,101,100,101,115,107,116,111,112,47,68,66,117,115,0,0,0,2,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0,3,1,115,0,5,0,0,0,72,101,108,108,111,0,0,0,6,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0]))
+    }
+
     /**
      * DBus constructor
      * @param connection
      */
     constructor(connection: DBusConnection) {
         this.#connection = connection
+        this.#connection.on('message', console.log)
         //TODO
     }
 

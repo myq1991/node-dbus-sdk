@@ -37,3 +37,8 @@ export class SignatureError extends Error implements NodeJS.ErrnoException {
     errno: number = 1007
     code: string = 'E_SIGNATURE'
 }
+
+export class SerialError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1008
+    code: string = 'E_SERIAL'
+}

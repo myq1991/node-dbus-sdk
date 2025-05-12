@@ -83,38 +83,17 @@ export class DBusBuffer {
     }
 
     /**
-     * Aligns the current position to the specified boundary (e.g., 4-byte or 8-byte alignment) for writing.
+     * Aligns the current position to the specified boundary (e.g., 4-byte or 8-byte alignment).
      * @param boundary - The alignment boundary (e.g., 4 for 32-bit, 8 for 64-bit).
      */
-    #alignWrite(boundary: number): void {
+    #align(boundary: number): void {
         const remainder = this.#position % boundary
         if (remainder !== 0) {
             const padding = boundary - remainder
-            this.#ensureSpace(padding)
-            for (let i = 0; i < padding; i++) {
-                this.#buffer.writeUInt8(0, this.#position + i) // Write padding bytes as 0
-            }
             this.#position += padding
-        }
-    }
-
-    /**
-     * Aligns the current position to the specified boundary (e.g., 4-byte or 8-byte alignment) for reading.
-     * @param boundary - The alignment boundary (e.g., 4 for 32-bit, 8 for 64-bit).
-     * @param requiredSpace - Optional additional space required after alignment.
-     * @throws {RangeError} If the aligned position exceeds the Buffer length or if required space after alignment is not available.
-     */
-    #alignRead(boundary: number, requiredSpace: number = 0): void {
-        const remainder = this.#position % boundary
-        if (remainder !== 0) {
-            const padding = boundary - remainder
-            const newPosition = this.#position + padding
-            if (newPosition > this.#buffer.length || newPosition + requiredSpace > this.#buffer.length) {
-                throw new RangeError(`Buffer out of range after alignment: position ${newPosition} (with required space ${requiredSpace}) exceeds length ${this.#buffer.length}`)
+            if (this.#position > this.#buffer.length) {
+                this.#position = this.#buffer.length
             }
-            this.#position = newPosition
-        } else if (this.#position + requiredSpace > this.#buffer.length) {
-            throw new RangeError(`Buffer out of range after alignment check: position ${this.#position + requiredSpace} exceeds length ${this.#buffer.length}`)
         }
     }
 
@@ -141,7 +120,10 @@ export class DBusBuffer {
      * @throws {RangeError} If the current position plus 2 bytes exceeds the Buffer length.
      */
     public readSInt16(): number {
-        this.#alignRead(2, 2) // 16-bit alignment
+        this.#align(2) // 16-bit alignment
+        if (this.#position + 2 > this.#buffer.length) {
+            throw new RangeError(`Buffer out of range: position ${this.#position + 2} exceeds length ${this.#buffer.length}`)
+        }
         const res: number = this.#buffer.readInt16LE(this.#position)
         this.#position += 2
         return res
@@ -154,7 +136,10 @@ export class DBusBuffer {
      * @throws {RangeError} If the current position plus 2 bytes exceeds the Buffer length.
      */
     public readInt16(): number {
-        this.#alignRead(2, 2) // 16-bit alignment
+        this.#align(2) // 16-bit alignment
+        if (this.#position + 2 > this.#buffer.length) {
+            throw new RangeError(`Buffer out of range: position ${this.#position + 2} exceeds length ${this.#buffer.length}`)
+        }
         const res: number = this.#buffer.readUInt16LE(this.#position)
         this.#position += 2
         return res
@@ -167,7 +152,10 @@ export class DBusBuffer {
      * @throws {RangeError} If the current position plus 4 bytes exceeds the Buffer length.
      */
     public readSInt32(): number {
-        this.#alignRead(4, 4) // 32-bit alignment
+        this.#align(4) // 32-bit alignment
+        if (this.#position + 4 > this.#buffer.length) {
+            throw new RangeError(`Buffer out of range: position ${this.#position + 4} exceeds length ${this.#buffer.length}`)
+        }
         const res: number = this.#buffer.readInt32LE(this.#position)
         this.#position += 4
         return res
@@ -180,11 +168,14 @@ export class DBusBuffer {
      * @throws {RangeError} If the current position plus 4 bytes exceeds the Buffer length or if the value is negative.
      */
     public readInt32(): number {
-        this.#alignRead(4, 4) // 32-bit alignment
+        this.#align(4) // 32-bit alignment
+        if (this.#position + 4 > this.#buffer.length) {
+            throw new RangeError(`Buffer out of range: position ${this.#position + 4} exceeds length ${this.#buffer.length}`)
+        }
         const res: number = this.#buffer.readUInt32LE(this.#position)
         this.#position += 4
-        if (res < 0) {
-            throw new RangeError(`Invalid value read: ${res} at position ${this.#position - 4}`)
+        if (res < 0 || res > this.#buffer.length * 2) { // Arbitrary max to avoid huge values
+            throw new RangeError(`Invalid length value read: ${res} at position ${this.#position - 4}`)
         }
         return res
     }
@@ -196,7 +187,10 @@ export class DBusBuffer {
      * @throws {RangeError} If the current position plus 8 bytes exceeds the Buffer length.
      */
     public readSInt64(): bigint {
-        this.#alignRead(8, 8) // 64-bit alignment
+        this.#align(8) // 64-bit alignment
+        if (this.#position + 8 > this.#buffer.length) {
+            throw new RangeError(`Buffer out of range: position ${this.#position + 8} exceeds length ${this.#buffer.length}`)
+        }
         return BigInt(Long.fromBits(this.readInt32(), this.readInt32(), false).toString())
     }
 
@@ -207,7 +201,10 @@ export class DBusBuffer {
      * @throws {RangeError} If the current position plus 8 bytes exceeds the Buffer length.
      */
     public readInt64(): bigint {
-        this.#alignRead(8, 8) // 64-bit alignment
+        this.#align(8) // 64-bit alignment
+        if (this.#position + 8 > this.#buffer.length) {
+            throw new RangeError(`Buffer out of range: position ${this.#position + 8} exceeds length ${this.#buffer.length}`)
+        }
         return BigInt(Long.fromBits(this.readInt32(), this.readInt32(), true).toString())
     }
 
@@ -218,7 +215,10 @@ export class DBusBuffer {
      * @throws {RangeError} If the current position plus 8 bytes exceeds the Buffer length.
      */
     public readDouble(): number {
-        this.#alignRead(8, 8) // 64-bit alignment
+        this.#align(8) // 64-bit alignment
+        if (this.#position + 8 > this.#buffer.length) {
+            throw new RangeError(`Buffer out of range: position ${this.#position + 8} exceeds length ${this.#buffer.length}`)
+        }
         const res: number = this.#buffer.readDoubleLE(this.#position)
         this.#position += 8
         return res
@@ -240,8 +240,8 @@ export class DBusBuffer {
             return ''
         }
         // Ensure alignment for string content if needed, but length prefix should already be aligned
-        if (len > this.#buffer.length - this.#position) {
-            throw new RangeError(`Buffer out of range for string length ${len}: position ${this.#position + len} exceeds length ${this.#buffer.length}`)
+        if (this.#position + len > this.#buffer.length) {
+            throw new RangeError(`Buffer out of range: position ${this.#position + len} exceeds length ${this.#buffer.length}`)
         }
         const res = this.#buffer.toString('utf8', this.#position, this.#position + len)
         this.#position += len
@@ -259,9 +259,6 @@ export class DBusBuffer {
      * @throws {SignatureError} If the array element signature is incorrect.
      */
     public readTree(tree: Record<string, any>): any {
-        if (this.#position >= this.#buffer.length) {
-            throw new RangeError(`Buffer out of range while reading at position ${this.#position}`)
-        }
         switch (tree.type) {
             case '(':
             case '{':
@@ -270,12 +267,7 @@ export class DBusBuffer {
             case 'a':
                 if (!tree.child || tree.child.length !== 1)
                     throw new SignatureError('Incorrect array element signature')
-                this.#alignRead(4, 4) // Align before reading array length
                 let arrayBlobLength = this.readInt32()
-                // Ensure array length does not exceed remaining buffer
-                if (arrayBlobLength > this.#buffer.length - this.#position) {
-                    throw new RangeError(`Invalid array blob length ${arrayBlobLength} at position ${this.#position - 4}`)
-                }
                 return this.readArray(tree.child[0], arrayBlobLength)
             case 'v':
                 return this.readVariant()
@@ -344,7 +336,10 @@ export class DBusBuffer {
         // Handle known signature types manually to avoid parsing errors
         if (signature === 's' || signature === 'o') {
             // For string or object path, read the actual data with aligned length
-            this.#alignRead(4, 4) // Align for string length prefix
+            this.#align(4) // Align for string length prefix
+            if (this.#position + 4 > this.#buffer.length) {
+                throw new RangeError(`Buffer out of range for string length at position ${this.#position}`)
+            }
             const strLen = this.readInt32()
             if (strLen < 0 || strLen > this.#buffer.length - this.#position) {
                 return ''
@@ -352,11 +347,17 @@ export class DBusBuffer {
             return this.readString(strLen)
         } else if (signature === 'u') {
             // For unsigned integer, read aligned value
-            this.#alignRead(4, 4)
+            this.#align(4)
+            if (this.#position + 4 > this.#buffer.length) {
+                throw new RangeError(`Buffer out of range for uint32 at position ${this.#position}`)
+            }
             return this.readInt32()
         } else if (signature === 'i') {
             // For signed integer, read aligned value
-            this.#alignRead(4, 4)
+            this.#align(4)
+            if (this.#position + 4 > this.#buffer.length) {
+                throw new RangeError(`Buffer out of range for int32 at position ${this.#position}`)
+            }
             return this.readSInt32()
         } else {
             try {
@@ -379,15 +380,9 @@ export class DBusBuffer {
      * @returns An array of values read from the Buffer, corresponding to the struct's child types.
      */
     public readStruct(struct: Record<string, any>): any[] {
-        this.#alignRead(8) // Structs often start at 8-byte alignment in DBus
-        if (this.#position >= this.#buffer.length) {
-            throw new RangeError(`Buffer out of range while reading struct at position ${this.#position}`)
-        }
+        this.#align(8) // Structs often start at 8-byte alignment in DBus
         const result: any[] = []
         for (let i: number = 0; i < struct.length; ++i) {
-            if (this.#position >= this.#buffer.length) {
-                break // Stop if buffer is exhausted
-            }
             result.push(this.readTree(struct[i]))
         }
         return result
@@ -429,9 +424,6 @@ export class DBusBuffer {
             isVariant = true
         }
         while (this.#position < end) {
-            if (this.#position >= this.#buffer.length) {
-                break // Stop if buffer is exhausted
-            }
             let item
             if (isVariant) {
                 item = this.readVariant()
@@ -496,6 +488,11 @@ export class DBusBuffer {
 
     /**
      * Reads a complete DBus message from the Buffer, including header and body.
+     * @returns An object containing the parsed header and body.
+     * @throws {RangeError} If the Buffer position exceeds the length during reading.
+     */
+    /**
+     * Reads a complete DBus message from the Buffer, including header and body.
      * @returns An object containing the parsed header and body. Body is undefined if bodyLength is 0.
      * @throws {RangeError} If the Buffer position exceeds the length during reading.
      */
@@ -550,10 +547,15 @@ export class DBusBuffer {
         let body: any | undefined = undefined
         if (bodyLength > 0) {
             if (signature && (signature === 's' || signature === 'o')) {
-                this.#alignRead(4, 4) // Align for string length prefix
-                const strLen = this.readInt32()
-                if (strLen >= 0 && this.#position + strLen <= this.#buffer.length) {
-                    body = this.readString(strLen)
+                this.#align(4) // Align for string length prefix
+                if (this.#position + 4 <= this.#buffer.length) {
+                    const strLen = this.readInt32()
+                    if (strLen >= 0 && this.#position + strLen <= this.#buffer.length) {
+                        body = this.readString(strLen)
+                    } else {
+                        body = this.#buffer.subarray(this.#position, Math.min(this.#position + bodyLength, this.#buffer.length))
+                        this.#position += bodyLength
+                    }
                 } else {
                     body = this.#buffer.subarray(this.#position, Math.min(this.#position + bodyLength, this.#buffer.length))
                     this.#position += bodyLength
@@ -573,6 +575,7 @@ export class DBusBuffer {
 
         return {header, body}
     }
+
 
     // Write Methods
 
@@ -597,7 +600,6 @@ export class DBusBuffer {
      */
     public writeSInt16(value: number): this {
         this.#ensureSpace(2)
-        this.#alignWrite(2)
         this.#buffer.writeInt16LE(value, this.#position)
         this.#position += 2
         return this
@@ -611,7 +613,6 @@ export class DBusBuffer {
      */
     public writeInt16(value: number): this {
         this.#ensureSpace(2)
-        this.#alignWrite(2)
         this.#buffer.writeUInt16LE(value, this.#position)
         this.#position += 2
         return this
@@ -625,7 +626,6 @@ export class DBusBuffer {
      */
     public writeSInt32(value: number): this {
         this.#ensureSpace(4)
-        this.#alignWrite(4)
         this.#buffer.writeInt32LE(value, this.#position)
         this.#position += 4
         return this
@@ -639,7 +639,6 @@ export class DBusBuffer {
      */
     public writeInt32(value: number): this {
         this.#ensureSpace(4)
-        this.#alignWrite(4)
         this.#buffer.writeUInt32LE(value, this.#position)
         this.#position += 4
         return this
@@ -653,7 +652,6 @@ export class DBusBuffer {
      */
     public writeSInt64(value: bigint): this {
         this.#ensureSpace(8)
-        this.#alignWrite(8)
         const long = Long.fromString(value.toString(), false)
         this.writeSInt32(long.getLowBits())
         this.writeSInt32(long.getHighBits())
@@ -668,7 +666,6 @@ export class DBusBuffer {
      */
     public writeInt64(value: bigint): this {
         this.#ensureSpace(8)
-        this.#alignWrite(8)
         const long = Long.fromString(value.toString(), true)
         this.writeInt32(long.getLowBitsUnsigned())
         this.writeInt32(long.getHighBitsUnsigned())
@@ -683,7 +680,6 @@ export class DBusBuffer {
      */
     public writeDouble(value: number): this {
         this.#ensureSpace(8)
-        this.#alignWrite(8)
         this.#buffer.writeDoubleLE(value, this.#position)
         this.#position += 8
         return this
@@ -835,9 +831,6 @@ export class DBusBuffer {
             throw new SignatureError(`Struct data must be an object or array at ${path}`)
         }
 
-        // Align before writing struct
-        this.#alignWrite(8)
-
         // Relax length validation to avoid errors with nested structures
         for (let i = 0; i < Math.min(struct.length, structData.length); i++) {
             this.writeTree(struct[i], structData[i], `${path}[${i}]`)
@@ -855,9 +848,6 @@ export class DBusBuffer {
      * @throws {SignatureError} If the data structure does not match the expected format for the array or dictionary.
      */
     public writeArray(eleType: DataType, data: any, path: string = ''): this {
-        // Align before writing array length
-        this.#alignWrite(4)
-
         // Write a placeholder for array length (updated later)
         const lengthPos = this.#position
         this.writeInt32(0) // Placeholder
@@ -956,7 +946,6 @@ export class DBusBuffer {
             case 's':
             case 'o':
                 const strBuffer = Buffer.from(value, 'utf8')
-                this.#alignWrite(4) // Align before writing length
                 this.writeInt32(strBuffer.length) // Use byte length instead of character length
                 return this.writeString(value) // String or object path (32-bit length)
             case 'x':

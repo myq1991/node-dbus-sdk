@@ -18,7 +18,6 @@ import {HandshakeOpts} from '../types/HandshakeOpts'
 import EventEmitter from 'node:events'
 import {Socket} from 'node:net'
 import {NetConnectOpts} from 'net'
-import {Key} from 'node:readline'
 import {DBusMessage} from './DBusMessage'
 
 export class DBusConnection extends EventEmitter {
