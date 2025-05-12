@@ -102,7 +102,7 @@ export class DBusMessage {
             this.headerSignature![0]!.child![0]!,
             fieldsLength
         )
-        messageBuffer.align(3)
+        // messageBuffer.align(3)
         let headerName: string | null
         const messageHeader: Partial<DBusMessageHeader> = {}
         messageHeader.serial = header.readUInt32LE(8)
