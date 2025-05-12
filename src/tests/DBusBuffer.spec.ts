@@ -20,6 +20,8 @@ function DBusBufferSpecTest(signature: string, data: any): void {
 }
 
 const TestSet: { signature: string, data: any }[] = [
+    {signature: 'i', data: 1},
+    {signature: 'b', data: true},
     {
         signature: 'a{say}',
         data: {test: Buffer.from('hahahahah')}
