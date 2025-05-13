@@ -75,6 +75,7 @@ export class DBusMessage {
 
         // Combine header, fields, padding, and body
         const finalMessage = Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
+        console.log(JSON.stringify(Array.from(finalMessage)))
         //
         // console.log('Generated headerBuffer Array:', JSON.stringify(Array.from(headerBuffer)), headerBuffer.length)
         // console.log('Generated fieldsBuff Array:', JSON.stringify(Array.from(fieldsBuff)), fieldsBuff.length)

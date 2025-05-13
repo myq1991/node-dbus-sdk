@@ -883,7 +883,8 @@ export class DBusBuffer {
         }
 
         // For header fields (path includes array index), align to 4-byte boundary after each struct
-        if (path.includes('[')) {
+        // But skip alignment if path contains a special flag indicating it's the last field
+        if (path.includes('[') && !path.includes('last-no-align')) {
             this.#alignWrite(4)
         }
 
@@ -960,23 +961,22 @@ export class DBusBuffer {
                     throw new SignatureError(`Array data must be an array at ${path}`)
                 }
                 for (let i = 0; i < data.length; i++) {
-                    this.writeTree(eleType, data[i], `${path}[${i}]`)
+                    // For header fields, skip alignment for the last element to avoid final padding
+                    const elementPath = path === '' && eleType.type === '(' && i === data.length - 1 ? `${path}[${i}][last-no-align]` : `${path}[${i}]`
+                    this.writeTree(eleType, data[i], elementPath)
                 }
             }
         }
 
-        // Calculate array length and update placeholder (hardcode length for header fields to match dbus-ts)
+        // Calculate array length and update placeholder (do not include post-array padding for header fields)
         let arrayLength = this.#position - startPos
-        // Hardcode array length to 109 for header fields to match dbus-ts
-        if (path === '' && eleType.type === '(' && data.length === 4) {
-            arrayLength = 109 // Hardcoded to match dbus-ts output for header fields array
-        }
         const tempPos = this.#position
         this.#position = lengthPos
         this.#buffer.writeUInt32LE(arrayLength, this.#position) // Update array length directly without alignment
         this.#position = tempPos
         return this
     }
+
 
     /**
      * Writes a simple (basic) type to the Buffer based on the provided type code.
