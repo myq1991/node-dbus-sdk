@@ -1,16 +1,13 @@
 import {DBusMessageHeader} from '../types/DBusMessageHeader'
 import {DBusMessageType} from './DBusMessageType'
 import {DBusMessageFlags} from './DBusMessageFlags'
-import {DataType} from '../types/DataType'
 import {DBusBuffer} from './DBusBuffer'
 import {SerialError} from './Errors'
 import {DBusMessageEndianness} from './DBusMessageEndianness'
 import {DBusTypedValue} from './DBusTypedValue'
 
 export class DBusMessage {
-
     public readonly header: DBusMessageHeader
-
     public readonly body: any[] = []
 
     constructor(header: DBusMessageHeader | Partial<DBusMessageHeader>, ...body: any[]) {
@@ -39,11 +36,27 @@ export class DBusMessage {
         const type: DBusMessageType = this.header.type || DBusMessageType.METHOD_CALL
         let bodyLength: number = 0
         let bodyBuff: Buffer = Buffer.from([])
-        if (this.header.signature && this.body) {
+        if (this.header.signature && this.body.length > 0) {
             bodyBuff = new DBusBuffer().write(this.header.signature, this.body).toBuffer()
             bodyLength = bodyBuff.length
         }
-        const header: number[] = [
+
+        // Create header fields array
+        const fields: any[] = []
+        DBusMessage.headerTypeName.forEach((fieldName: string | null): void => {
+            if (fieldName && this.header[fieldName]) {
+                fields.push([
+                    DBusMessage.headerTypeId[fieldName],
+                    new DBusTypedValue(DBusMessage.fieldSignature[fieldName], this.header[fieldName])
+                ])
+            }
+        })
+
+        // Encode fields to calculate length
+        const fieldsBuff = new DBusBuffer().write('a(yv)', fields).toBuffer()
+
+        // Build basic header with only 12 bytes (without headerFieldsLength)
+        const headerBasic: number[] = [
             DBusMessageEndianness.LE,
             type,
             flags,
@@ -51,41 +64,25 @@ export class DBusMessage {
             bodyLength,
             this.header.serial
         ]
-        const headerBuffer: Buffer = new DBusBuffer().write('yyyyuu', header).toBuffer()
-        console.log('headerBuffer-len:', headerBuffer.length, headerBuffer)
-        const fields: any[] = []
-        const $fields = {}
-        DBusMessage.headerTypeName.forEach((fieldName: string | null): void => {
-            const fieldVal: string | number | undefined = this.header[fieldName!]
-            if (fieldVal) {
-                fields.push([
-                    DBusMessage.headerTypeId[fieldName!],
-                    // [DBusMessage.fieldSignature[fieldName!], fieldVal]
-                    new DBusTypedValue(DBusMessage.fieldSignature[fieldName!], fieldVal)
-                    // {_signature:DBusMessage.fieldSignature[fieldName!],value:fieldVal}
-                    // fieldVal//TODO
-                ])
-                $fields[DBusMessage.headerTypeId[fieldName!]] = new DBusTypedValue(DBusMessage.fieldSignature[fieldName!], fieldVal)
-            }
-        })
-        console.log('fields:', fields)
-        const fieldsBuffer: Buffer = Buffer.concat([Buffer.alloc(12, 0), new DBusBuffer().write('a(yv)', fields).toBuffer()])
-        // console.log(JSON.stringify(Array.from(new DBusBuffer().write('a(yv)', fields).toBuffer())))
-        console.log('++++++1', new DBusBuffer().write('a(yv)', fields).toBuffer())
-        console.log('++++++2', new DBusBuffer().write('a{yv})', [$fields]).toBuffer())
-        console.log(new DBusBuffer(new DBusBuffer().write('a(yv)', fields).toBuffer()).read('a(yv)'))
-        // const buf=Buffer.from([109,0,0,0,1,1,111,0,21,0,0,0,47,111,114,103,47,102,114,101,101,100,101,115,107,116,111,112,47,68,66,117,115,0,0,0,2,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0,3,1,115,0,5,0,0,0,72,101,108,108,111,0,0,0,6,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0])
-        // console.log('buf:',buf)
-        // console.log(new DBusBuffer(buf).read('a(yv)'))
-        console.log('fieldsBuffer-len:', fieldsBuffer.length, fieldsBuffer)
-        return Buffer.concat([headerBuffer, new DBusBuffer().write('a(yv)', fields).toBuffer()])
-        // const headerLenAligned = ((headerBuffer.length + fieldsBuffer.length + 7) >> 3) << 3
-        // const messageLen: number = headerLenAligned + bodyLength
-        // const messageBuff: Buffer = Buffer.alloc(messageLen)
-        // headerBuffer.copy(messageBuff)
-        // fieldsBuffer.copy(messageBuff, fieldsBuffer.length)
-        // if (bodyLength > 0) bodyBuff.copy(messageBuff, headerLenAligned)
-        // return messageBuff
+        const headerBuffer = new DBusBuffer().write('yyyyuu', headerBasic).toBuffer()
+
+        // Calculate total header length (headerBuffer + fieldsBuff) and align to 8-byte boundary
+        const totalHeaderLen = headerBuffer.length + fieldsBuff.length
+        const headerLenAligned = Math.ceil(totalHeaderLen / 8) * 8
+        const paddingLen = headerLenAligned - totalHeaderLen
+        const paddingBuff = Buffer.alloc(paddingLen, 0)
+        console.log('Debug: Calculated total header length', totalHeaderLen, 'aligned to', headerLenAligned, 'adding padding of', paddingLen, 'bytes')
+
+        // Combine header, fields, padding, and body
+        const finalMessage = Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
+
+        console.log('Generated headerBuffer Array:', JSON.stringify(Array.from(headerBuffer)), headerBuffer.length)
+        console.log('Generated fieldsBuff Array:', JSON.stringify(Array.from(fieldsBuff)), fieldsBuff.length)
+        console.log('Generated paddingBuff Array:', JSON.stringify(Array.from(paddingBuff)), paddingBuff.length)
+        console.log('Generated bodyBuff Array:', JSON.stringify(Array.from(bodyBuff)), bodyBuff.length)
+        console.log('Generated Buffer Array:', JSON.stringify(Array.from(finalMessage)), finalMessage.length)
+        console.log('Generated Buffer:', finalMessage)
+        return finalMessage
     }
 
     /**
@@ -129,19 +126,6 @@ export class DBusMessage {
         signature: 'g'
     }
 
-    public static readonly headerSignature: DataType[] = [
-        {
-            type: 'a',
-            child: [{
-                type: '(',
-                child: [
-                    {type: 'y', child: []},
-                    {type: 'v', child: []}
-                ]
-            }]
-        }
-    ]
-
     /**
      * Encode message instance to buffer
      * @param header
@@ -174,27 +158,7 @@ export class DBusMessage {
     public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number): DBusMessage {
         const messageBuffer: DBusBuffer = new DBusBuffer(Buffer.concat([header, fieldsAndBody]))
         const message = messageBuffer.readMessage()
-
-        return new DBusMessage(this.mapToDBusMessageHeader(message.header), message.body)
-
-        // console.log(JSON.stringify(Array.from(Buffer.concat([header,fieldsAndBody]))))
-        // // const messageBuffer: DBusBuffer = new DBusBuffer(header)
-        // const messageBuffer: DBusBuffer = new DBusBuffer(Buffer.concat([header,fieldsAndBody]))
-        // const unmarshalledHeader: any = messageBuffer.readArray(
-        //     this.headerSignature![0]!.child![0]!,
-        //     fieldsLength
-        // )
-        // // messageBuffer.align(3)
-        // let headerName: string | null
-        // const messageHeader: Partial<DBusMessageHeader> = {}
-        // messageHeader.serial = header.readUInt32LE(8)
-        // for (let i: number = 0; i < unmarshalledHeader.length; ++i) {
-        //     headerName = this.headerTypeName[unmarshalledHeader[i][0]]
-        //     messageHeader[headerName!] = unmarshalledHeader[i][1]
-        // }
-        // messageHeader.type = header[1]
-        // messageHeader.flags = header[2]
-        // return (bodyLength > 0 && messageHeader.signature) ? new DBusMessage(messageHeader, messageBuffer.read(messageHeader.signature)) : new DBusMessage(messageHeader)
+        return new DBusMessage(this.mapToDBusMessageHeader(message.header), message.body || [])
     }
 
     /**
@@ -252,5 +216,4 @@ export class DBusMessage {
 
         return messageHeader
     }
-
 }
