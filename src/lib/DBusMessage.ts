@@ -71,17 +71,17 @@ export class DBusMessage {
         const headerLenAligned = Math.ceil(totalHeaderLen / 8) * 8
         const paddingLen = headerLenAligned - totalHeaderLen
         const paddingBuff = Buffer.alloc(paddingLen, 0)
-        console.log('Debug: Calculated total header length', totalHeaderLen, 'aligned to', headerLenAligned, 'adding padding of', paddingLen, 'bytes')
+        // console.log('Debug: Calculated total header length', totalHeaderLen, 'aligned to', headerLenAligned, 'adding padding of', paddingLen, 'bytes')
 
         // Combine header, fields, padding, and body
         const finalMessage = Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
-
-        console.log('Generated headerBuffer Array:', JSON.stringify(Array.from(headerBuffer)), headerBuffer.length)
-        console.log('Generated fieldsBuff Array:', JSON.stringify(Array.from(fieldsBuff)), fieldsBuff.length)
-        console.log('Generated paddingBuff Array:', JSON.stringify(Array.from(paddingBuff)), paddingBuff.length)
-        console.log('Generated bodyBuff Array:', JSON.stringify(Array.from(bodyBuff)), bodyBuff.length)
-        console.log('Generated Buffer Array:', JSON.stringify(Array.from(finalMessage)), finalMessage.length)
-        console.log('Generated Buffer:', finalMessage)
+        //
+        // console.log('Generated headerBuffer Array:', JSON.stringify(Array.from(headerBuffer)), headerBuffer.length)
+        // console.log('Generated fieldsBuff Array:', JSON.stringify(Array.from(fieldsBuff)), fieldsBuff.length)
+        // console.log('Generated paddingBuff Array:', JSON.stringify(Array.from(paddingBuff)), paddingBuff.length)
+        // console.log('Generated bodyBuff Array:', JSON.stringify(Array.from(bodyBuff)), bodyBuff.length)
+        // console.log('Generated Buffer Array:', JSON.stringify(Array.from(finalMessage)), finalMessage.length)
+        // console.log('Generated Buffer:', finalMessage)
         return finalMessage
     }
 

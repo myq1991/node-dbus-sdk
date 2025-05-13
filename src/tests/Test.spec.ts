@@ -2,7 +2,7 @@ import {DBus} from '../DBus'
 import {DBusBuffer} from '../lib/DBusBuffer'
 import {runDBusBufferReadArrayTestSet, runDBusBufferTestSet} from './DBusBuffer.spec'
 
-// runDBusBufferTestSet()
+runDBusBufferTestSet()
 // runDBusBufferReadArrayTestSet()
 
 setImmediate(async (): Promise<void> => {
