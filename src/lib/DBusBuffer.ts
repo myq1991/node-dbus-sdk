@@ -209,8 +209,7 @@ export class DBusBuffer {
      */
     public readSInt64(): bigint {
         this.#alignRead(8, 8)
-        const result = BigInt(Long.fromBits(this.readInt32(), this.readInt32(), false).toString())
-        return result
+        return BigInt(Long.fromBits(this.readInt32(), this.readInt32(), false).toString())
     }
 
     /**
@@ -220,8 +219,7 @@ export class DBusBuffer {
      */
     public readInt64(): bigint {
         this.#alignRead(8, 8)
-        const result = BigInt(Long.fromBits(this.readInt32(), this.readInt32(), true).toString())
-        return result
+        return BigInt(Long.fromBits(this.readInt32(), this.readInt32(), true).toString())
     }
 
     /**
@@ -349,13 +347,12 @@ export class DBusBuffer {
                 result = mergedDict
             } else {
                 if (tree[0].child && tree[0].child.length === 1 && tree[0].child[0].type === 'v') {
-                    const processedArray = arrayResult.map((item: any) => {
+                    result = arrayResult.map((item: any) => {
                         if (Array.isArray(item) && item.length === 1 && typeof item[0] === 'object' && item[0] !== null && !Array.isArray(item[0])) {
                             return item[0]
                         }
                         return item
                     })
-                    result = processedArray
                 } else {
                     result = arrayResult
                 }
@@ -1004,7 +1001,7 @@ export class DBusBuffer {
                         if (typeof entry === 'object' && entry !== null) {
                             entry = Object.entries(entry)[0]
                         }
-                        if (!Array.isArray(entry) || entry.length !== 2) {
+                        if (!Array.isArray(entry) || !entry || entry.length !== 2) {
                             throw new SignatureError(`Dictionary entry must be a key-value pair array at ${path}[${i}]`)
                         }
                     }

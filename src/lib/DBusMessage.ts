@@ -40,7 +40,6 @@ export class DBusMessage {
             bodyBuff = new DBusBuffer().write(this.header.signature, this.body).toBuffer()
             bodyLength = bodyBuff.length
         }
-
         // Create header fields array
         const fields: any[] = []
         DBusMessage.headerTypeName.forEach((fieldName: string | null): void => {
@@ -51,10 +50,8 @@ export class DBusMessage {
                 ])
             }
         })
-
         // Encode fields to calculate length
-        const fieldsBuff = new DBusBuffer().write('a(yv)', fields).toBuffer()
-
+        const fieldsBuff: Buffer = new DBusBuffer().write('a(yv)', fields).toBuffer()
         // Build basic header with only 12 bytes (without headerFieldsLength)
         const headerBasic: number[] = [
             DBusMessageEndianness.LE,
@@ -64,26 +61,14 @@ export class DBusMessage {
             bodyLength,
             this.header.serial
         ]
-        const headerBuffer = new DBusBuffer().write('yyyyuu', headerBasic).toBuffer()
-
+        const headerBuffer: Buffer = new DBusBuffer().write('yyyyuu', headerBasic).toBuffer()
         // Calculate total header length (headerBuffer + fieldsBuff) and align to 8-byte boundary
-        const totalHeaderLen = headerBuffer.length + fieldsBuff.length
-        const headerLenAligned = Math.ceil(totalHeaderLen / 8) * 8
-        const paddingLen = headerLenAligned - totalHeaderLen
-        const paddingBuff = Buffer.alloc(paddingLen, 0)
-        // console.log('Debug: Calculated total header length', totalHeaderLen, 'aligned to', headerLenAligned, 'adding padding of', paddingLen, 'bytes')
-
+        const totalHeaderLen: number = headerBuffer.length + fieldsBuff.length
+        const headerLenAligned: number = Math.ceil(totalHeaderLen / 8) * 8
+        const paddingLen: number = headerLenAligned - totalHeaderLen
+        const paddingBuff: Buffer = Buffer.alloc(paddingLen, 0)
         // Combine header, fields, padding, and body
-        const finalMessage = Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
-        console.log(JSON.stringify(Array.from(finalMessage)))
-        //
-        // console.log('Generated headerBuffer Array:', JSON.stringify(Array.from(headerBuffer)), headerBuffer.length)
-        // console.log('Generated fieldsBuff Array:', JSON.stringify(Array.from(fieldsBuff)), fieldsBuff.length)
-        // console.log('Generated paddingBuff Array:', JSON.stringify(Array.from(paddingBuff)), paddingBuff.length)
-        // console.log('Generated bodyBuff Array:', JSON.stringify(Array.from(bodyBuff)), bodyBuff.length)
-        // console.log('Generated Buffer Array:', JSON.stringify(Array.from(finalMessage)), finalMessage.length)
-        // console.log('Generated Buffer:', finalMessage)
-        return finalMessage
+        return Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
     }
 
     /**
