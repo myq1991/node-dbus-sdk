@@ -4,7 +4,7 @@ function DBusBufferSpecTest(signature: string, data: any): void {
     try {
         console.log('Testing signature:', signature)
         const writer = new DBusBuffer()
-        writer.write(signature, data)
+          writer.write(signature, data)
         const buffer = writer.toBuffer()
         console.log('Written Buffer Length:', buffer.length)
         console.log('Written Buffer:', buffer)

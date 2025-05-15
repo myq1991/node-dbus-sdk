@@ -42,3 +42,8 @@ export class SerialError extends Error implements NodeJS.ErrnoException {
     errno: number = 1008
     code: string = 'E_SERIAL'
 }
+
+export class ObjectPathError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1009
+    code: string = 'E_OBJECT_PATH'
+}

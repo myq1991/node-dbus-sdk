@@ -34,6 +34,19 @@ export class DBusMessage {
         if (!this.header.serial) throw new SerialError('Missing or invalid serial')
         const flags: DBusMessageFlags = this.header.flags || DBusMessageFlags.REPLY_EXPECTED
         const type: DBusMessageType = this.header.type || DBusMessageType.METHOD_CALL
+
+        console.log({
+            serial: this.header.serial,
+            type: this.header.type,
+            flags: this.header.flags,
+            path: this.header.path,
+            interface: this.header.interfaceName,
+            member: this.header.member,
+            destination: this.header.destination,
+            signature: this.header.signature,
+            body: this.body
+        })
+
         let bodyLength: number = 0
         let bodyBuff: Buffer = Buffer.from([])
         if (this.header.signature && this.body.length > 0) {
@@ -50,6 +63,7 @@ export class DBusMessage {
                 ])
             }
         })
+        console.log(fields)
         // Encode fields to calculate length
         const fieldsBuff: Buffer = new DBusBuffer().write('a(yv)', fields).toBuffer()
         // Build basic header with only 12 bytes (without headerFieldsLength)
@@ -68,6 +82,7 @@ export class DBusMessage {
         const paddingLen: number = headerLenAligned - totalHeaderLen
         const paddingBuff: Buffer = Buffer.alloc(paddingLen, 0)
         // Combine header, fields, padding, and body
+        console.log('fieldsBuff:', JSON.stringify(Array.from(fieldsBuff)))
         return Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
     }
 

@@ -339,9 +339,11 @@ export class DBusConnection extends EventEmitter {
         this.#stream.on('close', (): boolean => this.emit('close'))
             .on('error', (error: Error): boolean => this.emit('error', error))
             .on('readable', (): void => {
+                console.log('readable!!!!!')
                 while (true) {
                     if (!state) {
                         header = stream.read(16)
+                        console.log('header',header)
                         if (!header) break
                         state = true
                         fieldsLength = header.readUInt32LE(12)
@@ -352,7 +354,7 @@ export class DBusConnection extends EventEmitter {
                         fieldsAndBody = stream.read(fieldsAndBodyLength)
                         if (!fieldsAndBody) break
                         state = false
-                        this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength))
+                        // this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength))
                     }
                 }
             })
