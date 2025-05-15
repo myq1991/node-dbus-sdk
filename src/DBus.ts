@@ -52,6 +52,7 @@ export class DBus {
             const buf2 = DBusMessage.encode({
                 serial: 2,
                 type: 1,
+                flags: 0x01,
                 destination: 'org.ptswitch.pad',
                 path: '/slot1/port1/stc',
                 interfaceName: 'pad.stc',

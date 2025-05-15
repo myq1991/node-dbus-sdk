@@ -339,7 +339,7 @@ export class DBusConnection extends EventEmitter {
         this.#stream.on('close', (): boolean => this.emit('close'))
             .on('error', (error: Error): boolean => this.emit('error', error))
             .on('readable', (): void => {
-               console.log(stream.read(16))
+                console.log(stream.read(16))
                 // while (true) {
                 //     if (!state) {
                 //         header = stream.read(16)
