@@ -1,361 +1,438 @@
 import {DBusMessageEndianness} from './DBusMessageEndianness'
 import {ObjectPathError, SignatureError} from './Errors'
+import {DBusSignedValue} from './DBusSignedValue'
 
 export class DBusBufferEncoder {
 
-    public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.BE
+    public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.LE
 
     protected buffer: Buffer
 
     /**
-     * 构造函数
-     * @param initBuffer
-     * @param alignment
+     * Constructor for DBusBufferEncoder
+     * @param endianness Byte order for encoding (little-endian or big-endian)
+     * @param initBuffer Initial buffer to start with, if any
+     * @param alignment Initial alignment requirement, if specified
      */
-    constructor(initBuffer?: Buffer, alignment?: number) {
+    constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, initBuffer?: Buffer, alignment?: number) {
+        this.endianness = endianness
         this.buffer = initBuffer ? initBuffer : Buffer.alloc(0)
         if (alignment) this.align(alignment)
     }
 
     /**
-     * 数据对齐
-     * @param alignment
+     * Aligns the buffer to the specified byte boundary
+     * @param alignment The byte boundary to align to (e.g., 1, 2, 4, 8)
      * @protected
      */
     protected align(alignment: number): this {
+        // Calculate the remainder and required padding for alignment
         const remainder: number = this.buffer.length % alignment
-        if (remainder === 0) return this // 已经对齐，无需操作
+        if (remainder === 0) return this // Buffer is already aligned, no action needed
         const padding: number = alignment - remainder
-        const paddingBuffer: Buffer = Buffer.alloc(padding, 0) // 用 0 填充
-        this.buffer = Buffer.concat([this.buffer, paddingBuffer]) // 填充字节追加在原缓冲区的后部
+        const paddingBuffer: Buffer = Buffer.alloc(padding, 0) // Create padding with zeros
+        this.buffer = Buffer.concat([this.buffer, paddingBuffer]) // Append padding to the buffer
         return this
     }
 
     /**
-     * 编码BYTE类型数据
-     * 使用前需要对之前的Buffer进行1字节对齐
-     * @param value
+     * Encodes a BYTE type value
+     * Buffer must be 1-byte aligned before calling this method
+     * @param value The byte value to encode (0-255)
      */
     public writeByte(value: number): this {
         this.align(1)
         const buffer: Buffer = Buffer.alloc(1)
-        buffer.writeUInt8(value & 0xFF, 0) // 确保值在 0-255 范围内
+        buffer.writeUInt8(value & 0xFF, 0) // Ensure value is in the range 0-255
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码BOOLEAN类型数据
-     * 使用前需要对之前的Buffer进行4字节对齐
-     * @param value
+     * Encodes a BOOLEAN type value
+     * Buffer must be 4-byte aligned before calling this method
+     * @param value The boolean value to encode
      */
     public writeBoolean(value: boolean): this {
         this.align(4)
-        const buffer: Buffer = Buffer.alloc(4) // BOOLEAN 类型占用 4 字节
-        const intValue: 0 | 1 = value ? 1 : 0 // true 编码为 1，false 编码为 0
+        const buffer: Buffer = Buffer.alloc(4) // BOOLEAN occupies 4 bytes
+        const intValue: 0 | 1 = value ? 1 : 0 // Encode true as 1, false as 0
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeUInt32LE(intValue, 0) // 小端字节序
+            buffer.writeUInt32LE(intValue, 0) // Little-endian byte order
         } else {
-            buffer.writeUInt32BE(intValue, 0) // 大端字节序
+            buffer.writeUInt32BE(intValue, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码INT16类型数据
-     * 使用前需要对之前的Buffer进行2字节对齐
-     * @param value
+     * Encodes an INT16 type value
+     * Buffer must be 2-byte aligned before calling this method
+     * @param value The 16-bit signed integer value to encode
      */
     public writeInt16(value: number): this {
         this.align(2)
-        const buffer: Buffer = Buffer.alloc(2) // INT16 类型占用 2 字节
+        const buffer: Buffer = Buffer.alloc(2) // INT16 occupies 2 bytes
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeInt16LE(value, 0) // 小端字节序
+            buffer.writeInt16LE(value, 0) // Little-endian byte order
         } else {
-            buffer.writeInt16BE(value, 0) // 大端字节序
+            buffer.writeInt16BE(value, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码UINT16类型数据
-     * 使用前需要对之前的Buffer进行2字节对齐
-     * @param value
+     * Encodes a UINT16 type value
+     * Buffer must be 2-byte aligned before calling this method
+     * @param value The 16-bit unsigned integer value to encode
      */
     public writeUInt16(value: number): this {
         this.align(2)
-        const buffer: Buffer = Buffer.alloc(2) // UINT16 类型占用 2 字节
+        const buffer: Buffer = Buffer.alloc(2) // UINT16 occupies 2 bytes
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeUInt16LE(value, 0) // 小端字节序
+            buffer.writeUInt16LE(value, 0) // Little-endian byte order
         } else {
-            buffer.writeUInt16BE(value, 0) // 大端字节序
+            buffer.writeUInt16BE(value, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码INT32类型数据
-     * 使用前需要对之前的Buffer进行4字节对齐
-     * @param value
+     * Encodes an INT32 type value
+     * Buffer must be 4-byte aligned before calling this method
+     * @param value The 32-bit signed integer value to encode
      */
     public writeInt32(value: number): this {
         this.align(4)
-        const buffer: Buffer = Buffer.alloc(4) // INT32 类型占用 4 字节
+        const buffer: Buffer = Buffer.alloc(4) // INT32 occupies 4 bytes
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeInt32LE(value, 0) // 小端字节序
+            buffer.writeInt32LE(value, 0) // Little-endian byte order
         } else {
-            buffer.writeInt32BE(value, 0) // 大端字节序
+            buffer.writeInt32BE(value, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码UINT32类型数据
-     * 使用前需要对之前的Buffer进行4字节对齐
-     * @param value
+     * Encodes a UINT32 type value
+     * Buffer must be 4-byte aligned before calling this method
+     * @param value The 32-bit unsigned integer value to encode
      */
     public writeUInt32(value: number): this {
         this.align(4)
-        const buffer: Buffer = Buffer.alloc(4) // UINT32 类型占用 4 字节
+        const buffer: Buffer = Buffer.alloc(4) // UINT32 occupies 4 bytes
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeUInt32LE(value, 0) // 小端字节序
+            buffer.writeUInt32LE(value, 0) // Little-endian byte order
         } else {
-            buffer.writeUInt32BE(value, 0) // 大端字节序
+            buffer.writeUInt32BE(value, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码INT64类型数据
-     * 使用前需要对之前的Buffer进行8字节对齐
-     * @param value
+     * Encodes an INT64 type value
+     * Buffer must be 8-byte aligned before calling this method
+     * @param value The 64-bit signed integer value to encode
      */
     public writeInt64(value: bigint): this {
         this.align(8)
-        const buffer: Buffer = Buffer.alloc(8) // INT64 类型占用 8 字节
+        const buffer: Buffer = Buffer.alloc(8) // INT64 occupies 8 bytes
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeBigInt64LE(value, 0) // 小端字节序
+            buffer.writeBigInt64LE(value, 0) // Little-endian byte order
         } else {
-            buffer.writeBigInt64BE(value, 0) // 大端字节序
+            buffer.writeBigInt64BE(value, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码UINT64类型数据
-     * 使用前需要对之前的Buffer进行8字节对齐
-     * @param value
+     * Encodes a UINT64 type value
+     * Buffer must be 8-byte aligned before calling this method
+     * @param value The 64-bit unsigned integer value to encode
      */
     public writeUInt64(value: bigint): this {
         this.align(8)
-        const buffer: Buffer = Buffer.alloc(8) // UINT64 类型占用 8 字节
+        const buffer: Buffer = Buffer.alloc(8) // UINT64 occupies 8 bytes
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeBigUInt64LE(value, 0) // 小端字节序
+            buffer.writeBigUInt64LE(value, 0) // Little-endian byte order
         } else {
-            buffer.writeBigUInt64BE(value, 0) // 大端字节序
+            buffer.writeBigUInt64BE(value, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码DOUBLE类型数据
-     * 使用前需要对之前的Buffer进行8字节对齐
-     * @param value
+     * Encodes a DOUBLE type value
+     * Buffer must be 8-byte aligned before calling this method
+     * @param value The double-precision floating-point value to encode
      */
     public writeDouble(value: number): this {
         this.align(8)
-        const buffer: Buffer = Buffer.alloc(8) // DOUBLE 类型占用 8 字节
+        const buffer: Buffer = Buffer.alloc(8) // DOUBLE occupies 8 bytes
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeDoubleLE(value, 0) // 小端字节序
+            buffer.writeDoubleLE(value, 0) // Little-endian byte order
         } else {
-            buffer.writeDoubleBE(value, 0) // 大端字节序
+            buffer.writeDoubleBE(value, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码UNIX_FD类型数据
-     * 使用前需要对之前的Buffer进行4字节对齐
-     * @param fdIndex
+     * Encodes a UNIX_FD type value
+     * Buffer must be 4-byte aligned before calling this method
+     * @param fdIndex The file descriptor index to encode
      */
     public writeUnixFD(fdIndex: number): this {
         this.align(4)
-        const buffer: Buffer = Buffer.alloc(4) // UNIX_FD 类型占用 4 字节
+        const buffer: Buffer = Buffer.alloc(4) // UNIX_FD occupies 4 bytes
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeUInt32LE(fdIndex, 0) // 小端字节序
+            buffer.writeUInt32LE(fdIndex, 0) // Little-endian byte order
         } else {
-            buffer.writeUInt32BE(fdIndex, 0) // 大端字节序
+            buffer.writeUInt32BE(fdIndex, 0) // Big-endian byte order
         }
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码STRING类型数据
-     * 使用前需要对之前的Buffer进行4字节对齐
-     * @param value
+     * Encodes a STRING type value
+     * Buffer must be 4-byte aligned before calling this method
+     * @param value The string value to encode
      */
     public writeString(value: string): this {
         this.align(4)
-        const stringBuffer: Buffer = Buffer.from(value, 'utf8') // 将字符串转换为 UTF-8 编码的字节缓冲区
-        const length: number = stringBuffer.length // 获取字符串的字节长度
-        const totalLength: number = 4 + length + 1 // 4 字节长度字段 + 字符串内容 + 1 字节空终止符
-        const buffer: Buffer = Buffer.alloc(totalLength) // 分配总长度的缓冲区
-        // 写入长度字段（32 位无符号整数）
+        const stringBuffer: Buffer = Buffer.from(value, 'utf8') // Convert string to UTF-8 encoded buffer
+        const length: number = stringBuffer.length // Get byte length of the string
+        const totalLength: number = 4 + length + 1 // 4-byte length field + string content + 1-byte null terminator
+        const buffer: Buffer = Buffer.alloc(totalLength) // Allocate buffer for total length
+        // Write length field as a 32-bit unsigned integer
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeUInt32LE(length, 0) // 小端字节序
+            buffer.writeUInt32LE(length, 0) // Little-endian byte order
         } else {
-            buffer.writeUInt32BE(length, 0) // 大端字节序
+            buffer.writeUInt32BE(length, 0) // Big-endian byte order
         }
-        // 写入字符串内容
-        stringBuffer.copy(buffer, 4) // 从偏移量 4 开始写入字符串内容
-        // 写入末尾的空字节
-        buffer.writeUInt8(0, 4 + length) // 在字符串内容后写入空终止符
+        // Write string content
+        stringBuffer.copy(buffer, 4) // Copy string content starting at offset 4
+        // Write null terminator at the end
+        buffer.writeUInt8(0, 4 + length) // Write null byte after string content
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码OBJECT_PATH类型数据
-     * 使用前需要对之前的Buffer进行4字节对齐
-     * @param value
+     * Encodes an OBJECT_PATH type value
+     * Buffer must be 4-byte aligned before calling this method
+     * @param value The object path string to encode
      */
     public writeObjectPath(value: string): this {
-        // 校验对象路径是否符合 DBus 规范的格式
+        // Validate object path format according to DBus specification
         const objectPathRegex: RegExp = /^\/([a-zA-Z_][a-zA-Z0-9_]*)*(?:\/([a-zA-Z_][a-zA-Z0-9_]*))*$|^\/$/
         if (!objectPathRegex.test(value)) throw new ObjectPathError(`Invalid DBus object path: "${value}". Object path must start with '/' and consist of elements separated by '/', where each element starts with a letter or underscore and contains only letters, numbers, or underscores.`)
         this.align(4)
-        const pathBuffer: Buffer = Buffer.from(value, 'utf8') // 将路径转换为 UTF-8 编码的字节缓冲区
-        const length: number = pathBuffer.length // 获取路径的字节长度
-        const totalLength: number = 4 + length + 1 // 4 字节长度字段 + 路径内容 + 1 字节空终止符
-        const buffer: Buffer = Buffer.alloc(totalLength) // 分配总长度的缓冲区
-        // 写入长度字段（32 位无符号整数）
+        const pathBuffer: Buffer = Buffer.from(value, 'utf8') // Convert path to UTF-8 encoded buffer
+        const length: number = pathBuffer.length // Get byte length of the path
+        const totalLength: number = 4 + length + 1 // 4-byte length field + path content + 1-byte null terminator
+        const buffer: Buffer = Buffer.alloc(totalLength) // Allocate buffer for total length
+        // Write length field as a 32-bit unsigned integer
         if (this.endianness === DBusMessageEndianness.LE) {
-            buffer.writeUInt32LE(length, 0) // 小端字节序
+            buffer.writeUInt32LE(length, 0) // Little-endian byte order
         } else {
-            buffer.writeUInt32BE(length, 0) // 大端字节序
+            buffer.writeUInt32BE(length, 0) // Big-endian byte order
         }
-        // 写入路径内容
-        pathBuffer.copy(buffer, 4) // 从偏移量 4 开始写入路径内容
-        // 写入末尾的空字节
-        buffer.writeUInt8(0, 4 + length) // 在路径内容后写入空终止符
+        // Write path content
+        pathBuffer.copy(buffer, 4) // Copy path content starting at offset 4
+        // Write null terminator at the end
+        buffer.writeUInt8(0, 4 + length) // Write null byte after path content
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码SIGNATURE类型数据
-     * 使用前需要对之前的Buffer进行1字节对齐
-     * @param value
+     * Encodes a SIGNATURE type value
+     * Buffer must be 1-byte aligned before calling this method
+     * @param value The signature string to encode
      */
     public writeSignature(value: string): this {
         this.align(1)
-        const signatureBuffer: Buffer = Buffer.from(value, 'utf8') // 将签名字符串转换为 UTF-8 编码的字节缓冲区
-        const length: number = signatureBuffer.length // 获取签名字符串的字节长度
-        // 校验长度是否超过 255 字节（SIGNATURE 长度字段是 8 位无符号整数）
+        const signatureBuffer: Buffer = Buffer.from(value, 'utf8') // Convert signature string to UTF-8 encoded buffer
+        const length: number = signatureBuffer.length // Get byte length of the signature string
+        // Validate signature length does not exceed 255 bytes (SIGNATURE length field is 8-bit unsigned integer)
         if (length > 255) throw new SignatureError(`DBus signature length exceeds maximum of 255 bytes: "${value}"`)
-        const totalLength: number = 1 + length + 1 // 1 字节长度字段 + 签名内容 + 1 字节空终止符
-        const buffer: Buffer = Buffer.alloc(totalLength) // 分配总长度的缓冲区
-        // 写入长度字段（8 位无符号整数）
+        const totalLength: number = 1 + length + 1 // 1-byte length field + signature content + 1-byte null terminator
+        const buffer: Buffer = Buffer.alloc(totalLength) // Allocate buffer for total length
+        // Write length field as an 8-bit unsigned integer
         buffer.writeUInt8(length, 0)
-        // 写入签名字符串内容
-        signatureBuffer.copy(buffer, 1) // 从偏移量 1 开始写入签名内容
-        // 写入末尾的空字节
-        buffer.writeUInt8(0, 1 + length) // 在签名内容后写入空终止符
+        // Write signature string content
+        signatureBuffer.copy(buffer, 1) // Copy signature content starting at offset 1
+        // Write null terminator at the end
+        buffer.writeUInt8(0, 1 + length) // Write null byte after signature content
         this.buffer = Buffer.concat([this.buffer, buffer])
         return this
     }
 
     /**
-     * 编码基础类型数据
-     * @param type
-     * @param value
+     * Encodes an ARRAY type value
+     * Buffer must be 4-byte aligned before calling this method
+     * @param signedValues Array elements, each associated with a signature
      */
-    public writeSimpleType(type: string, value: any): this {
-        switch (type) {
+    public writeArray(signedValues: DBusSignedValue[]): this {
+        this.align(4)
+
+        // Create a temporary encoder to encode array content and calculate its length
+        const contentEncoder = new DBusBufferEncoder(this.endianness, Buffer.alloc(0), 1)
+
+        // Encode each element in the array
+        for (const signedValue of signedValues) {
+            contentEncoder.writeSignedValue(signedValue)
+        }
+
+        // Get the byte length of the encoded array content
+        const contentBuffer = contentEncoder.getBuffer()
+        const contentLength = contentBuffer.length
+
+        // Write length field as a 4-byte unsigned integer
+        const lengthBuffer = Buffer.alloc(4)
+        if (this.endianness === DBusMessageEndianness.LE) {
+            lengthBuffer.writeUInt32LE(contentLength, 0) // Little-endian byte order
+        } else {
+            lengthBuffer.writeUInt32BE(contentLength, 0) // Big-endian byte order
+        }
+
+        // Append length field to the main buffer
+        this.buffer = Buffer.concat([this.buffer, lengthBuffer])
+
+        // Append array content to the main buffer
+        this.buffer = Buffer.concat([this.buffer, contentBuffer])
+        return this
+    }
+
+    /**
+     * Encodes a STRUCT type value
+     * Buffer must be 8-byte aligned before calling this method
+     * @param signedValues Struct fields, each associated with a signature
+     */
+    public writeStruct(signedValues: DBusSignedValue[]): this {
+        this.align(8)
+
+        // Encode each field of the struct in sequence
+        for (const signedValue of signedValues) {
+            this.writeSignedValue(signedValue)
+        }
+        return this
+    }
+
+    /**
+     * Encodes a DICT_ENTRY type value
+     * Buffer must be 8-byte aligned before calling this method
+     * @param signedValues Dictionary entry as a key-value pair, must contain exactly two elements (key and value), each associated with a signature
+     */
+    public writeDictEntry(signedValues: DBusSignedValue[]): this {
+        this.align(8)
+
+        // Ensure dictionary entry contains exactly two elements (key and value)
+        if (signedValues.length !== 2) {
+            throw new SignatureError(`Dictionary entry must contain exactly 2 elements (key and value), got ${signedValues.length}`)
+        }
+
+        // Encode key and value in sequence
+        this.writeSignedValue(signedValues[0]) // Encode key
+        this.writeSignedValue(signedValues[1]) // Encode value
+        return this
+    }
+
+    /**
+     * Encodes a VARIANT type value
+     * Buffer must be 1-byte aligned before calling this method
+     * @param signedValue Variant value, associated with a signature
+     */
+    public writeVariant(signedValue: DBusSignedValue): this {
+        this.align(1)
+
+        // Write the type signature of the variant
+        this.writeSignature(signedValue.$signature)
+
+        // Write the actual content of the variant
+        this.writeSignedValue(signedValue)
+        return this
+    }
+
+    /**
+     * Encodes a value based on its DBus type signature
+     * @param signedValue The value to encode, associated with a DBus signature
+     */
+    public writeSignedValue(signedValue: DBusSignedValue): this {
+        // Route encoding based on the signature type
+        switch (signedValue.$signature) {
+            // Basic data types
             case 'y':
-                return this.writeByte(value)
+                return this.writeByte(signedValue.$value)
             case 'b':
-                return this.writeBoolean(value)
+                return this.writeBoolean(signedValue.$value)
             case 'n':
-                return this.writeInt16(value)
+                return this.writeInt16(signedValue.$value)
             case 'q':
-                return this.writeUInt16(value)
+                return this.writeUInt16(signedValue.$value)
             case 'u':
-                return this.writeUInt32(value)
+                return this.writeUInt32(signedValue.$value)
             case 'i':
-                return this.writeInt32(value)
+                return this.writeInt32(signedValue.$value)
             case 'g':
-                return this.writeSignature(value)
+                return this.writeSignature(signedValue.$value)
             case 's':
-                return this.writeString(value)
+                return this.writeString(signedValue.$value)
             case 'o':
-                return this.writeObjectPath(value)
+                return this.writeObjectPath(signedValue.$value)
             case 'x':
-                return this.writeInt64(BigInt(value))
+                return this.writeInt64(BigInt(signedValue.$value))
             case 't':
-                return this.writeUInt64(BigInt(value))
+                return this.writeUInt64(BigInt(signedValue.$value))
             case 'd':
-                return this.writeDouble(value)
+                return this.writeDouble(signedValue.$value)
+            case 'h':
+                return this.writeUnixFD(signedValue.$value)
+            // Container data types
+            case 'a':
+                return this.writeArray(signedValue.$value)
+            case '(':
+                return this.writeStruct(signedValue.$value)
+            case '{':
+                return this.writeDictEntry(signedValue.$value)
+            case 'v':
+                return this.writeVariant(signedValue.$value)
             default:
-                throw new SignatureError(`Unsupported type: ${type}`)
+                throw new SignatureError(`Unsupported type: ${signedValue.$signature}`)
         }
     }
 
     /**
-     * 编码数组类型数据
-     * 使用前需要对之前的Buffer进行4字节对齐
+     * Retrieves the current encoded buffer
+     * @returns The current buffer with encoded data
      */
-    public writeArray(): this {
-        this.align(4)
-        //TODO 看起来不能单独拎出来进行编码
-        return this
+    public getBuffer(): Buffer {
+        return this.buffer
     }
 
     /**
-     * 编码结构类型数据
-     * 使用前需要对之前的Buffer进行8字节对齐
+     * Encodes a value or set of values based on a DBus signature
+     * @param signature The DBus signature defining the type(s) of the value(s)
+     * @param value The value(s) to encode, can be raw or already wrapped as DBusSignedValue(s)
+     * @returns The encoded buffer
      */
-    public writeStruct(): this {
-        this.align(8)
-        //TODO
-        return this
-    }
-
-    /**
-     * 编码变量数据
-     * 使用前需要对之前的Buffer进行1字节对齐
-     */
-    public writeVariant(): this {
-        this.align(1)
-        //TODO
-        return this
-    }
-
-    /**
-     * 编码字典数据
-     * 使用前需要对之前的Buffer进行8字节对齐
-     */
-    public writeDictEntry(): this {
-        this.align(8)
-        //TODO
-        return this
-    }
-
-    public write(): this {
-        //TODO
-        return this
-    }
-
-    public encode() {
-
+    public encode(signature: string, value: any | DBusSignedValue | DBusSignedValue[]): Buffer {
+        // Parse the input value(s) into signed values based on the signature
+        const signedValues: DBusSignedValue[] = DBusSignedValue.parse(signature, value)
+        // Encode each signed value
+        for (const signedValue of signedValues) {
+            this.writeSignedValue(signedValue)
+        }
+        return this.buffer
     }
 }

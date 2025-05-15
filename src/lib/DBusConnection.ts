@@ -339,24 +339,24 @@ export class DBusConnection extends EventEmitter {
         this.#stream.on('close', (): boolean => this.emit('close'))
             .on('error', (error: Error): boolean => this.emit('error', error))
             .on('readable', (): void => {
-                console.log('readable!!!!!')
-                while (true) {
-                    if (!state) {
-                        header = stream.read(16)
-                        console.log('header',header)
-                        if (!header) break
-                        state = true
-                        fieldsLength = header.readUInt32LE(12)
-                        fieldsLengthPadded = ((fieldsLength + 7) >> 3) << 3
-                        bodyLength = header.readUInt32LE(4)
-                        fieldsAndBodyLength = fieldsLengthPadded + bodyLength
-                    } else {
-                        fieldsAndBody = stream.read(fieldsAndBodyLength)
-                        if (!fieldsAndBody) break
-                        state = false
-                        // this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength))
-                    }
-                }
+               console.log(stream.read(16))
+                // while (true) {
+                //     if (!state) {
+                //         header = stream.read(16)
+                //         console.log('header',header)
+                //         if (!header) break
+                //         state = true
+                //         fieldsLength = header.readUInt32LE(12)
+                //         fieldsLengthPadded = ((fieldsLength + 7) >> 3) << 3
+                //         bodyLength = header.readUInt32LE(4)
+                //         fieldsAndBodyLength = fieldsLengthPadded + bodyLength
+                //     } else {
+                //         fieldsAndBody = stream.read(fieldsAndBodyLength)
+                //         if (!fieldsAndBody) break
+                //         state = false
+                //         // this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength))
+                //     }
+                // }
             })
         if ('setNoDelay' in this.#stream && typeof this.#stream.setNoDelay === 'function') this.#stream.setNoDelay()
     }

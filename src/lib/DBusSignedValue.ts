@@ -41,9 +41,16 @@ export class DBusSignedValue {
             }
 
             // Create independent DBusSignedValue objects for each type and corresponding value
-            return dataTypes.map((dataType, index) => new DBusSignedValue(dataType, values[index]))
+            // Check if the value is already a DBusSignedValue instance
+            return dataTypes.map((dataType, index) =>
+                values[index] instanceof DBusSignedValue ? values[index] : new DBusSignedValue(dataType, values[index])
+            )
         } else {
             // For single types, structs, or other composite types, return a single DBusSignedValue object
+            // If value is already a DBusSignedValue instance and matches the signature, return it directly
+            if (value instanceof DBusSignedValue && dataTypes.length === 1 && value.$signature === dataTypes[0].type) {
+                return [value]
+            }
             return [new DBusSignedValue(dataTypes, value)]
         }
     }
@@ -75,17 +82,33 @@ export class DBusSignedValue {
             if (structValues.length !== dataTypes.length) {
                 throw new SignatureError(`Struct value length (${structValues.length}) does not match signature child length (${dataTypes.length})`)
             }
-            this.$value = structValues.map((item, index) => new DBusSignedValue(dataTypes[index], item))
+            // Check if each value is already a DBusSignedValue instance
+            this.$value = structValues.map((item, index) => {
+                if (item instanceof DBusSignedValue) {
+                    // If the item is a DBusSignedValue and the corresponding type is 'v', wrap it in a variant structure
+                    if (dataTypes[index].type === 'v') {
+                        return new DBusSignedValue('v', item)
+                    }
+                    return item
+                }
+                return new DBusSignedValue(dataTypes[index], item)
+            })
         } else {
             const dataType: DataType = dataTypes[0]
             this.$signature = dataType.type // Extract the type as the signature for single type
 
             // Process value based on type
             if (dataType.type === 'v') {
-                // Special handling for variant type, infer signature from value type
-                const inferredType: string = this.inferType(value)
-                const inferredDataType: DataType = Signature.parseSignature(inferredType)[0]
-                this.$value = new DBusSignedValue(inferredDataType, value)
+                // Special handling for variant type
+                if (value instanceof DBusSignedValue) {
+                    // If value is already a DBusSignedValue instance, use it directly (it will be wrapped in variant structure by caller if needed)
+                    this.$value = value
+                } else {
+                    // Otherwise, infer signature from value type
+                    const inferredType: string = this.inferType(value)
+                    const inferredDataType: DataType = Signature.parseSignature(inferredType)[0]
+                    this.$value = new DBusSignedValue(inferredDataType, value)
+                }
             } else if (dataType.child && dataType.child.length > 0) {
                 // Handle composite types: array, dictionary, struct
                 switch (dataType.type) {
@@ -119,10 +142,17 @@ export class DBusSignedValue {
                         }
                         // Handle Array or TypedArray for array type
                         if (dataType.child[0].type === 'v') {
-                            // If child type is variant, process each element directly
-                            this.$value = Array.from(value).map((item: any) => new DBusSignedValue(dataType.child![0], item))
+                            // If child type is variant, check if elements are DBusSignedValue instances
+                            this.$value = Array.from(value).map((item: any) =>
+                                item instanceof DBusSignedValue
+                                    ? new DBusSignedValue('v', item) // Wrap in variant structure
+                                    : new DBusSignedValue(dataType.child![0], item)
+                            )
                         } else {
-                            this.$value = Array.from(value).map((item: any) => new DBusSignedValue(dataType.child![0], item))
+                            // For non-variant child types, check if elements are DBusSignedValue instances
+                            this.$value = Array.from(value).map((item: any) =>
+                                item instanceof DBusSignedValue ? item : new DBusSignedValue(dataType.child![0], item)
+                            )
                         }
                         break
 
@@ -149,8 +179,8 @@ export class DBusSignedValue {
                             }
                             const [key, val] = entries[0]
                             this.$value = [
-                                new DBusSignedValue(dataType.child[0], key),
-                                new DBusSignedValue(dataType.child[1], val)
+                                <any>key instanceof DBusSignedValue ? key : new DBusSignedValue(dataType.child[0], key),
+                                <any>val instanceof DBusSignedValue ? val : new DBusSignedValue(dataType.child[1], val)
                             ]
                         } else {
                             throw new SignatureError(`Expected array or object with one key-value pair for dictionary signature "{}", got: ${typeof value}`)
@@ -170,7 +200,15 @@ export class DBusSignedValue {
                         if (structValues.length !== dataType.child.length) {
                             throw new SignatureError(`Struct value length (${structValues.length}) does not match signature child length (${dataType.child.length})`)
                         }
+                        // Check if each value is already a DBusSignedValue instance
                         this.$value = structValues.map((item: any, index: number) => {
+                            if (item instanceof DBusSignedValue) {
+                                // If the item is a DBusSignedValue and the corresponding type is 'v', wrap it in a variant structure
+                                if (dataType.child![index].type === 'v') {
+                                    return new DBusSignedValue('v', item)
+                                }
+                                return item
+                            }
                             return new DBusSignedValue(dataType.child![index], item)
                         })
                         break

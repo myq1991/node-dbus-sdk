@@ -1,12 +1,15 @@
 import {DBusMessageHeader} from '../types/DBusMessageHeader'
 import {DBusMessageType} from './DBusMessageType'
 import {DBusMessageFlags} from './DBusMessageFlags'
-import {DBusBuffer} from './DBusBuffer'
 import {SerialError} from './Errors'
 import {DBusMessageEndianness} from './DBusMessageEndianness'
-import {DBusTypedValue} from './DBusTypedValue'
+import {DBusBufferEncoder} from './DBusBufferEncoder'
+import {DBusSignedValue} from './DBusSignedValue'
+import {DBusBuffer} from './DBusBuffer'
 
 export class DBusMessage {
+    // public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.BE
+    public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.LE
     public readonly header: DBusMessageHeader
     public readonly body: any[] = []
 
@@ -34,23 +37,11 @@ export class DBusMessage {
         if (!this.header.serial) throw new SerialError('Missing or invalid serial')
         const flags: DBusMessageFlags = this.header.flags || DBusMessageFlags.REPLY_EXPECTED
         const type: DBusMessageType = this.header.type || DBusMessageType.METHOD_CALL
-
-        console.log({
-            serial: this.header.serial,
-            type: this.header.type,
-            flags: this.header.flags,
-            path: this.header.path,
-            interface: this.header.interfaceName,
-            member: this.header.member,
-            destination: this.header.destination,
-            signature: this.header.signature,
-            body: this.body
-        })
-
         let bodyLength: number = 0
         let bodyBuff: Buffer = Buffer.from([])
         if (this.header.signature && this.body.length > 0) {
-            bodyBuff = new DBusBuffer().write(this.header.signature, this.body).toBuffer()
+            const bodyEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
+            bodyBuff = bodyEncoder.encode(this.header.signature, this.body)
             bodyLength = bodyBuff.length
         }
         // Create header fields array
@@ -59,13 +50,12 @@ export class DBusMessage {
             if (fieldName && this.header[fieldName]) {
                 fields.push([
                     DBusMessage.headerTypeId[fieldName],
-                    new DBusTypedValue(DBusMessage.fieldSignature[fieldName], this.header[fieldName])
+                    new DBusSignedValue(DBusMessage.fieldSignature[fieldName], this.header[fieldName])
                 ])
             }
         })
-        console.log(fields)
-        // Encode fields to calculate length
-        const fieldsBuff: Buffer = new DBusBuffer().write('a(yv)', fields).toBuffer()
+        const fieldsEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
+        const fieldsBuff: Buffer = fieldsEncoder.encode('a(yv)', fields)
         // Build basic header with only 12 bytes (without headerFieldsLength)
         const headerBasic: number[] = [
             DBusMessageEndianness.LE,
@@ -75,14 +65,14 @@ export class DBusMessage {
             bodyLength,
             this.header.serial
         ]
-        const headerBuffer: Buffer = new DBusBuffer().write('yyyyuu', headerBasic).toBuffer()
+        const headerEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
+        const headerBuffer: Buffer = headerEncoder.encode('yyyyuu', headerBasic)
         // Calculate total header length (headerBuffer + fieldsBuff) and align to 8-byte boundary
         const totalHeaderLen: number = headerBuffer.length + fieldsBuff.length
         const headerLenAligned: number = Math.ceil(totalHeaderLen / 8) * 8
         const paddingLen: number = headerLenAligned - totalHeaderLen
         const paddingBuff: Buffer = Buffer.alloc(paddingLen, 0)
         // Combine header, fields, padding, and body
-        console.log('fieldsBuff:', JSON.stringify(Array.from(fieldsBuff)))
         return Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
     }
 

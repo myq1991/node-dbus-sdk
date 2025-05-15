@@ -48,9 +48,9 @@ export class DBus {
         this.#connection.write(buf)
 
 
-        setTimeout(() => {
+        setInterval(() => {
             const buf2 = DBusMessage.encode({
-                serial: 3,
+                serial: 2,
                 type: 1,
                 destination: 'org.ptswitch.pad',
                 path: '/slot1/port1/stc',
