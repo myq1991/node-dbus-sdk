@@ -354,4 +354,8 @@ export class DBusBufferEncoder {
         //TODO
         return this
     }
+
+    public encode() {
+
+    }
 }
