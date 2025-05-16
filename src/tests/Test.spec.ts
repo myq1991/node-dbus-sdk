@@ -5,22 +5,23 @@ import {runDBusBufferReadArrayTestSet, runDBusBufferTestSet} from './DBusBuffer.
 import {DBusSignedValue} from '../lib/DBusSignedValue'
 import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {DBusMessageEndianness} from '../lib/DBusMessageEndianness'
+import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
 
 // runDBusBufferTestSet()
 // runDBusBufferReadArrayTestSet()
 
-setImmediate(async (): Promise<void> => {
-    const dbus=await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
-    console.log('success')
-    dbus.write()
-//     // const dbuf = new DBusBuffer()
-//     // const data = `{"name":"Json.CN","url":"http://www.json.cn","page":88,"isNonProfit":true,"address":{"street":"科技园路.","city":"江苏苏州","country":"中国"},"links":[{"name":"Google","url":"http://www.google.com"},{"name":"Baidu","url":"http://www.baidu.com"},{"name":"SoSo","url":"http://www.SoSo.com"}]}`
-//     //
-//     // const buffer=new DBusBuffer().write('ssib(sss)a(ss)', JSON.parse(`{"name":"Json.CN","url":"http://www.json.cn","page":88,"isNonProfit":true,"address":{"street":"科技园路.","city":"江苏苏州","country":"中国"},"links":[{"name":"Google","url":"http://www.google.com"},{"name":"Baidu","url":"http://www.baidu.com"},{"name":"SoSo","url":"http://www.SoSo.com"}]}`)).toBuffer()
-//     const buffer = new DBusBuffer().write('a{sv}', {a: true, b: 1, c: '1234'}).toBuffer()
-//     console.log(buffer)
-//     console.log(new DBusBuffer(buffer).read('a{sv}'))
-})
+// setImmediate(async (): Promise<void> => {
+//     const dbus=await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
+//     console.log('success')
+//     dbus.write()
+// //     // const dbuf = new DBusBuffer()
+// //     // const data = `{"name":"Json.CN","url":"http://www.json.cn","page":88,"isNonProfit":true,"address":{"street":"科技园路.","city":"江苏苏州","country":"中国"},"links":[{"name":"Google","url":"http://www.google.com"},{"name":"Baidu","url":"http://www.baidu.com"},{"name":"SoSo","url":"http://www.SoSo.com"}]}`
+// //     //
+// //     // const buffer=new DBusBuffer().write('ssib(sss)a(ss)', JSON.parse(`{"name":"Json.CN","url":"http://www.json.cn","page":88,"isNonProfit":true,"address":{"street":"科技园路.","city":"江苏苏州","country":"中国"},"links":[{"name":"Google","url":"http://www.google.com"},{"name":"Baidu","url":"http://www.baidu.com"},{"name":"SoSo","url":"http://www.SoSo.com"}]}`)).toBuffer()
+// //     const buffer = new DBusBuffer().write('a{sv}', {a: true, b: 1, c: '1234'}).toBuffer()
+// //     console.log(buffer)
+// //     console.log(new DBusBuffer(buffer).read('a{sv}'))
+// })
 
 // const dbsv = DBusSignedValue.parse('as', ['hello', 'world'])
 // const dbsv = DBusSignedValue.parse('{sv}', {key1: 'value1'})
@@ -104,13 +105,12 @@ setImmediate(async (): Promise<void> => {
 //
 // console.log(stringify(dbsv, null, 2))
 
-
 // // console.log(dbsv.$value[12].$value)
 // // console.log(dbsv.$value[12].$value)
 // // console.log(JSON.stringify(dbsv, null, 2))
 //
 // //
-// const encoder = new DBusBufferEncoder()
+const encoder = new DBusBufferEncoder()
 // // // // const encodeBuf = encoder.encode('i(ii)', [123, [456, 789]])
 // // const encodeBuf = encoder.encode('a(yv)', [
 // //     [1, new DBusSignedValue('o', '/org/freedesktop/DBus')],
@@ -118,14 +118,18 @@ setImmediate(async (): Promise<void> => {
 // //     [3, 'Hello'],
 // //     [6, 'org.freedesktop.DBus']
 // // ])
-//
-// const encodeBuf = encoder.encode('a(yv)', [
-//     [1, new DBusSignedValue('o', '/slot1/port1/stc')],
-//     [2, 'pad.stc'],
-//     [3, 'portGetSpeed'],
-//     [6, 'org.ptswitch.pad']
-// ])
-//
+
+const encodeBuf = encoder.encode('a(yv)', [
+    [1, new DBusSignedValue('o', '/slot1/port1/stc')],
+    [2, 'pad.stc'],
+    [3, 'portGetSpeed'],
+    [6, 'org.ptswitch.pad']
+])
+console.log(stringify(Array.from(encodeBuf)),encodeBuf.length)
+const decoder= new DBusBufferDecoder(DBusMessageEndianness.LE,encodeBuf)
+console.log(decoder.read('a(yv)'))
+// console.log(decoder.decode('a(yv)'))
+
 // console.log(stringify(Array.from(encodeBuf)), encodeBuf.length)
 
 // const headerEncoder = new DBusBufferEncoder(DBusMessageEndianness.LE)

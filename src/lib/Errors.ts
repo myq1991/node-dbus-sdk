@@ -47,3 +47,18 @@ export class ObjectPathError extends Error implements NodeJS.ErrnoException {
     errno: number = 1009
     code: string = 'E_OBJECT_PATH'
 }
+
+export class AlignmentError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1010
+    code: string = 'E_ALIGNMENT'
+}
+
+export class ReadBufferError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1011
+    code: string = 'E_READ_BUFFER'
+}
+
+export class InvalidValueError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1012
+    code: string = 'E_INVALID_VALUE'
+}
