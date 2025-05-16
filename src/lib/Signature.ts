@@ -30,8 +30,10 @@ export class Signature {
         }
 
         function parseOne(c: Types): DataType {
+            const parsingType: Types = c
+
             function checkNotEnd(c: Types) {
-                if (!c) throw new SignatureError('Bad signature: unexpected end')
+                if (!c) throw new SignatureError(`Bad signature: unexpected end (${parsingType})`)
                 return c
             }
 

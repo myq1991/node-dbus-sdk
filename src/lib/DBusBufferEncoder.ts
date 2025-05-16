@@ -356,12 +356,109 @@ export class DBusBufferEncoder {
     public writeVariant(signedValue: DBusSignedValue): this {
         this.align(1)
 
-        // Write the type signature of the variant
-        this.writeSignature(signedValue.$signature)
+        // Reconstruct the complete signature string for the variant's internal value
+        const signature = this.buildSignature(signedValue)
 
+        // Write the type signature of the variant
+        // this.writeSignature(signedValue.$signature)
+        this.writeSignature(signature)
+        console.log(JSON.stringify(signedValue))
         // Write the actual content of the variant
         this.writeSignedValue(signedValue)
         return this
+    }
+
+    /**
+     * Builds the complete signature string for a given signed value
+     * Recursively handles nested structures like arrays, structs, dictionaries, and variants
+     * @param signedValue The signed value to build a signature for
+     * @returns The complete signature string
+     */
+    /**
+     * Builds the complete signature string for a given signed value
+     * Recursively handles nested structures like arrays, structs, dictionaries, and variants
+     * @param signedValue The signed value to build a signature for
+     * @returns The complete signature string
+     */
+    private buildSignature(signedValue: DBusSignedValue): string {
+        // Basic types return their signature directly
+        const basicTypes = ['y', 'b', 'n', 'q', 'u', 'i', 'g', 's', 'o', 'x', 't', 'd', 'h'];
+        if (basicTypes.includes(signedValue.$signature)) {
+            return signedValue.$signature;
+        }
+
+        // Handle container types recursively
+        switch (signedValue.$signature) {
+            case 'a': {
+                // Array: Check if the array is empty or elements have consistent signatures
+                const values = signedValue.$value as DBusSignedValue[];
+                if (values.length === 0) {
+                    throw new SignatureError('Cannot build signature for empty array in variant');
+                }
+
+                // Get the signature of the first element
+                const firstElementSignature = this.buildSignature(values[0]);
+
+                // Check if all elements have the same signature
+                const isConsistent = values.every(val => this.buildSignature(val) === firstElementSignature);
+
+                if (isConsistent) {
+                    // If consistent, return 'a' followed by the element's signature
+                    return `a${firstElementSignature}`;
+                } else {
+                    // If inconsistent, check if it matches a dictionary structure like 'a{sv}'
+                    // Assume dictionary array if elements are dict entries with key-value pairs
+                    const isDictArray = values.every(val => val.$signature === '{');
+                    if (isDictArray) {
+                        // Check the structure of the dictionary entries
+                        const firstDictEntry = values[0].$value as DBusSignedValue[];
+                        if (firstDictEntry.length === 2) {
+                            // Get signatures of key and value from the first entry
+                            const firstKeySignature = this.buildSignature(firstDictEntry[0]);
+                            const firstValueSignature = this.buildSignature(firstDictEntry[1]);
+
+                            // Check if all dictionary entries have consistent key signatures
+                            const areKeysConsistent = values.every(val => {
+                                const [key] = val.$value as DBusSignedValue[];
+                                return this.buildSignature(key) === firstKeySignature;
+                            });
+
+                            // Check if all dictionary entries have consistent value signatures
+                            const areValuesConsistent = values.every(val => {
+                                const [, value] = val.$value as DBusSignedValue[];
+                                return this.buildSignature(value) === firstValueSignature;
+                            });
+
+                            // Build the dictionary signature based on consistency
+                            const keySignature = areKeysConsistent ? firstKeySignature : 'v';
+                            const valueSignature = areValuesConsistent ? firstValueSignature : 'v';
+                            return `a{${keySignature}${valueSignature}}`;
+                        }
+                    }
+                    // If not a consistent dictionary array or other recognized structure, throw error
+                    throw new SignatureError('Cannot build signature for array with inconsistent element types in variant');
+                }
+            }
+            case '(': {
+                // Struct: signature is '(' followed by field signatures and ')'
+                const fieldSignedValues = signedValue.$value as DBusSignedValue[];
+                const fieldSignatures = fieldSignedValues.map(field => this.buildSignature(field)).join('');
+                return `(${fieldSignatures})`;
+            }
+            case '{': {
+                // Dictionary entry: signature is '{' followed by key and value signatures and '}'
+                const [keySignedValue, valueSignedValue] = signedValue.$value as DBusSignedValue[];
+                const keySignature = this.buildSignature(keySignedValue);
+                const valueSignature = this.buildSignature(valueSignedValue);
+                return `{${keySignature}${valueSignature}}`;
+            }
+            case 'v': {
+                // Variant: signature is 'v' directly, not the internal value's signature
+                return 'v';
+            }
+            default:
+                throw new SignatureError(`Cannot build signature for unsupported type: ${signedValue.$signature}`);
+        }
     }
 
     /**

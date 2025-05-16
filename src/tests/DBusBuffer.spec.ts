@@ -12,7 +12,7 @@ function DBusBufferSpecTest(signature: string, data: any): void {
     const encodeBuffer: Buffer = encoder.encode(signature, data)
     console.log('encodeBuffer:', stringify(Array.from(encodeBuffer)), 'length:', encodeBuffer.length)
     const decoder = new DBusBufferDecoder(endianness, encodeBuffer)
-    console.log(stringify(decoder.read(signature),null,2))
+    console.log(stringify(decoder.read(signature), null, 2))
 }
 
 const TestSet: { signature: string, data: any }[] = [
@@ -39,9 +39,11 @@ const TestSet: { signature: string, data: any }[] = [
             42,
             true,
             [1, 2, 3],
-            {key: 'value'}
+            // {key: 'value'}
+            {key: 12345, key2: 67890}
+            // {key: 'value',key2:123}
         ]
-    },
+    }
     // {
     //     signature: 'aav',
     //     data: [
