@@ -20,10 +20,10 @@ export class DBusSignedValue {
      */
     public static parse(signature: string, value: any | DBusSignedValue | DBusSignedValue[]): DBusSignedValue[] {
         // Parse the signature string into an array of DataType objects
-        const dataTypes = Signature.parseSignature(signature)
+        const dataTypes: DataType[] = Signature.parseSignature(signature)
 
         // Check if the signature represents a struct (starts with '(' and ends with ')')
-        const isStruct = signature.trim().startsWith('(') && signature.trim().endsWith(')')
+        const isStruct: boolean = signature.trim().startsWith('(') && signature.trim().endsWith(')')
 
         if (dataTypes.length > 1 && !isStruct) {
             // If the signature has multiple types and is not a struct, treat it as an independent parameter sequence (e.g., 'si')
@@ -42,7 +42,7 @@ export class DBusSignedValue {
 
             // Create independent DBusSignedValue objects for each type and corresponding value
             // Check if the value is already a DBusSignedValue instance
-            return dataTypes.map((dataType, index) =>
+            return dataTypes.map((dataType: DataType, index: number): DBusSignedValue =>
                 values[index] instanceof DBusSignedValue ? values[index] : new DBusSignedValue(dataType, values[index])
             )
         } else {
@@ -79,11 +79,16 @@ export class DBusSignedValue {
         // Handle different signature types
         switch (value.$signature) {
             case 'a': // Array
-                const arrayValues = (value.$value as DBusSignedValue[]).map(item => DBusSignedValue.convertToPlain(item))
+                const arrayValues: any[] = (value.$value as DBusSignedValue[]).map(item => DBusSignedValue.convertToPlain(item))
                 // Check if the array represents a dictionary array (e.g., a{sv})
                 if (arrayValues.length > 0 && typeof arrayValues[0] === 'object' && !Array.isArray(arrayValues[0])) {
                     // Merge dictionary entries into a single object
                     return arrayValues.reduce((acc, curr) => ({...acc, ...curr}), {})
+                }
+                // Check if the array represents a byte array (ay)
+                if (arrayValues.length > 0 && Array.isArray(value.$value) && value.$value.length > 0 && (value.$value as DBusSignedValue[])[0].$signature === 'y') {
+                    // Convert to Buffer for byte array
+                    return Buffer.from(arrayValues as number[])
                 }
                 return arrayValues
             case '{': // Dictionary (key-value pair)

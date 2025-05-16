@@ -20,19 +20,19 @@ const TestSet: { signature: string, data: any }[] = [
     // {signature: 'i', data: 1},
     // {signature: 'b', data: true},
     // {signature: 'ib', data: [1, true]},
-    // {
-    //     signature: 'a(yv)',
-    //     data: [
-    //         [1, new DBusSignedValue('o', '/slot1/port1/stc')],
-    //         [2, 'pad.stc'],
-    //         [3, 'portGetSpeed'],
-    //         [6, 'org.ptswitch.pad']
-    //     ]
-    // }
     {
-        signature: 'a{say}',
-        data: {test: Buffer.from('hahahahah')}
+        signature: 'a(yv)',
+        data: [
+            [1, new DBusSignedValue('o', '/slot1/port1/stc')],
+            [2, 'pad.stc'],
+            [3, 'portGetSpeed'],
+            [6, 'org.ptswitch.pad']
+        ]
     },
+    // {
+    //     signature: 'a{say}',
+    //     data: {test: Buffer.from('hahahahah')}
+    // },
     // {
     //     signature: 'av',
     //     data: [

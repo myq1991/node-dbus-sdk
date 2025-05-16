@@ -434,20 +434,20 @@ export class DBusBufferDecoder {
         }
 
         // Read the signature of the contained type
-        const signatureValue = this.readSignature()
+        const signatureValue: DBusSignedValue = this.readSignature()
 
         const variantSignature = signatureValue.$value as string // Extract the signature string from DBusSignedValue
 
         // Parse the signature to get the DataType(s)
-        const dataTypes = Signature.parseSignature(variantSignature)
+        const dataTypes: DataType[] = Signature.parseSignature(variantSignature)
 
         if (dataTypes.length !== 1) {
             throw new SignatureError(`VARIANT signature must describe exactly one type, got: ${variantSignature}`)
         }
-        const dataType = dataTypes[0]
+        const dataType: DataType = dataTypes[0]
 
         // Read the value based on the signature
-        const variantContent = this.readSignedValue(dataType)
+        const variantContent: DBusSignedValue = this.readSignedValue(dataType)
 
         // Return a DBusSignedValue with signature 'v' and the contained value
         return new DBusSignedValue('v', variantContent)
