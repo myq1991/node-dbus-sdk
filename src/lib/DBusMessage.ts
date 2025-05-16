@@ -5,7 +5,7 @@ import {SerialError} from './Errors'
 import {DBusMessageEndianness} from './DBusMessageEndianness'
 import {DBusBufferEncoder} from './DBusBufferEncoder'
 import {DBusSignedValue} from './DBusSignedValue'
-import {DBusBuffer} from './DBusBuffer'
+import {DBusBufferDecoder} from './DBusBufferDecoder'
 
 export class DBusMessage {
     // public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.BE
@@ -147,6 +147,10 @@ export class DBusMessage {
      * @param bodyLength
      */
     public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number): DBusMessage {
+        const endianness: DBusMessageEndianness = header[0] === DBusMessageEndianness.LE ? DBusMessageEndianness.LE : DBusMessageEndianness.BE
+        const headerDecoder:DBusBufferDecoder=new DBusBufferDecoder(endianness, header)
+        const fieldsAndBodyDecoder:DBusBufferDecoder=new DBusBufferDecoder(endianness, fieldsAndBody)
+
         const messageBuffer: DBusBuffer = new DBusBuffer(Buffer.concat([header, fieldsAndBody]))
         const message = messageBuffer.readMessage()
         return new DBusMessage(this.mapToDBusMessageHeader(message.header), message.body || [])
