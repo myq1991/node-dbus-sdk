@@ -56,6 +56,59 @@ export class DBusSignedValue {
     }
 
     /**
+     * Static method to convert an array of DBusSignedValue objects back to plain JavaScript objects.
+     * Recursively processes nested structures and removes DBus signature metadata.
+     * @param values - An array of DBusSignedValue objects to convert.
+     * @returns An array of plain JavaScript values representing the data without DBus signatures.
+     */
+    public static toJSON(values: DBusSignedValue[]): any[] {
+        return values.map(value => DBusSignedValue.convertToPlain(value))
+    }
+
+    /**
+     * Private static method to recursively convert a single DBusSignedValue object to a plain JavaScript value.
+     * @param value - The DBusSignedValue object to convert.
+     * @returns The plain JavaScript value.
+     */
+    private static convertToPlain(value: DBusSignedValue): any {
+        // If the value is a basic type (not a composite type), return the raw value
+        if (!Array.isArray(value.$value) && !(value.$value instanceof DBusSignedValue)) {
+            return value.$value
+        }
+
+        // Handle different signature types
+        switch (value.$signature) {
+            case 'a': // Array
+                const arrayValues = (value.$value as DBusSignedValue[]).map(item => DBusSignedValue.convertToPlain(item))
+                // Check if the array represents a dictionary array (e.g., a{sv})
+                if (arrayValues.length > 0 && typeof arrayValues[0] === 'object' && !Array.isArray(arrayValues[0])) {
+                    // Merge dictionary entries into a single object
+                    return arrayValues.reduce((acc, curr) => ({...acc, ...curr}), {})
+                }
+                return arrayValues
+            case '{': // Dictionary (key-value pair)
+                const [key, val] = value.$value as DBusSignedValue[]
+                return {
+                    [DBusSignedValue.convertToPlain(key) as string]: DBusSignedValue.convertToPlain(val)
+                }
+            case '(': // Struct
+                return (value.$value as DBusSignedValue[]).map(item => DBusSignedValue.convertToPlain(item))
+            case 'v': // Variant
+                return DBusSignedValue.convertToPlain(value.$value as DBusSignedValue)
+            default:
+                // For nested structures or unsupported types, recursively process if it's a DBusSignedValue
+                if (value.$value instanceof DBusSignedValue) {
+                    return DBusSignedValue.convertToPlain(value.$value)
+                } else if (Array.isArray(value.$value)) {
+                    return value.$value.map((item: any) =>
+                        item instanceof DBusSignedValue ? DBusSignedValue.convertToPlain(item) : item
+                    )
+                }
+                return value.$value
+        }
+    }
+
+    /**
      * Constructor for creating a DBusSignedValue object from a signature and value.
      * @param signature - The DBus signature, as a string, DataType, or array of DataType.
      * @param value - The value associated with the signature.

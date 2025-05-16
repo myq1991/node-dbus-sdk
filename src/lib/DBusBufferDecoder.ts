@@ -530,7 +530,7 @@ export class DBusBufferDecoder {
         return results
     }
 
-    public decode(signature: string): any {
-        //TODO
+    public decode(signature: string): any[] {
+        return DBusSignedValue.toJSON(this.read(signature))
     }
 }

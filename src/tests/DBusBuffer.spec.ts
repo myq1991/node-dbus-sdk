@@ -12,7 +12,8 @@ function DBusBufferSpecTest(signature: string, data: any): void {
     const encodeBuffer: Buffer = encoder.encode(signature, data)
     console.log('encodeBuffer:', stringify(Array.from(encodeBuffer)), 'length:', encodeBuffer.length)
     const decoder = new DBusBufferDecoder(endianness, encodeBuffer)
-    console.log(stringify(decoder.read(signature), null, 2))
+    // console.log(stringify(decoder.read(signature), null, 2))
+    console.log(stringify(decoder.decode(signature), null, 2))
 }
 
 const TestSet: { signature: string, data: any }[] = [
@@ -28,31 +29,22 @@ const TestSet: { signature: string, data: any }[] = [
     //         [6, 'org.ptswitch.pad']
     //     ]
     // }
-    // {
-    //     signature: 'a{say}',
-    //     data: {test: Buffer.from('hahahahah')}
-    // },
     {
-        signature: 'av',
-        // data: [
-        //     'Hello',
-        //     42,
-        //     true,
-        //     [1, 2, 3],
-        //     // {key: 'value'}
-        //     {key: 12345, key2: 67890}
-        //     // {key: 'value',key2:123}
-        // ],
-        data: [
-            'Hello',
-            42,
-            true,
-            [1, 2, 3],
-            // {key: 'value'}
-            {key: 12345, key2: 67890}
-            // {key: 'value',key2:123}
-        ]
+        signature: 'a{say}',
+        data: {test: Buffer.from('hahahahah')}
     },
+    // {
+    //     signature: 'av',
+    //     data: [
+    //         'Hello',
+    //         42,
+    //         true,
+    //         [1, 2, 3],
+    //         // {key: 'value'}
+    //         {key: 12345, key2: 67890}
+    //         // {key: 'value',key2:123}
+    //     ]
+    // },
     // {
     //     signature: 'av',
     //     data: [
@@ -64,7 +56,7 @@ const TestSet: { signature: string, data: any }[] = [
     //         new DBusSignedValue('a{si}',{key: 12345, key2: 67890})
     //         // {key: 'value',key2:123}
     //     ]
-    // }
+    // },
     // {
     //     signature: 'aav',
     //     data: [
