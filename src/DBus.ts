@@ -19,7 +19,22 @@ export class DBus {
         return new DBus(await DBusConnection.createConnection(opts))
     }
 
-    public write() {
+    /**
+     * Write data to DBus socket
+     * @param data
+     */
+    public write(data: Buffer) {
+        this.#connection.write(data)
+    }
+
+    public async invokeMethod(){}
+
+    public async getProperty(){}
+
+    public async setProperty(){}
+
+
+    public _write() {
         // // const buf=new DBusMessage({
         // //     serial: 1,
         // //     destination: 'org.ptswitch.pad',
