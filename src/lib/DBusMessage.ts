@@ -8,9 +8,11 @@ import {DBusSignedValue} from './DBusSignedValue'
 import {DBusBufferDecoder} from './DBusBufferDecoder'
 
 export class DBusMessage {
-    // public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.BE
+
     public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.LE
+
     public readonly header: DBusMessageHeader
+
     public readonly body: any[] = []
 
     constructor(header: DBusMessageHeader | Partial<DBusMessageHeader>, ...body: any[]) {
@@ -148,12 +150,32 @@ export class DBusMessage {
      */
     public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number): DBusMessage {
         const endianness: DBusMessageEndianness = header[0] === DBusMessageEndianness.LE ? DBusMessageEndianness.LE : DBusMessageEndianness.BE
-        const headerDecoder:DBusBufferDecoder=new DBusBufferDecoder(endianness, header)
-        const fieldsAndBodyDecoder:DBusBufferDecoder=new DBusBufferDecoder(endianness, fieldsAndBody)
-
-        const messageBuffer: DBusBuffer = new DBusBuffer(Buffer.concat([header, fieldsAndBody]))
-        const message = messageBuffer.readMessage()
-        return new DBusMessage(this.mapToDBusMessageHeader(message.header), message.body || [])
+        const headerDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, header)
+        const headers: number[] = headerDecoder.decode('yyyyuuu')
+        const type: number = headers[1]
+        const flags: number = headers[2]
+        const protocolVersion: number = headers[3]
+        const serial: number = headers[5]
+        let fulfillFieldsBuffer: Buffer = Buffer.concat([header.subarray(12), fieldsAndBody.subarray(0, fieldsLength)])
+        const offset: number = fieldsAndBody.length % 8
+        const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fulfillFieldsBuffer)
+        const [fields] = fieldsDecoder.decode('a(yv)')
+        const messageHeader: Partial<DBusMessageHeader> = {
+            type: type,
+            flags: flags,
+            protocolVersion: protocolVersion,
+            serial: serial
+        }
+        for (const field of (fields as [number, string | number][])) {
+            const [typeId, fieldValue] = field
+            const headerTypeName: string | null = this.headerTypeName[typeId]
+            if (!headerTypeName) continue
+            messageHeader[headerTypeName] = fieldValue
+        }
+        if (!bodyLength || !messageHeader.signature) return new DBusMessage(messageHeader)
+        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fieldsAndBody.subarray(fieldsLength + offset))
+        const body: any[] = bodyDecoder.decode(messageHeader.signature)
+        return new DBusMessage(messageHeader, ...body)
     }
 
     /**

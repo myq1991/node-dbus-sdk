@@ -524,7 +524,6 @@ export class DBusBufferEncoder {
     public encode(signature: string, value: any | DBusSignedValue | DBusSignedValue[]): Buffer {
         // Parse the input value(s) into signed values based on the signature
         const signedValues: DBusSignedValue[] = DBusSignedValue.parse(signature, value)
-        console.log(JSON.stringify(signedValues, null, 2))
         // Encode each signed value
         for (const signedValue of signedValues) {
             this.writeSignedValue(signedValue)
