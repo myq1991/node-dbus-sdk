@@ -12,7 +12,7 @@ function DBusBufferSpecTest(signature: string, data: any): void {
     const encodeBuffer: Buffer = encoder.encode(signature, data)
     console.log('encodeBuffer:', stringify(Array.from(encodeBuffer)), 'length:', encodeBuffer.length)
     const decoder = new DBusBufferDecoder(endianness, encodeBuffer)
-    // console.log(stringify(decoder.read(signature), null, 2))
+    // console.log(stringify(decoder.toSignedValues(signature), null, 2))
     console.log(stringify(decoder.decode(signature), null, 2))
 }
 

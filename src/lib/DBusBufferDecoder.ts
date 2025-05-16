@@ -515,7 +515,7 @@ export class DBusBufferDecoder {
      * @param signature The DBus signature string describing the type(s) to read
      * @returns An array of DBusSignedValue instances
      */
-    public read(signature: string): DBusSignedValue[] {
+    public toSignedValues(signature: string): DBusSignedValue[] {
         const dataTypes: DataType[] = Signature.parseSignature(signature)
 
         if (dataTypes.length === 0) {
@@ -531,6 +531,6 @@ export class DBusBufferDecoder {
     }
 
     public decode(signature: string): any[] {
-        return DBusSignedValue.toJSON(this.read(signature))
+        return DBusSignedValue.toJSON(this.toSignedValues(signature))
     }
 }
