@@ -63,7 +63,7 @@ export class DBusSignedValue {
     constructor(signature: string | DataType | DataType[], value: any | DBusSignedValue | DBusSignedValue[]) {
         // Handle signature input: parse string to DataType array, or use directly if already DataType or array
         const dataTypes: DataType[] = typeof signature === 'string'
-            ? Signature.parseSignature(signature)
+            ? signature.length > 1 ? Signature.parseSignature(signature) : [{type: <any>signature}]
             : Array.isArray(signature)
                 ? signature
                 : [signature]

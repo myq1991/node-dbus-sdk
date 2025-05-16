@@ -1,14 +1,13 @@
 import {stringify} from 'json5'
 import {DBus} from '../DBus'
 import {DBusBuffer} from '../lib/DBusBuffer'
-import {runDBusBufferReadArrayTestSet, runDBusBufferTestSet} from './DBusBuffer.spec'
+import {runDBusBufferTestSet} from './DBusBuffer.spec'
 import {DBusSignedValue} from '../lib/DBusSignedValue'
 import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {DBusMessageEndianness} from '../lib/DBusMessageEndianness'
 import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
 
-// runDBusBufferTestSet()
-// runDBusBufferReadArrayTestSet()
+runDBusBufferTestSet()
 
 // setImmediate(async (): Promise<void> => {
 //     const dbus=await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
@@ -110,24 +109,24 @@ import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
 // // console.log(JSON.stringify(dbsv, null, 2))
 //
 // //
-const encoder = new DBusBufferEncoder()
-// // // // const encodeBuf = encoder.encode('i(ii)', [123, [456, 789]])
-// // const encodeBuf = encoder.encode('a(yv)', [
-// //     [1, new DBusSignedValue('o', '/org/freedesktop/DBus')],
-// //     [2, 'org.freedesktop.DBus'],
-// //     [3, 'Hello'],
-// //     [6, 'org.freedesktop.DBus']
-// // ])
-
-const encodeBuf = encoder.encode('a(yv)', [
-    [1, new DBusSignedValue('o', '/slot1/port1/stc')],
-    [2, 'pad.stc'],
-    [3, 'portGetSpeed'],
-    [6, 'org.ptswitch.pad']
-])
-console.log(stringify(Array.from(encodeBuf)),encodeBuf.length)
-const decoder= new DBusBufferDecoder(DBusMessageEndianness.LE,encodeBuf)
-console.log(decoder.read('a(yv)'))
+// const encoder = new DBusBufferEncoder()
+// // // // // const encodeBuf = encoder.encode('i(ii)', [123, [456, 789]])
+// // // const encodeBuf = encoder.encode('a(yv)', [
+// // //     [1, new DBusSignedValue('o', '/org/freedesktop/DBus')],
+// // //     [2, 'org.freedesktop.DBus'],
+// // //     [3, 'Hello'],
+// // //     [6, 'org.freedesktop.DBus']
+// // // ])
+//
+// const encodeBuf = encoder.encode('a(yv)', [
+//     [1, new DBusSignedValue('o', '/slot1/port1/stc')],
+//     [2, 'pad.stc'],
+//     [3, 'portGetSpeed'],
+//     [6, 'org.ptswitch.pad']
+// ])
+// console.log(stringify(Array.from(encodeBuf)), encodeBuf.length)
+// const decoder = new DBusBufferDecoder(DBusMessageEndianness.LE, encodeBuf)
+// console.log(decoder.read('a(yv)'))
 // console.log(decoder.decode('a(yv)'))
 
 // console.log(stringify(Array.from(encodeBuf)), encodeBuf.length)

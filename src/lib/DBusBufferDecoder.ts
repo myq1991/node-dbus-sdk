@@ -356,39 +356,26 @@ export class DBusBufferDecoder {
      * @returns The array of elements wrapped in DBusSignedValue
      */
     public readArray(elementType: DataType): DBusSignedValue {
-        this.align(4) // Ensure 4-byte alignment for length field
+        this.align(4)
         if (this.offset + 4 > this.buffer.length) {
             throw new ReadBufferError(`Cannot read ARRAY length: offset ${this.offset} exceeds buffer length ${this.buffer.length}`)
         }
-
-        // Read the byte length of the array data (32-bit unsigned integer)
         let byteLength: number
         if (this.endianness === DBusMessageEndianness.LE) {
-            byteLength = this.buffer.readUInt32LE(this.offset) // Read length as little-endian
+            byteLength = this.buffer.readUInt32LE(this.offset)
         } else {
-            byteLength = this.buffer.readUInt32BE(this.offset) // Read length as big-endian
+            byteLength = this.buffer.readUInt32BE(this.offset)
         }
-        this.offset += 4 // Increment offset by 4 bytes for length field
-
-        // Check if we can read the array data
-        if (this.offset + byteLength > this.buffer.length) {
-            throw new ReadBufferError(`Cannot read ARRAY content: offset ${this.offset} + byteLength ${byteLength} exceeds buffer length ${this.buffer.length}`)
-        }
-
-        // Read array elements until we reach the end of the array data
+        this.offset += 4
         const arrayEndOffset = this.offset + byteLength
+        const arrayBuffer = this.buffer.subarray(this.offset, arrayEndOffset)
+        const arrayDecoder = new DBusBufferDecoder(this.endianness, arrayBuffer)
         const elements: DBusSignedValue[] = []
-        while (this.offset < arrayEndOffset) {
-            const element = this.readSignedValue(elementType) // Recursively read each element, alignment handled by specific read methods
+        while (arrayDecoder.offset < arrayBuffer.length) {
+            const element = arrayDecoder.readSignedValue(elementType)
             elements.push(element)
         }
-
-        // Ensure we consumed exactly the specified byte length
-        if (this.offset !== arrayEndOffset) {
-            throw new ReadBufferError(`ARRAY content not fully consumed: expected offset ${arrayEndOffset}, but current offset is ${this.offset}`)
-        }
-
-        // Construct the DBusSignedValue with signature 'a' only, elements carry their own signatures
+        this.offset = arrayEndOffset
         return new DBusSignedValue('a', elements)
     }
 
