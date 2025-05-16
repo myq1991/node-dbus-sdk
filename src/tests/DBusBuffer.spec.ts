@@ -34,6 +34,15 @@ const TestSet: { signature: string, data: any }[] = [
     // },
     {
         signature: 'av',
+        // data: [
+        //     'Hello',
+        //     42,
+        //     true,
+        //     [1, 2, 3],
+        //     // {key: 'value'}
+        //     {key: 12345, key2: 67890}
+        //     // {key: 'value',key2:123}
+        // ],
         data: [
             'Hello',
             42,
@@ -43,7 +52,19 @@ const TestSet: { signature: string, data: any }[] = [
             {key: 12345, key2: 67890}
             // {key: 'value',key2:123}
         ]
-    }
+    },
+    // {
+    //     signature: 'av',
+    //     data: [
+    //         'Hello',
+    //         42,
+    //         true,
+    //         [1, 2, 3],
+    //         // {key: 'value'}
+    //         new DBusSignedValue('a{si}',{key: 12345, key2: 67890})
+    //         // {key: 'value',key2:123}
+    //     ]
+    // }
     // {
     //     signature: 'aav',
     //     data: [

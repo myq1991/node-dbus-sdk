@@ -256,7 +256,6 @@ export class DBusBufferDecoder {
             length = this.buffer.readUInt32BE(this.offset) // Read length as big-endian
         }
         this.offset += 4 // Increment offset by 4 bytes for length field
-console.log(this.offset,length,JSON.stringify(Array.from(this.buffer.subarray(this.offset))))
         // Check if we can read the string content plus the null terminator
         if (this.offset + length + 1 > this.buffer.length) {
             throw new ReadBufferError(`Cannot read STRING content: offset ${this.offset} + length ${length} + 1 exceeds buffer length ${this.buffer.length}`)
@@ -264,7 +263,6 @@ console.log(this.offset,length,JSON.stringify(Array.from(this.buffer.subarray(th
 
         // Read the string content
         const value: string = this.buffer.toString('utf8', this.offset, this.offset + length)
-console.log('readString:',value)
         this.offset += length // Increment offset by string length
 
         // Check and skip the null terminator
@@ -437,7 +435,7 @@ console.log('readString:',value)
 
         // Read the signature of the contained type
         const signatureValue = this.readSignature()
-console.log('signatureValue:',signatureValue)
+
         const variantSignature = signatureValue.$value as string // Extract the signature string from DBusSignedValue
 
         // Parse the signature to get the DataType(s)

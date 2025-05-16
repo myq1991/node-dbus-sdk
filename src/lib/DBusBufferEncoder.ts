@@ -360,9 +360,7 @@ export class DBusBufferEncoder {
         const signature = this.buildSignature(signedValue)
 
         // Write the type signature of the variant
-        // this.writeSignature(signedValue.$signature)
         this.writeSignature(signature)
-        console.log(JSON.stringify(signedValue))
         // Write the actual content of the variant
         this.writeSignedValue(signedValue)
         return this
