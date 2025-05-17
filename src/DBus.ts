@@ -10,6 +10,8 @@ import {DBusMessageType} from './lib/DBusMessageType'
 import {GetPropertyValueOpts} from './types/GetPropertyValueOpts'
 import {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
 import {DBusSignedValue} from './lib/DBusSignedValue'
+import {SignalListenerOpts} from './types/SignalListenerOpts'
+import {CreateSignalEmitterOpts} from './types/CreateSignalEmitterOpts'
 
 export class DBus {
 
@@ -68,6 +70,14 @@ export class DBus {
         //     interface: 'org.sigxcpu.Feedback',
         //     property: 'Profile'
         // }))
+        bus.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'AddMatch',
+            signature: 's',
+            args: ['type=signal']
+        }, true)
         return bus
     }
 
@@ -138,6 +148,39 @@ export class DBus {
         })
     }
 
+    /**
+     * @deprecated
+     * @param opts
+     */
+    public addSignalListener(opts: SignalListenerOpts) {
+        this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'AddMatch',
+            signature: 's',
+            args: ['']//TODO
+        }, true)
+    }
+
+    /**
+     * @deprecated
+     * @param opts
+     */
+    public removeSignalListener(opts: SignalListenerOpts) {
+        this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'AddMatch',
+            signature: 's',
+            args: ['RemoveMatch']//TODO
+        }, true)
+    }
+
+    public createSignalEmitter(opts: CreateSignalEmitterOpts) {
+
+    }
 
     public _write() {
         // // const buf=new DBusMessage({
@@ -211,6 +254,8 @@ export class DBus {
                     error.name = message.header.errorName ? message.header.errorName : error.name
                     return this.#inflightCalls[message.header.replySerial][1](error)
                 case DBusMessageType.SIGNAL:
+                    console.log(message)
+                    console.log('signal!')
                     //TODO
                     return
                 case DBusMessageType.METHOD_CALL:
