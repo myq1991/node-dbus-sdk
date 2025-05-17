@@ -1,8 +1,8 @@
-export interface InvokeMethodOpts {
+export interface SetPropertyValueOpts {
     service: string
     objectPath: string
     interface: string
-    method: string
+    property: string
+    value: any
     signature?: string
-    args?: any[]
 }

@@ -62,3 +62,4 @@ export class InvalidValueError extends Error implements NodeJS.ErrnoException {
     errno: number = 1012
     code: string = 'E_INVALID_VALUE'
 }
+

@@ -4,9 +4,12 @@ import {DBusInterface} from './DBusInterface'
 import {ConnectOpts} from './types/ConnectOpts'
 import {DBusConnection} from './lib/DBusConnection'
 import {DBusMessage} from './lib/DBusMessage'
-import {InvokeMethodOpts} from './types/invokeMethodOpts'
+import {InvokeOpts} from './types/InvokeOpts'
 import {DBusMessageFlags} from './lib/DBusMessageFlags'
 import {DBusMessageType} from './lib/DBusMessageType'
+import {GetPropertyValueOpts} from './types/GetPropertyValueOpts'
+import {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
+import {DBusSignedValue} from './lib/DBusSignedValue'
 
 export class DBus {
 
@@ -24,7 +27,7 @@ export class DBus {
      */
     public static async connect(opts: ConnectOpts): Promise<DBus> {
         const bus: DBus = new DBus(await DBusConnection.createConnection(opts))
-        const [uniqueId] = await bus.invokeMethod({
+        const [uniqueId] = await bus.invoke({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
@@ -37,14 +40,34 @@ export class DBus {
         //     interface: 'org.freedesktop.DBus',
         //     method: 'Hello'
         // })
-        console.log(await bus.invokeMethod({
-            service: 'org.ptswitch.pad',
-            objectPath: '/slot1/port1/stc',
-            interface: 'pad.stc',
-            method: 'portSetRate',
-            signature: 'u',
-            args: [100]
-        }))
+        // console.log(await bus.invokeMethod({
+        //     service: 'org.ptswitch.pad',
+        //     objectPath: '/slot1/port1/stc',
+        //     interface: 'pad.stc',
+        //     method: 'portSetRate',
+        //     signature: 'u',
+        //     args: [100]
+        // }))
+        // console.log(await bus.getProperty({
+        //     service: 'org.ptswitch.pad',
+        //     objectPath: '/slot1/port1/stc',
+        //     interface: 'pad.stc',
+        //     property: 'linkSpeed'
+        // }))
+        // console.log(await bus.setProperty({
+        //     service: 'org.sigxcpu.Feedback',
+        //     objectPath: '/org/sigxcpu/Feedback',
+        //     interface: 'org.sigxcpu.Feedback',
+        //     property: 'Profile',
+        //     // value: new DBusSignedValue('s', 'full1')
+        //     value: new DBusSignedValue('s', 'full')
+        // }))
+        // console.log(await bus.getProperty({
+        //     service: 'org.sigxcpu.Feedback',
+        //     objectPath: '/org/sigxcpu/Feedback',
+        //     interface: 'org.sigxcpu.Feedback',
+        //     property: 'Profile'
+        // }))
         return bus
     }
 
@@ -58,10 +81,10 @@ export class DBus {
     }
 
 
-    public invokeMethod(opts: InvokeMethodOpts, noReply: true): void
-    public async invokeMethod(opts: InvokeMethodOpts, noReply: false): Promise<any[]>
-    public async invokeMethod(opts: InvokeMethodOpts): Promise<any[]>
-    public invokeMethod(opts: InvokeMethodOpts, noReply: boolean = false): Promise<any[]> | void {
+    public invoke(opts: InvokeOpts, noReply: true): void
+    public async invoke(opts: InvokeOpts, noReply: false): Promise<any[]>
+    public async invoke(opts: InvokeOpts): Promise<any[]>
+    public invoke(opts: InvokeOpts, noReply: boolean = false): Promise<any[]> | void {
         if (noReply) {
             this.write(DBusMessage.encode({
                 serial: this.#serial++,
@@ -91,10 +114,28 @@ export class DBus {
         }
     }
 
-    public async getProperty() {
+    public async getProperty(opts: GetPropertyValueOpts): Promise<any> {
+        const [value] = await this.invoke({
+            service: opts.service,
+            objectPath: opts.objectPath,
+            interface: 'org.freedesktop.DBus.Properties',
+            method: 'Get',
+            signature: 'ss',
+            args: [opts.interface, opts.property]
+        })
+        return value
     }
 
-    public async setProperty() {
+    public async setProperty(opts: SetPropertyValueOpts): Promise<void> {
+        const signedValue: DBusSignedValue = opts.signature ? new DBusSignedValue('v', new DBusSignedValue(opts.signature, opts.value)) : new DBusSignedValue('v', opts.value)
+        await this.invoke({
+            service: opts.service,
+            objectPath: opts.objectPath,
+            interface: 'org.freedesktop.DBus.Properties',
+            method: 'Set',
+            signature: 'ssv',
+            args: [opts.interface, opts.property, signedValue]
+        })
     }
 
 
@@ -158,20 +199,23 @@ export class DBus {
     constructor(connection: DBusConnection) {
         this.#connection = connection
         this.#connection.on('message', (message: DBusMessage): void => {
-            if ([DBusMessageType.METHOD_RETURN, DBusMessageType.ERROR].includes(message.header.type)) {
-                if (!message.header.replySerial) return
-                if (!this.#inflightCalls[message.header.replySerial]) return
-                const [resolve, reject] = this.#inflightCalls[message.header.replySerial]
-                switch (message.header.type) {
-                    case DBusMessageType.METHOD_RETURN:
-                        return resolve(message.body)
-                    case DBusMessageType.ERROR:
-                        const error: Error = new Error(message.body[0] ? message.body[0] : '')
-                        error.name = message.header.errorName ? message.header.errorName : error.name
-                        return reject(error)
-                    default:
-                        return
-                }
+            switch (message.header.type) {
+                case DBusMessageType.METHOD_RETURN:
+                    if (!message.header.replySerial) return
+                    if (!this.#inflightCalls[message.header.replySerial]) return
+                    return this.#inflightCalls[message.header.replySerial][0](message.body)
+                case DBusMessageType.ERROR:
+                    if (!message.header.replySerial) return
+                    if (!this.#inflightCalls[message.header.replySerial]) return
+                    const error: Error = new Error(message.body[0] ? message.body[0] : '')
+                    error.name = message.header.errorName ? message.header.errorName : error.name
+                    return this.#inflightCalls[message.header.replySerial][1](error)
+                case DBusMessageType.SIGNAL:
+                    //TODO
+                    return
+                case DBusMessageType.METHOD_CALL:
+                    //TODO
+                    return
             }
         })
         //TODO
