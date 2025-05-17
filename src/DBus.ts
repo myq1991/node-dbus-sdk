@@ -4,6 +4,9 @@ import {DBusInterface} from './DBusInterface'
 import {ConnectOpts} from './types/ConnectOpts'
 import {DBusConnection} from './lib/DBusConnection'
 import {DBusMessage} from './lib/DBusMessage'
+import {InvokeMethodOpts} from './types/invokeMethodOpts'
+import {DBusMessageFlags} from './lib/DBusMessageFlags'
+import {DBusMessageType} from './lib/DBusMessageType'
 
 export class DBus {
 
@@ -11,12 +14,38 @@ export class DBus {
 
     #uniqueId: string
 
+    #serial: number = 1
+
+    #inflightCalls: Record<number, [(response: any[]) => void, (error: Error) => void]> = {}
+
     /**
      * Connect to DBus
      * @param opts
      */
     public static async connect(opts: ConnectOpts): Promise<DBus> {
-        return new DBus(await DBusConnection.createConnection(opts))
+        const bus: DBus = new DBus(await DBusConnection.createConnection(opts))
+        const [uniqueId] = await bus.invokeMethod({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'Hello'
+        })
+        bus.#uniqueId = uniqueId
+        // await bus.invokeMethod({
+        //     service: 'org.freedesktop.DBus',
+        //     objectPath: '/org/freedesktop/DBus',
+        //     interface: 'org.freedesktop.DBus',
+        //     method: 'Hello'
+        // })
+        console.log(await bus.invokeMethod({
+            service: 'org.ptswitch.pad',
+            objectPath: '/slot1/port1/stc',
+            interface: 'pad.stc',
+            method: 'portSetRate',
+            signature: 'u',
+            args: [100]
+        }))
+        return bus
     }
 
     /**
@@ -24,14 +53,49 @@ export class DBus {
      * @param data
      */
     public write(data: Buffer) {
+        //TODO 需要加入错误判断
         this.#connection.write(data)
     }
 
-    public async invokeMethod(){}
 
-    public async getProperty(){}
+    public invokeMethod(opts: InvokeMethodOpts, noReply: true): void
+    public async invokeMethod(opts: InvokeMethodOpts, noReply: false): Promise<any[]>
+    public async invokeMethod(opts: InvokeMethodOpts): Promise<any[]>
+    public invokeMethod(opts: InvokeMethodOpts, noReply: boolean = false): Promise<any[]> | void {
+        if (noReply) {
+            this.write(DBusMessage.encode({
+                serial: this.#serial++,
+                type: DBusMessageType.METHOD_CALL,
+                flags: DBusMessageFlags.NO_REPLY_EXPECTED,
+                destination: opts.service,
+                path: opts.objectPath,
+                interfaceName: opts.interface,
+                member: opts.method,
+                signature: opts.signature ? opts.signature : undefined
+            }, ...opts.args ? opts.args : []))
+        } else {
+            return new Promise<any[]>((resolve, reject) => {
+                const message: DBusMessage = new DBusMessage({
+                    serial: this.#serial++,
+                    type: DBusMessageType.METHOD_CALL,
+                    flags: DBusMessageFlags.REPLY_EXPECTED,
+                    destination: opts.service,
+                    path: opts.objectPath,
+                    interfaceName: opts.interface,
+                    member: opts.method,
+                    signature: opts.signature ? opts.signature : undefined
+                }, ...opts.args ? opts.args : [])
+                this.#inflightCalls[message.header.serial] = [resolve, reject]
+                this.write(message.toBuffer())
+            })
+        }
+    }
 
-    public async setProperty(){}
+    public async getProperty() {
+    }
+
+    public async setProperty() {
+    }
 
 
     public _write() {
@@ -51,31 +115,32 @@ export class DBus {
         // //     interfaceName: 'org.freedesktop.DBus',
         // //     member: 'Hello'
         // // }).toBuffer()
-        const buf = DBusMessage.encode({
-            serial: 1,
-            type: 1,
-            destination: 'org.freedesktop.DBus',
-            path: '/org/freedesktop/DBus',
-            interfaceName: 'org.freedesktop.DBus',
-            member: 'Hello'
-        })
-        console.log(JSON.stringify(Array.from(buf)), buf.length)
-        this.#connection.write(buf)
 
-
-        setInterval(() => {
-            const buf2 = DBusMessage.encode({
-                serial: 2,
-                type: 1,
-                flags: 0x01,
-                destination: 'org.ptswitch.pad',
-                path: '/slot1/port1/stc',
-                interfaceName: 'pad.stc',
-                member: 'portGetSpeed'
-            })
-            console.log(JSON.stringify(Array.from(buf2)), buf2.length)
-            this.#connection.write(buf2)
-        }, 5000)
+        // const buf = DBusMessage.encode({
+        //     serial: 1,
+        //     type: 1,
+        //     destination: 'org.freedesktop.DBus',
+        //     path: '/org/freedesktop/DBus',
+        //     interfaceName: 'org.freedesktop.DBus',
+        //     member: 'Hello'
+        // })
+        // console.log(JSON.stringify(Array.from(buf)), buf.length)
+        // this.#connection.write(buf)
+        //
+        //
+        // setInterval(() => {
+        //     const buf2 = DBusMessage.encode({
+        //         serial: 2,
+        //         type: 1,
+        //         flags: 0x01,
+        //         destination: 'org.ptswitch.pad',
+        //         path: '/slot1/port1/stc',
+        //         interfaceName: 'pad.stc',
+        //         member: 'portGetSpeed'
+        //     })
+        //     console.log(JSON.stringify(Array.from(buf2)), buf2.length)
+        //     this.#connection.write(buf2)
+        // }, 5000)
 
         // const l=Buffer.from([108,1,0,1,0,0,0,0,1,0,0,0,109,0,0,0,1,1,111,0,21,0,0,0,47,111,114,103,47,102,114,101,101,100,101,115,107,116,111,112,47,68,66,117,115,0,0,0,2,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0,3,1,115,0,5,0,0,0,72,101,108,108,111,0,0,0,6,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0])
         // console.log(l.toString('hex'))
@@ -92,7 +157,23 @@ export class DBus {
      */
     constructor(connection: DBusConnection) {
         this.#connection = connection
-        this.#connection.on('message', console.log)
+        this.#connection.on('message', (message: DBusMessage): void => {
+            if ([DBusMessageType.METHOD_RETURN, DBusMessageType.ERROR].includes(message.header.type)) {
+                if (!message.header.replySerial) return
+                if (!this.#inflightCalls[message.header.replySerial]) return
+                const [resolve, reject] = this.#inflightCalls[message.header.replySerial]
+                switch (message.header.type) {
+                    case DBusMessageType.METHOD_RETURN:
+                        return resolve(message.body)
+                    case DBusMessageType.ERROR:
+                        const error: Error = new Error(message.body[0] ? message.body[0] : '')
+                        error.name = message.header.errorName ? message.header.errorName : error.name
+                        return reject(error)
+                    default:
+                        return
+                }
+            }
+        })
         //TODO
     }
 

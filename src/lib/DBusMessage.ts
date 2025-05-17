@@ -40,10 +40,10 @@ export class DBusMessage {
         const flags: DBusMessageFlags = this.header.flags || DBusMessageFlags.REPLY_EXPECTED
         const type: DBusMessageType = this.header.type || DBusMessageType.METHOD_CALL
         let bodyLength: number = 0
-        let bodyBuff: Buffer = Buffer.from([])
+        let bodyBuff: Buffer = Buffer.alloc(0)
         if (this.header.signature && this.body.length > 0) {
             const bodyEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
-            bodyBuff = bodyEncoder.encode(this.header.signature, this.body)
+            bodyBuff = bodyEncoder.encode(this.header.signature, this.body.length > 1 ? this.body : this.body[0])
             bodyLength = bodyBuff.length
         }
         // Create header fields array
@@ -157,7 +157,6 @@ export class DBusMessage {
         const protocolVersion: number = headers[3]
         const serial: number = headers[5]
         let fulfillFieldsBuffer: Buffer = Buffer.concat([header.subarray(12), fieldsAndBody.subarray(0, fieldsLength)])
-        const offset: number = fieldsAndBody.length % 8
         const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fulfillFieldsBuffer)
         const [fields] = fieldsDecoder.decode('a(yv)')
         const messageHeader: Partial<DBusMessageHeader> = {
@@ -173,7 +172,9 @@ export class DBusMessage {
             messageHeader[headerTypeName] = fieldValue
         }
         if (!bodyLength || !messageHeader.signature) return new DBusMessage(messageHeader)
-        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fieldsAndBody.subarray(fieldsLength + offset))
+        //Calculate aligned offset before body
+        const bodyOffset: number = fieldsLength + (8 - (header.length + fieldsLength) % 8)
+        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fieldsAndBody.subarray(bodyOffset))
         const body: any[] = bodyDecoder.decode(messageHeader.signature)
         return new DBusMessage(messageHeader, ...body)
     }
