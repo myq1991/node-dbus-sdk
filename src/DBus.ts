@@ -10,8 +10,8 @@ import {DBusMessageType} from './lib/DBusMessageType'
 import {GetPropertyValueOpts} from './types/GetPropertyValueOpts'
 import {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
 import {DBusSignedValue} from './lib/DBusSignedValue'
-import {SignalListenerOpts} from './types/SignalListenerOpts'
 import {CreateSignalEmitterOpts} from './types/CreateSignalEmitterOpts'
+import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 
 export class DBus {
 
@@ -22,6 +22,10 @@ export class DBus {
     #serial: number = 1
 
     #inflightCalls: Record<number, [(response: any[]) => void, (error: Error) => void]> = {}
+
+    #signalEmitters: Set<WeakRef<DBusSignalEmitter>> = new Set()
+
+    #signalRulesMap: Map<Record<string, string>, string> = new Map()
 
     /**
      * Connect to DBus
@@ -36,48 +40,6 @@ export class DBus {
             method: 'Hello'
         })
         bus.#uniqueId = uniqueId
-        // await bus.invokeMethod({
-        //     service: 'org.freedesktop.DBus',
-        //     objectPath: '/org/freedesktop/DBus',
-        //     interface: 'org.freedesktop.DBus',
-        //     method: 'Hello'
-        // })
-        // console.log(await bus.invokeMethod({
-        //     service: 'org.ptswitch.pad',
-        //     objectPath: '/slot1/port1/stc',
-        //     interface: 'pad.stc',
-        //     method: 'portSetRate',
-        //     signature: 'u',
-        //     args: [100]
-        // }))
-        // console.log(await bus.getProperty({
-        //     service: 'org.ptswitch.pad',
-        //     objectPath: '/slot1/port1/stc',
-        //     interface: 'pad.stc',
-        //     property: 'linkSpeed'
-        // }))
-        // console.log(await bus.setProperty({
-        //     service: 'org.sigxcpu.Feedback',
-        //     objectPath: '/org/sigxcpu/Feedback',
-        //     interface: 'org.sigxcpu.Feedback',
-        //     property: 'Profile',
-        //     // value: new DBusSignedValue('s', 'full1')
-        //     value: new DBusSignedValue('s', 'full')
-        // }))
-        // console.log(await bus.getProperty({
-        //     service: 'org.sigxcpu.Feedback',
-        //     objectPath: '/org/sigxcpu/Feedback',
-        //     interface: 'org.sigxcpu.Feedback',
-        //     property: 'Profile'
-        // }))
-        bus.invoke({
-            service: 'org.freedesktop.DBus',
-            objectPath: '/org/freedesktop/DBus',
-            interface: 'org.freedesktop.DBus',
-            method: 'AddMatch',
-            signature: 's',
-            args: ['type=signal']
-        }, true)
         return bus
     }
 
@@ -148,38 +110,62 @@ export class DBus {
         })
     }
 
-    /**
-     * @deprecated
-     * @param opts
-     */
-    public addSignalListener(opts: SignalListenerOpts) {
-        this.invoke({
+    protected formatMatchSignalRule(uniqueId: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string): string {
+        const matchSignalRules: string[] = ['type=signal']
+        if (uniqueId !== '*') matchSignalRules.push(`sender=${uniqueId}`)
+        if (objectPath !== '*') matchSignalRules.push(`path=${objectPath}`)
+        if (interfaceName !== '*') matchSignalRules.push(`interface=${interfaceName}`)
+        matchSignalRules.push(`member=${signalName}`)
+        return matchSignalRules.join(',')
+    }
+
+    protected onSignal(uniqueId: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*'): void {
+        const rules: Record<string, string> = {
+            uniqueId: uniqueId,
+            objectPath: objectPath,
+            interfaceName: interfaceName,
+            signalName: signalName
+        }
+        this.#signalRulesMap.set(rules, this.formatMatchSignalRule(uniqueId, objectPath, interfaceName, signalName))
+        return this.invoke({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
             method: 'AddMatch',
             signature: 's',
-            args: ['']//TODO
+            args: [this.#signalRulesMap.get(rules)]
         }, true)
     }
 
-    /**
-     * @deprecated
-     * @param opts
-     */
-    public removeSignalListener(opts: SignalListenerOpts) {
+    protected offSignal(signalRuleString: string) {
         this.invoke({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
-            method: 'AddMatch',
+            method: 'RemoveMatch',
             signature: 's',
-            args: ['RemoveMatch']//TODO
+            args: [signalRuleString]
         }, true)
     }
 
-    public createSignalEmitter(opts: CreateSignalEmitterOpts) {
-
+    public createSignalEmitter(opts: CreateSignalEmitterOpts): DBusSignalEmitter {
+        const emitter: DBusSignalEmitter = new DBusSignalEmitter(
+            opts,
+            (
+                service: string | '*',
+                objectPath: string | '*',
+                interfaceName: string | '*',
+                signalName: string | '*'
+            ): void => this.onSignal(
+                service,
+                objectPath,
+                interfaceName,
+                signalName
+            )
+        )
+        const emitterRef: WeakRef<DBusSignalEmitter> = new WeakRef(emitter)
+        this.#signalEmitters.add(emitterRef)
+        return emitter
     }
 
     public _write() {
@@ -254,16 +240,41 @@ export class DBus {
                     error.name = message.header.errorName ? message.header.errorName : error.name
                     return this.#inflightCalls[message.header.replySerial][1](error)
                 case DBusMessageType.SIGNAL:
-                    console.log(message)
-                    console.log('signal!')
-                    //TODO
-                    return
+                    const sender: string = message.header.sender
+                    const objectPath: string = message.header.path
+                    const interfaceName: string = message.header.interfaceName
+                    const signalName: string = message.header.member
+                    const signalArgs: any[] = message.body
+                    const emitResults: boolean[] = []
+                    this.#signalEmitters.forEach((emitterRef: WeakRef<DBusSignalEmitter>): void => {
+                        emitResults.push(((): boolean => {
+                            const emitter: DBusSignalEmitter | undefined = emitterRef.deref()
+                            if (!emitter) return this.#signalEmitters.delete(emitterRef)
+                            if (emitter.uniqueId !== '*' && emitter.uniqueId !== sender) return false
+                            if (emitter.objectPath !== '*' && emitter.objectPath !== objectPath) return false
+                            if (emitter.interface !== '*' && emitter.interface !== interfaceName) return false
+                            if (!emitter.eventNames().includes(signalName) && !emitter.eventNames().includes('*')) return false
+                            const emitDirectly: boolean = emitter.emit(signalName, ...signalArgs)
+                            const emitWildcard: boolean = emitter.emit('*', signalName, ...signalArgs)
+                            return emitDirectly || emitWildcard
+                        })())
+                    })
+                    if (emitResults.find((result: boolean): boolean => result)) return
+                    const deprecatedSignalRuleStrings: string[] = []
+                    this.#signalRulesMap.forEach((signalRuleString: string, rule: Record<string, string>): void => {
+                        if (rule.uniqueId !== '*' && rule.uniqueId !== sender) return
+                        if (rule.objectPath !== '*' && rule.objectPath !== objectPath) return
+                        if (rule.interfaceName !== '*' && rule.interfaceName !== interfaceName) return
+                        if (rule.signalName !== '*' && rule.signalName !== signalName) return
+                        deprecatedSignalRuleStrings.push(signalRuleString)
+                        this.#signalRulesMap.delete(rule)
+                    })
+                    return deprecatedSignalRuleStrings.forEach((deprecatedSignalRuleString: string): void => this.offSignal(deprecatedSignalRuleString))
                 case DBusMessageType.METHOD_CALL:
                     //TODO
                     return
             }
         })
-        //TODO
     }
 
     /**
