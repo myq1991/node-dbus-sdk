@@ -63,3 +63,8 @@ export class InvalidValueError extends Error implements NodeJS.ErrnoException {
     code: string = 'E_INVALID_VALUE'
 }
 
+export class ServiceNotFoundError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1013
+    code: string = 'E_SERVICE_NOT_FOUND'
+}
+

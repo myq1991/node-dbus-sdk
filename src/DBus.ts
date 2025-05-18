@@ -12,6 +12,9 @@ import {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 import {CreateSignalEmitterOpts} from './types/CreateSignalEmitterOpts'
 import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
+import {ServiceBasicInfo} from './types/ServiceBasicInfo'
+import {RequestNameFlags} from './lib/RequestNameFlags'
+import {RequestNameResultCode} from './lib/RequestNameResultCode'
 
 export class DBus {
 
@@ -127,25 +130,11 @@ export class DBus {
             signalName: signalName
         }
         this.#signalRulesMap.set(rules, this.formatMatchSignalRule(uniqueId, objectPath, interfaceName, signalName))
-        return this.invoke({
-            service: 'org.freedesktop.DBus',
-            objectPath: '/org/freedesktop/DBus',
-            interface: 'org.freedesktop.DBus',
-            method: 'AddMatch',
-            signature: 's',
-            args: [this.#signalRulesMap.get(rules)]
-        }, true)
+        return this.addMatch(this.#signalRulesMap.get(rules)!)
     }
 
-    protected offSignal(signalRuleString: string) {
-        this.invoke({
-            service: 'org.freedesktop.DBus',
-            objectPath: '/org/freedesktop/DBus',
-            interface: 'org.freedesktop.DBus',
-            method: 'RemoveMatch',
-            signature: 's',
-            args: [signalRuleString]
-        }, true)
+    protected offSignal(signalRuleString: string): void {
+        return this.removeMatch(signalRuleString)
     }
 
     public createSignalEmitter(opts: CreateSignalEmitterOpts): DBusSignalEmitter {
@@ -166,59 +155,6 @@ export class DBus {
         const emitterRef: WeakRef<DBusSignalEmitter> = new WeakRef(emitter)
         this.#signalEmitters.add(emitterRef)
         return emitter
-    }
-
-    public _write() {
-        // // const buf=new DBusMessage({
-        // //     serial: 1,
-        // //     destination: 'org.ptswitch.pad',
-        // //     path: '/slot1/port1/stc',
-        // //     interfaceName: 'pad.stc',
-        // //     member: 'portGetSpeed'
-        // // }).toBuffer()
-        //
-        // // const buf = new DBusMessage({
-        // //     serial: 1,
-        // //     type: 1,
-        // //     destination: 'org.freedesktop.DBus',
-        // //     path: '/org/freedesktop/DBus',
-        // //     interfaceName: 'org.freedesktop.DBus',
-        // //     member: 'Hello'
-        // // }).toBuffer()
-
-        // const buf = DBusMessage.encode({
-        //     serial: 1,
-        //     type: 1,
-        //     destination: 'org.freedesktop.DBus',
-        //     path: '/org/freedesktop/DBus',
-        //     interfaceName: 'org.freedesktop.DBus',
-        //     member: 'Hello'
-        // })
-        // console.log(JSON.stringify(Array.from(buf)), buf.length)
-        // this.#connection.write(buf)
-        //
-        //
-        // setInterval(() => {
-        //     const buf2 = DBusMessage.encode({
-        //         serial: 2,
-        //         type: 1,
-        //         flags: 0x01,
-        //         destination: 'org.ptswitch.pad',
-        //         path: '/slot1/port1/stc',
-        //         interfaceName: 'pad.stc',
-        //         member: 'portGetSpeed'
-        //     })
-        //     console.log(JSON.stringify(Array.from(buf2)), buf2.length)
-        //     this.#connection.write(buf2)
-        // }, 5000)
-
-        // const l=Buffer.from([108,1,0,1,0,0,0,0,1,0,0,0,109,0,0,0,1,1,111,0,21,0,0,0,47,111,114,103,47,102,114,101,101,100,101,115,107,116,111,112,47,68,66,117,115,0,0,0,2,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0,3,1,115,0,5,0,0,0,72,101,108,108,111,0,0,0,6,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0])
-        // console.log(l.toString('hex'))
-
-        // this.#connection.write(Buffer.from([108,1,0,1,0,0,0,0,1,0,0,0,109,0,0,0,1,1,111,0,21,0,0,0,47,111,114,103,47,102,114,101,101,100,101,115,107,116,111,112,47,68,66,117,115,0,0,0,2,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0,3,1,115,0,5,0,0,0,72,101,108,108,111,0,0,0,6,1,115,0,20,0,0,0,111,114,103,46,102,114,101,101,100,101,115,107,116,111,112,46,68,66,117,115,0,0,0,0]))
-        // const buf=Buffer.from('4201000001010000010000000000000000000000000000000000000000000000010000006F00000001016F001500000072672E667265656465736B746F702E4442757300000002017300140000002F6F72672F667265656465736B746F702F4442757300000003017300130000006F72672E667265656465736B746F702E444275730000040173000500000048656C6C6F0000000000','hex')
-        // console.log(JSON.stringify(Array.from(buf)),buf.length)
-        // this.#connection.write(buf)
     }
 
     /**
@@ -277,20 +213,177 @@ export class DBus {
         })
     }
 
+    public addMatch(rule: string): void {
+        this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'AddMatch',
+            signature: 's',
+            args: [rule]
+        }, true)
+    }
+
+    public removeMatch(rule: string): void {
+        this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'RemoveMatch',
+            signature: 's',
+            args: [rule]
+        }, true)
+    }
+
+    public async getNameOwner(name: string): Promise<string | undefined> {
+        try {
+            const [owner] = await this.invoke({
+                service: 'org.freedesktop.DBus',
+                objectPath: '/org/freedesktop/DBus',
+                interface: 'org.freedesktop.DBus',
+                method: 'GetNameOwner',
+                signature: 's',
+                args: [name]
+            })
+            return owner
+        } catch (e) {
+            return undefined
+        }
+    }
+
+    public async listActivatableNames(): Promise<string[]> {
+        const [activatableNames] = await this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'ListActivatableNames'
+        })
+        return activatableNames
+    }
+
+    public async listNames(): Promise<string[]> {
+        const [names] = await this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'ListNames'
+        })
+        return names
+    }
+
+    public async nameHasOwner(name: string): Promise<boolean> {
+        const [hasOwner] = await this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            signature: 's',
+            method: 'NameHasOwner',
+            args: [name]
+        })
+        return hasOwner
+    }
+
+    public async requestName(name: string, flags: RequestNameFlags = RequestNameFlags.DBUS_NAME_FLAG_DEFAULT): Promise<RequestNameResultCode> {
+        const [res] = await this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            signature: 'su',
+            method: 'RequestName',
+            args: [name, flags]
+        })
+        return res
+    }
+
+    public async releaseName(name: string): Promise<number> {
+        const [res] = await this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            signature: 's',
+            method: 'ReleaseName',
+            args: [name]
+        })
+        return res
+    }
+
+    public async reloadConfig(): Promise<void> {
+        await this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            method: 'ReloadConfig'
+        })
+    }
+
+    public async startServiceByName(name: string, flags: number = 0): Promise<number> {
+        const [res] = await this.invoke({
+            service: 'org.freedesktop.DBus',
+            objectPath: '/org/freedesktop/DBus',
+            interface: 'org.freedesktop.DBus',
+            signature: 'su',
+            method: 'StartServiceByName'
+        })
+        return res
+    }
+
+    public async getConnectionUnixProcessID(name: string): Promise<number | undefined> {
+        try {
+            const [pid] = await this.invoke({
+                service: 'org.freedesktop.DBus',
+                objectPath: '/org/freedesktop/DBus',
+                interface: 'org.freedesktop.DBus',
+                method: 'GetConnectionUnixProcessID',
+                signature: 's',
+                args: [name]
+            })
+            return pid
+        } catch (e) {
+            return undefined
+        }
+    }
+
     /**
      * List all services
      */
-    public async listServices(): Promise<string[]> {
-        //TODO
-        return []
+    public async listServices(): Promise<ServiceBasicInfo[]> {
+        let activeServiceNames: string[]
+        let activatableServiceNames: string[]
+
+        [
+            activeServiceNames,
+            activatableServiceNames
+        ]
+            = await Promise.all([
+            this.listNames(),
+            this.listActivatableNames()
+        ])
+        const serviceNames: string[] = [...new Set([...activeServiceNames, ...activatableServiceNames])]
+        return await Promise.all(serviceNames.map((serviceName: string): Promise<ServiceBasicInfo> => {
+            return new Promise(async (resolve): Promise<void> => {
+                let uniqueId: string | undefined
+                let pid: number | undefined
+                [uniqueId, pid] = await Promise.all([
+                    this.getNameOwner(serviceName),
+                    this.getConnectionUnixProcessID(serviceName)
+                ])
+                return resolve({
+                    name: serviceName,
+                    uniqueId: uniqueId,
+                    active: activeServiceNames.includes(serviceName),
+                    activatable: activatableServiceNames.includes(serviceName),
+                    pid: pid
+                })
+            })
+        }))
     }
 
     /**
      * Get all services
      */
     public async getServices(): Promise<DBusService[]> {
-        const serviceNames: string[] = await this.listServices()
-        return Promise.all(serviceNames.map((serviceName: string): Promise<DBusService> => this.getService(serviceName)))
+        const serviceBasicInfos: ServiceBasicInfo[] = await this.listServices()
+        return Promise.all(serviceBasicInfos.map((serviceBasicInfo: ServiceBasicInfo): Promise<DBusService> => this.getService(serviceBasicInfo.name)))
     }
 
     /**
@@ -298,7 +391,7 @@ export class DBus {
      * @param service
      */
     public async getService(service: string): Promise<DBusService> {
-        //TODO 需要判断服务是否存在
+        await this.startServiceByName(service)
         return new DBusService({dbus: this, service: service})
     }
 

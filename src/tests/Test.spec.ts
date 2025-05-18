@@ -20,12 +20,8 @@ setImmediate(async (): Promise<void> => {
     })
         .on('PropertiesChanged', console.log)
         .on('*', console.log)
-    // dbus.write()
-//     // const dbuf = new DBusBuffer()
-//     // const data = `{"name":"Json.CN","url":"http://www.json.cn","page":88,"isNonProfit":true,"address":{"street":"科技园路.","city":"江苏苏州","country":"中国"},"links":[{"name":"Google","url":"http://www.google.com"},{"name":"Baidu","url":"http://www.baidu.com"},{"name":"SoSo","url":"http://www.SoSo.com"}]}`
-//     //
-//     // const buffer=new DBusBuffer().write('ssib(sss)a(ss)', JSON.parse(`{"name":"Json.CN","url":"http://www.json.cn","page":88,"isNonProfit":true,"address":{"street":"科技园路.","city":"江苏苏州","country":"中国"},"links":[{"name":"Google","url":"http://www.google.com"},{"name":"Baidu","url":"http://www.baidu.com"},{"name":"SoSo","url":"http://www.SoSo.com"}]}`)).toBuffer()
-//     const buffer = new DBusBuffer().write('a{sv}', {a: true, b: 1, c: '1234'}).toBuffer()
-//     console.log(buffer)
-//     console.log(new DBusBuffer(buffer).read('a{sv}'))
+    console.log(await dbus.listServices())
+    const serv=await dbus.getService('org.ptswitch.pad')
+    // const serv=await dbus.getService('org.sigxcpu.Feedback')
+    console.log(await serv.listObjects())
 })
