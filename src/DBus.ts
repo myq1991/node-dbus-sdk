@@ -15,6 +15,7 @@ import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 import {ServiceBasicInfo} from './types/ServiceBasicInfo'
 import {RequestNameFlags} from './lib/RequestNameFlags'
 import {RequestNameResultCode} from './lib/RequestNameResultCode'
+import {ServiceNotFoundError} from './lib/Errors'
 
 export class DBus {
 
@@ -391,7 +392,14 @@ export class DBus {
      * @param service
      */
     public async getService(service: string): Promise<DBusService> {
-        await this.startServiceByName(service)
+        let activeNames: string[]
+        let activatableNames: string[]
+        [activeNames, activatableNames] = await Promise.all([
+            this.listNames(),
+            this.listActivatableNames()
+        ])
+        if (!activeNames.includes(service) && !activatableNames.includes(service)) throw new ServiceNotFoundError(`Service ${service} not found`)
+        if (activatableNames.includes(service) && !activeNames.includes(service)) await this.startServiceByName(service)
         return new DBusService({dbus: this, service: service})
     }
 
