@@ -322,7 +322,8 @@ export class DBus {
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
             signature: 'su',
-            method: 'StartServiceByName'
+            method: 'StartServiceByName',
+            args: [name, flags]
         })
         return res
     }
@@ -349,7 +350,6 @@ export class DBus {
     public async listServices(): Promise<ServiceBasicInfo[]> {
         let activeServiceNames: string[]
         let activatableServiceNames: string[]
-
         [
             activeServiceNames,
             activatableServiceNames
