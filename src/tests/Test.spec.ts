@@ -21,13 +21,20 @@ setImmediate(async (): Promise<void> => {
         .on('PropertiesChanged', console.log)
         .on('*', console.log)
     // console.log(await dbus.listServices())
-    // const serv = await dbus.getService('org.ptswitch.pad')
-    // const obj = await serv.getObject('/slot1/port1/stc')
+    const serv = await dbus.getService('org.ptswitch.pad')
+    const obj = await serv.getObject('/slot1/port1/stc')
 
-    const serv = await dbus.getService('org.sigxcpu.Feedback')
-    const obj = await serv.getObject('/org/sigxcpu/Feedback')
+    // const serv = await dbus.getService('org.sigxcpu.Feedback')
+    // const obj = await serv.getObject('/org/sigxcpu/Feedback')
     // console.log(await serv.listObjects())
 
-    console.log(await obj.introspect())
+    const iface = await obj.getInterface('pad.stc')
+
+    console.log(iface.listProperties())
+    console.log(await iface.property.serialNo.get())
+    // console.log(await iface.method.portSetRate(100))
+    // console.log(iface.noReplyMethod.portSetRate(100))
+    // iface.method.xxxx
+    // console.log((await obj.listInterfaces()))
     // console.log(await obj.listInterfaces())
 })

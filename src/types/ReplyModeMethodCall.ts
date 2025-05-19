@@ -1,0 +1,1 @@
+export type ReplyModeMethodCall = (...args: any[]) => Promise<any>

@@ -78,4 +78,9 @@ export class InterfaceNotFoundError extends Error implements NodeJS.ErrnoExcepti
     code: string = 'E_INTERFACE_NOT_FOUND'
 }
 
+export class AccessPropertyForbiddenError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1016
+    code: string = 'E_ACCESS_PROPERTY_FORBIDDEN'
+}
+
 

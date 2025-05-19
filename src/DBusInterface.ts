@@ -3,6 +3,15 @@ import {DBus} from './DBus'
 import {DBusService} from './DBusService'
 import {DBusObject} from './DBusObject'
 import {IntrospectInterface} from './types/IntrospectInterface'
+import {IntrospectMethod} from './types/IntrospectMethod'
+import {IntrospectProperty} from './types/IntrospectProperty'
+import {IntrospectSignal} from './types/IntrospectSignal'
+import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
+import {ReplyModeMethodCall} from './types/ReplyModeMethodCall'
+import {NoReplyModeMethodCall} from './types/NoReplyModeMethodCall'
+import {PropertyOperation} from './types/PropertyOperation'
+import {DBusPropertyAccess} from './lib/DBusPropertyAccess'
+import {AccessPropertyForbiddenError} from './lib/Errors'
 
 export class DBusInterface {
     protected readonly opts: DBusInterfaceOpts
@@ -26,24 +35,85 @@ export class DBusInterface {
         this.introspectInterface = this.opts.introspectInterface
     }
 
-    public async getMethods() {
-        //TODO
+    public get method(): Record<string, ReplyModeMethodCall> {
+        const methods: Record<string, ReplyModeMethodCall> = {}
+        this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
+            methods[methodInfo.name] = async (...args: any[]): Promise<any> => {
+                const types: string[] = methodInfo.arg
+                    .filter((arg: IntrospectMethodArgument): boolean => arg.direction === 'in')
+                    .map((arg: IntrospectMethodArgument): string => arg.type)
+                const result: any[] = await this.dbus.invoke({
+                    service: this.service.name,
+                    objectPath: this.object.name,
+                    interface: this.name,
+                    method: methodInfo.name,
+                    signature: types.length ? types.join('') : undefined,
+                    args: args
+                })
+                if (result.length > 1) return result
+                return result[0]
+            }
+        })
+        return methods
     }
 
-    public async getProperties() {
-        //TODO
+    public get noReplyMethod(): Record<string, NoReplyModeMethodCall> {
+        const noReplyMethods: Record<string, NoReplyModeMethodCall> = {}
+        this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
+            noReplyMethods[methodInfo.name] = (...args: any[]): void => {
+                const types: string[] = methodInfo.arg
+                    .filter((arg: IntrospectMethodArgument): boolean => arg.direction === 'in')
+                    .map((arg: IntrospectMethodArgument): string => arg.type)
+                this.dbus.invoke({
+                    service: this.service.name,
+                    objectPath: this.object.name,
+                    interface: this.name,
+                    method: methodInfo.name,
+                    signature: types.length ? types.join('') : undefined,
+                    args: args
+                }, true)
+            }
+        })
+        return noReplyMethods
     }
 
-    public async getSignals() {
-        //TODO
+    public get property(): Record<string, PropertyOperation> {
+        const properties: Record<string, PropertyOperation> = {}
+        this.listProperties().forEach((propertyInfo: IntrospectProperty): void => {
+            properties[propertyInfo.name] = {
+                set: async (value: any): Promise<void> => {
+                    if (![DBusPropertyAccess.WRITE, DBusPropertyAccess.READWRITE].includes(propertyInfo.access)) throw new AccessPropertyForbiddenError(`Access to attribute ${propertyInfo.name} is prohibited, and its access mode is ${propertyInfo.access}`)
+                    return this.dbus.setProperty({
+                        service: this.service.name,
+                        objectPath: this.object.name,
+                        interface: this.name,
+                        property: propertyInfo.name,
+                        value: value
+                    })
+                },
+                get: async (): Promise<any> => {
+                    if (![DBusPropertyAccess.READ, DBusPropertyAccess.READWRITE].includes(propertyInfo.access)) throw new AccessPropertyForbiddenError(`Access to attribute ${propertyInfo.name} is prohibited, and its access mode is ${propertyInfo.access}`)
+                    return this.dbus.getProperty({
+                        service: this.service.name,
+                        objectPath: this.object.name,
+                        interface: this.name,
+                        property: propertyInfo.name
+                    })
+                }
+            }
+        })
+        return properties
     }
 
-    public async getMethod(method: string) {
+    public listMethods(): IntrospectMethod[] {
+        return this.introspectInterface.method
     }
 
-    public async getProperty(property: string) {
+    public listProperties(): IntrospectProperty[] {
+        return this.introspectInterface.property
     }
 
-    public async getSignal(signal: string) {
+    public listSignals(): IntrospectSignal[] {
+        return this.introspectInterface.signal
     }
 }
