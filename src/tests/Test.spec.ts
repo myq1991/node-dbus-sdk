@@ -29,5 +29,5 @@ setImmediate(async (): Promise<void> => {
     // console.log(await serv.listObjects())
 
     console.log(await obj.introspect())
-    console.log(await obj.listInterfaces())
+    // console.log(await obj.listInterfaces())
 })

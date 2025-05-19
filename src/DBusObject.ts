@@ -21,6 +21,10 @@ export class DBusObject {
 
     public readonly name: string
 
+    #shareIntrospect: boolean = false
+
+    #shareIntrospectInterfaces: IntrospectInterface[] = []
+
     constructor(opts: DBusObjectOpts) {
         this.opts = opts
         this.dbus = this.opts.dbus
@@ -97,6 +101,7 @@ export class DBusObject {
      */
     public async listInterfaces(): Promise<string[]> {
         const introspectResult: IntrospectNode = await this.introspect()
+        if (this.#shareIntrospect) this.#shareIntrospectInterfaces = introspectResult.interface
         return introspectResult.interface.map((iface: IntrospectInterface): string => iface.name)
     }
 
@@ -104,8 +109,12 @@ export class DBusObject {
      * Get all interfaces from object
      */
     public async getInterfaces(): Promise<DBusInterface[]> {
+        this.#shareIntrospect = true
         const interfaceNames: string[] = await this.listInterfaces()
-        return Promise.all(interfaceNames.map((interfaceName: string): Promise<DBusInterface> => this.getInterface(interfaceName)))
+        const dbusInterfaces: DBusInterface[] = await Promise.all(interfaceNames.map((interfaceName: string): Promise<DBusInterface> => this.getInterface(interfaceName)))
+        this.#shareIntrospectInterfaces = []
+        this.#shareIntrospect = false
+        return dbusInterfaces
     }
 
     /**
@@ -113,10 +122,19 @@ export class DBusObject {
      * @param iface
      */
     public async getInterface(iface: string): Promise<DBusInterface> {
+        let introspectInterfaces: IntrospectInterface[]
+        if (this.#shareIntrospect) {
+            introspectInterfaces = this.#shareIntrospectInterfaces
+        } else {
+            introspectInterfaces = (await this.introspect()).interface
+        }
+        const introspectInterface: IntrospectInterface | undefined = introspectInterfaces.find((introspectInterface: IntrospectInterface): boolean => introspectInterface.name === iface)
+        //TODO 抛出错误
         return new DBusInterface({
             ...this.opts,
             iface: iface,
-            dbusObject: this
+            dbusObject: this,
+            introspectInterface: {} as any//TODO
         })
     }
 }
