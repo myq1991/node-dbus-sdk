@@ -2,6 +2,7 @@ import {DBusInterfaceOpts} from './types/DBusInterfaceOpts'
 import {DBus} from './DBus'
 import {DBusService} from './DBusService'
 import {DBusObject} from './DBusObject'
+import {IntrospectInterface} from './types/IntrospectInterface'
 
 export class DBusInterface {
     protected readonly opts: DBusInterfaceOpts
@@ -12,6 +13,8 @@ export class DBusInterface {
 
     protected readonly object: DBusObject
 
+    protected readonly introspectInterface: IntrospectInterface
+
     public readonly name: string
 
     constructor(opts: DBusInterfaceOpts) {
@@ -20,6 +23,7 @@ export class DBusInterface {
         this.dbus = this.opts.dbus
         this.service = this.opts.dbusService
         this.object = this.opts.dbusObject
+        this.introspectInterface = this.opts.introspectInterface
     }
 
     public async getMethods() {

@@ -10,6 +10,7 @@ import {IntrospectProperty} from './types/IntrospectProperty'
 import {IntrospectSignal} from './types/IntrospectSignal'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
+import {InterfaceNotFoundError} from './lib/Errors'
 
 export class DBusObject {
 
@@ -30,6 +31,23 @@ export class DBusObject {
         this.dbus = this.opts.dbus
         this.service = this.opts.dbusService
         this.name = this.opts.objectPath
+    }
+
+    protected async internalGetInterface(iface: string, shareIntrospect: boolean = false): Promise<DBusInterface> {
+        let introspectInterfaces: IntrospectInterface[]
+        if (shareIntrospect) {
+            introspectInterfaces = this.#shareIntrospectInterfaces
+        } else {
+            introspectInterfaces = (await this.introspect()).interface
+        }
+        const introspectInterface: IntrospectInterface | undefined = introspectInterfaces.find((introspectInterface: IntrospectInterface): boolean => introspectInterface.name === iface)
+        if (!introspectInterface) throw new InterfaceNotFoundError(`Interface ${iface} not found`)
+        return new DBusInterface({
+            ...this.opts,
+            iface: iface,
+            dbusObject: this,
+            introspectInterface: introspectInterface
+        })
     }
 
     /**
@@ -111,7 +129,7 @@ export class DBusObject {
     public async getInterfaces(): Promise<DBusInterface[]> {
         this.#shareIntrospect = true
         const interfaceNames: string[] = await this.listInterfaces()
-        const dbusInterfaces: DBusInterface[] = await Promise.all(interfaceNames.map((interfaceName: string): Promise<DBusInterface> => this.getInterface(interfaceName)))
+        const dbusInterfaces: DBusInterface[] = await Promise.all(interfaceNames.map((interfaceName: string): Promise<DBusInterface> => this.internalGetInterface(interfaceName, true)))
         this.#shareIntrospectInterfaces = []
         this.#shareIntrospect = false
         return dbusInterfaces
@@ -122,19 +140,6 @@ export class DBusObject {
      * @param iface
      */
     public async getInterface(iface: string): Promise<DBusInterface> {
-        let introspectInterfaces: IntrospectInterface[]
-        if (this.#shareIntrospect) {
-            introspectInterfaces = this.#shareIntrospectInterfaces
-        } else {
-            introspectInterfaces = (await this.introspect()).interface
-        }
-        const introspectInterface: IntrospectInterface | undefined = introspectInterfaces.find((introspectInterface: IntrospectInterface): boolean => introspectInterface.name === iface)
-        //TODO 抛出错误
-        return new DBusInterface({
-            ...this.opts,
-            iface: iface,
-            dbusObject: this,
-            introspectInterface: {} as any//TODO
-        })
+        return await this.internalGetInterface(iface, false)
     }
 }

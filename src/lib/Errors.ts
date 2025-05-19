@@ -68,3 +68,14 @@ export class ServiceNotFoundError extends Error implements NodeJS.ErrnoException
     code: string = 'E_SERVICE_NOT_FOUND'
 }
 
+export class ObjectNotFoundError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1014
+    code: string = 'E_OBJECT_NOT_FOUND'
+}
+
+export class InterfaceNotFoundError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1015
+    code: string = 'E_INTERFACE_NOT_FOUND'
+}
+
+
