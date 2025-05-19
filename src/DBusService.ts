@@ -5,19 +5,32 @@ import {parseStringPromise as parseXMLString} from 'xml2js'
 
 export class DBusService {
 
+    #uniqueName: string
+
     protected readonly opts: DBusServiceOpts
 
     protected readonly dbus: DBus
 
     public readonly name: string
 
-    public readonly uniqueName: string
+    public get uniqueName(): string {
+        return this.#uniqueName
+    }
 
     constructor(opts: DBusServiceOpts) {
         this.opts = opts
         this.dbus = opts.dbus
         this.name = opts.service
-        this.uniqueName = opts.uniqueName
+        this.#uniqueName = opts.uniqueName
+    }
+
+    /**
+     * Update unique name
+     * @param uniqueName
+     * @protected
+     */
+    protected updateUniqueName(uniqueName: string): void {
+        this.#uniqueName = uniqueName
     }
 
     /**

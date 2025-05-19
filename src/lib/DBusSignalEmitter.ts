@@ -5,21 +5,39 @@ export class DBusSignalEmitter extends EventEmitter {
 
     readonly #signalEmitters: Set<DBusSignalEmitter>
 
+    #uniqueName: string | '*'
+
+    #objectPath: string | '*'
+
+    #interface: string | '*'
+
     protected readonly onSignalHandler: (service: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*') => void
 
-    public readonly uniqueName: string | '*'
+    public get uniqueName(): string | '*' {
+        return this.#uniqueName
+    }
 
-    public readonly objectPath: string | '*'
+    public get objectPath(): string | '*' {
+        return this.#objectPath
+    }
 
-    public readonly interface: string | '*'
+    public get interface(): string | '*' {
+        return this.#interface
+    }
 
     constructor(opts: CreateSignalEmitterOpts, signalEmitters: Set<DBusSignalEmitter>, onSignalHandler: (service: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*') => void) {
         super()
         this.#signalEmitters = signalEmitters
         this.onSignalHandler = onSignalHandler
-        this.uniqueName = opts.uniqueName
-        this.objectPath = opts.objectPath
-        this.interface = opts.interface
+        this.#uniqueName = opts.uniqueName
+        this.#objectPath = opts.objectPath
+        this.#interface = opts.interface
+    }
+
+    protected updateUniqueName(newUniqueName: string): void {
+        if (this.uniqueName === '*') return
+        this.#uniqueName = newUniqueName
+        this.eventNames().forEach((eventName: string): void => this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName))
     }
 
     protected updateSignalEmitters(): void {

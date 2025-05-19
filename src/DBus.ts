@@ -27,9 +27,13 @@ export class DBus {
 
     #inflightCalls: Record<number, [(response: any[]) => void, (error: Error) => void]> = {}
 
+    #signalEmitterWeakRefSet: Set<WeakRef<DBusSignalEmitter>> = new Set()
+
     #signalEmitters: Set<DBusSignalEmitter> = new Set()
 
     #signalRulesMap: Map<Record<string, string>, string> = new Map()
+
+    #weakServiceSet: Set<WeakRef<DBusService>> = new Set()
 
     /**
      * Connect to DBus
@@ -37,16 +41,40 @@ export class DBus {
      */
     public static async connect(opts: ConnectOpts): Promise<DBus> {
         const bus: DBus = new DBus(await DBusConnection.createConnection(opts))
-        await bus.initialize()
-        return bus
+        return await bus.initialize()
     }
 
-    protected async initialize(): Promise<void> {
+    protected async initialize(): Promise<this> {
         await this.hello()
         const dbusManageInterface: DBusInterface = await this.getInterface('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus')
+        const updateServiceUniqueName: (this: DBusService, newUniqueName: string) => void = function (this: DBusService, newUniqueName: string): void {
+            this.updateUniqueName(newUniqueName)
+        }
+        const updateEmitterUniqueName: (this: DBusSignalEmitter, newUniqueName: string) => void = function (this: DBusSignalEmitter, newUniqueName: string): void {
+            this.updateUniqueName(newUniqueName)
+        }
         dbusManageInterface.signal.on('NameOwnerChanged', (name: string, oldOwner: string, newOwner: string): void => {
-            console.log(name, oldOwner, newOwner)
+            this.#weakServiceSet.forEach((serviceWeakRef: WeakRef<DBusService>): void => {
+                const dbusService: DBusService | undefined = serviceWeakRef.deref()
+                if (!dbusService) {
+                    this.#weakServiceSet.delete(serviceWeakRef)
+                    return
+                }
+                if (dbusService.name !== name) return
+                if (dbusService.uniqueName !== newOwner) updateServiceUniqueName.call(dbusService, newOwner)
+            })
+            this.#signalEmitterWeakRefSet.forEach((emitterRef: WeakRef<DBusSignalEmitter>): void => {
+                const emitter: DBusSignalEmitter | undefined = emitterRef.deref()
+                if (!emitter) {
+                    this.#signalEmitterWeakRefSet.delete(emitterRef)
+                    return
+                }
+                if (emitter.uniqueName !== oldOwner) return
+                updateEmitterUniqueName.call(emitter, newOwner)
+            })
+            
         })
+        return this
     }
 
     protected async hello(): Promise<void> {
@@ -151,7 +179,7 @@ export class DBus {
     }
 
     public createSignalEmitter(opts: CreateSignalEmitterOpts): DBusSignalEmitter {
-        return new DBusSignalEmitter(
+        const signalEmitter: DBusSignalEmitter = new DBusSignalEmitter(
             opts,
             this.#signalEmitters,
             (
@@ -166,6 +194,8 @@ export class DBus {
                 signalName
             )
         )
+        this.#signalEmitterWeakRefSet.add(new WeakRef(signalEmitter))
+        return signalEmitter
     }
 
     /**
@@ -410,7 +440,9 @@ export class DBus {
         if (activatableNames.includes(service) && !activeNames.includes(service)) await this.startServiceByName(service)
         const uniqueName: string | undefined = await this.getNameOwner(service)
         if (!uniqueName) throw new ServiceNotFoundError(`Service ${service} has not connection`)
-        return new DBusService({dbus: this, service: service, uniqueName: uniqueName})
+        const dbusService: DBusService = new DBusService({dbus: this, service: service, uniqueName: uniqueName})
+        this.#weakServiceSet.add(new WeakRef(dbusService))
+        return dbusService
     }
 
     /**
