@@ -19,6 +19,7 @@ import {ServiceNotFoundError} from './lib/Errors'
 import EventEmitter from 'node:events'
 import {ReplyOpts} from './types/ReplyOpts'
 import {EmitSignalOpts} from './types/EmitSignalOpts'
+import {BusNameBasicInfo} from './types/BusNameBasicInfo'
 
 export class DBus extends EventEmitter {
 
@@ -38,6 +39,8 @@ export class DBus extends EventEmitter {
 
     #weakServiceSet: Set<WeakRef<DBusService>> = new Set()
 
+    #dbusManageInterface: DBusInterface
+
     /**
      * Connect to DBus
      * @param opts
@@ -49,14 +52,40 @@ export class DBus extends EventEmitter {
 
     protected async initialize(): Promise<this> {
         await this.hello()
-        const dbusManageInterface: DBusInterface = await this.getInterface('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus')
+        if (this.#dbusManageInterface) this.#dbusManageInterface.signal.removeAllListeners()
+        if (this.#weakServiceSet.size || this.#signalEmitterWeakRefSet.size) {
+            const nameInfos: BusNameBasicInfo[] = await this.listBusNames()
+            const names: string[] = nameInfos.map((nameInfo: BusNameBasicInfo): string => nameInfo.name)
+            this.#weakServiceSet.forEach((serviceWeakRef: WeakRef<DBusService>): void => {
+                const dbusService: DBusService | undefined = serviceWeakRef.deref()
+                if (!dbusService) {
+                    this.#weakServiceSet.delete(serviceWeakRef)
+                    return
+                }
+                if (!names.includes(dbusService.name)) return
+                const index: number = names.indexOf(dbusService.name)
+                if (dbusService.uniqueName !== nameInfos[index].uniqueName) updateServiceUniqueName.call(dbusService, nameInfos[index].uniqueName ? nameInfos[index].uniqueName : '')
+            })
+            this.#signalEmitterWeakRefSet.forEach((emitterRef: WeakRef<DBusSignalEmitter>): void => {
+                const emitter: DBusSignalEmitter | undefined = emitterRef.deref()
+                if (!emitter) {
+                    this.#signalEmitterWeakRefSet.delete(emitterRef)
+                    return
+                }
+                if (!names.includes(emitter.service)) return
+                const index: number = names.indexOf(emitter.service)
+                if (emitter.uniqueName !== nameInfos[index].uniqueName) return
+                updateEmitterUniqueName.call(emitter, nameInfos[index].uniqueName)
+            })
+        }
+        this.#dbusManageInterface = await this.getInterface('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus')
         const updateServiceUniqueName: (this: DBusService, newUniqueName: string) => void = function (this: DBusService, newUniqueName: string): void {
             this.updateUniqueName(newUniqueName)
         }
         const updateEmitterUniqueName: (this: DBusSignalEmitter, newUniqueName: string) => void = function (this: DBusSignalEmitter, newUniqueName: string): void {
             this.updateUniqueName(newUniqueName)
         }
-        dbusManageInterface.signal
+        this.#dbusManageInterface.signal
             .on('NameOwnerChanged', (name: string, oldOwner: string, newOwner: string): void => {
                 this.emit('NameOwnerChanged', name, oldOwner, newOwner)
                 this.#weakServiceSet.forEach((serviceWeakRef: WeakRef<DBusService>): void => {
@@ -300,158 +329,6 @@ export class DBus extends EventEmitter {
                 case DBusMessageType.METHOD_CALL:
                     console.log(message)
                     //TODO
-                    this.reply({
-                        destination: message.header.sender,
-                        replySerial: message.header.serial,
-                        signature: 's',
-                        data: ['<node>\n' +
-                        '  <interface name="org.freedesktop.DBus">\n' +
-                        '    <method name="Hello">\n' +
-                        '      <arg direction="out" type="s"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="RequestName">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="in" type="u"/>\n' +
-                        '      <arg direction="out" type="u"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="ReleaseName">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="u"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="StartServiceByName">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="in" type="u"/>\n' +
-                        '      <arg direction="out" type="u"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="UpdateActivationEnvironment">\n' +
-                        '      <arg direction="in" type="a{ss}"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="NameHasOwner">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="b"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="ListNames">\n' +
-                        '      <arg direction="out" type="as"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="ListActivatableNames">\n' +
-                        '      <arg direction="out" type="as"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="AddMatch">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="RemoveMatch">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetNameOwner">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="s"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="ListQueuedOwners">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="as"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetConnectionUnixUser">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="u"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetConnectionUnixProcessID">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="u"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetAdtAuditSessionData">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="ay"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetConnectionSELinuxSecurityContext">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="ay"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetConnectionAppArmorSecurityContext">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="s"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="ReloadConfig">\n' +
-                        '    </method>\n' +
-                        '    <method name="GetId">\n' +
-                        '      <arg direction="out" type="s"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetConnectionCredentials">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="a{sv}"/>\n' +
-                        '    </method>\n' +
-                        '    <property name="Features" type="as" access="read">\n' +
-                        '      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>\n' +
-                        '    </property>\n' +
-                        '    <property name="Interfaces" type="as" access="read">\n' +
-                        '      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>\n' +
-                        '    </property>\n' +
-                        '    <signal name="NameOwnerChanged">\n' +
-                        '      <arg type="s"/>\n' +
-                        '      <arg type="s"/>\n' +
-                        '      <arg type="s"/>\n' +
-                        '    </signal>\n' +
-                        '    <signal name="NameLost">\n' +
-                        '      <arg type="s"/>\n' +
-                        '    </signal>\n' +
-                        '    <signal name="NameAcquired">\n' +
-                        '      <arg type="s"/>\n' +
-                        '    </signal>\n' +
-                        '    <signal name="ActivatableServicesChanged">\n' +
-                        '    </signal>\n' +
-                        '  </interface>\n' +
-                        '  <interface name="org.freedesktop.DBus.Properties">\n' +
-                        '    <method name="Get">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="v"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetAll">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="a{sv}"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="Set">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="in" type="v"/>\n' +
-                        '    </method>\n' +
-                        '    <signal name="PropertiesChanged">\n' +
-                        '      <arg type="s" name="interface_name"/>\n' +
-                        '      <arg type="a{sv}" name="changed_properties"/>\n' +
-                        '      <arg type="as" name="invalidated_properties"/>\n' +
-                        '    </signal>\n' +
-                        '  </interface>\n' +
-                        '  <interface name="org.freedesktop.DBus.Introspectable">\n' +
-                        '    <method name="Introspect">\n' +
-                        '      <arg direction="out" type="s"/>\n' +
-                        '    </method>\n' +
-                        '  </interface>\n' +
-                        '  <interface name="org.freedesktop.DBus.Monitoring">\n' +
-                        '    <method name="BecomeMonitor">\n' +
-                        '      <arg direction="in" type="as"/>\n' +
-                        '      <arg direction="in" type="u"/>\n' +
-                        '    </method>\n' +
-                        '  </interface>\n' +
-                        '  <interface name="org.freedesktop.DBus.Debug.Stats">\n' +
-                        '    <method name="GetStats">\n' +
-                        '      <arg direction="out" type="a{sv}"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetConnectionStats">\n' +
-                        '      <arg direction="in" type="s"/>\n' +
-                        '      <arg direction="out" type="a{sv}"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="GetAllMatchRules">\n' +
-                        '      <arg direction="out" type="a{sas}"/>\n' +
-                        '    </method>\n' +
-                        '  </interface>\n' +
-                        '  <interface name="org.freedesktop.DBus.Peer">\n' +
-                        '    <method name="GetMachineId">\n' +
-                        '      <arg direction="out" type="s"/>\n' +
-                        '    </method>\n' +
-                        '    <method name="Ping">\n' +
-                        '    </method>\n' +
-                        '  </interface>\n' +
-                        '</node>']
-                    })
                     return
             }
         })
@@ -636,38 +513,43 @@ export class DBus extends EventEmitter {
         }
     }
 
-    /**
-     * List all services
-     */
-    public async listServices(): Promise<ServiceBasicInfo[]> {
-        let activeServiceNames: string[]
-        let activatableServiceNames: string[]
+    public async listBusNames(): Promise<BusNameBasicInfo[]> {
+        let activeNames: string[]
+        let activatableNames: string[]
         [
-            activeServiceNames,
-            activatableServiceNames
+            activeNames,
+            activatableNames
         ]
             = await Promise.all([
             this.listNames(),
             this.listActivatableNames()
         ])
-        const serviceNames: string[] = [...new Set([...activeServiceNames, ...activatableServiceNames])]
-        return await Promise.all(serviceNames.map((serviceName: string): Promise<ServiceBasicInfo> => {
+        const names: string[] = [...new Set([...activeNames, ...activatableNames])]
+        return await Promise.all(names.map((name: string): Promise<ServiceBasicInfo> => {
             return new Promise(async (resolve): Promise<void> => {
                 let uniqueName: string | undefined
                 let pid: number | undefined
                 [uniqueName, pid] = await Promise.all([
-                    this.getNameOwner(serviceName),
-                    this.getConnectionUnixProcessID(serviceName)
+                    this.getNameOwner(name),
+                    this.getConnectionUnixProcessID(name)
                 ])
                 return resolve({
-                    name: serviceName,
+                    name: name,
                     uniqueName: uniqueName,
-                    active: activeServiceNames.includes(serviceName),
-                    activatable: activatableServiceNames.includes(serviceName),
+                    active: activeNames.includes(name),
+                    activatable: activatableNames.includes(name),
                     pid: pid
                 })
             })
         }))
+    }
+
+    /**
+     * List all services
+     */
+    public async listServices(): Promise<ServiceBasicInfo[]> {
+        const busNameInfos: BusNameBasicInfo[] = await this.listBusNames()
+        return busNameInfos.filter((busNameInfo: BusNameBasicInfo): boolean => busNameInfo.name !== busNameInfo.uniqueName)
     }
 
     /**

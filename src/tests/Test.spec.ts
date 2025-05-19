@@ -22,8 +22,8 @@ setImmediate(async (): Promise<void> => {
     //     .on('*', console.log)
     // console.log(await dbus.listServices())
     const serv = await dbus.getService('org.ptswitch.pad')
-    // const obj = await serv.getObject('/slot1/port1/stc')
-    const obj = await serv.getObject('/slot1/port1')
+    const obj = await serv.getObject('/slot1/port1/stc')
+    // const obj = await serv.getObject('/slot1/port1')
 
     //
     // // const serv = await dbus.getService('org.sigxcpu.Feedback')
@@ -31,7 +31,7 @@ setImmediate(async (): Promise<void> => {
     // // console.log(await serv.listObjects())
     //
     // const iface = await obj.getInterface('pad.stc')
-    // const iface1 = await obj.getInterface('org.freedesktop.DBus.Properties')
+    const iface1 = await obj.getInterface('org.freedesktop.DBus.Properties')
     //
     // // iface.signal.on('*',console.log)
     // iface1.signal.on('PropertiesChanged', console.log)

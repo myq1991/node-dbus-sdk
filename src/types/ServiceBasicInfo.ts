@@ -1,7 +1,3 @@
-export interface ServiceBasicInfo {
-    name: string
-    uniqueName?: string
-    active: boolean
-    activatable: boolean
-    pid?: number
-}
+import {BusNameBasicInfo} from './BusNameBasicInfo'
+
+export type ServiceBasicInfo = BusNameBasicInfo

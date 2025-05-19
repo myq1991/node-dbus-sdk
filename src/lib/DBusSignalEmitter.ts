@@ -13,6 +13,8 @@ export class DBusSignalEmitter extends EventEmitter {
 
     protected readonly onSignalHandler: (service: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*') => void
 
+    public readonly service: string
+
     public get uniqueName(): string | '*' {
         return this.#uniqueName
     }
