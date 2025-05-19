@@ -61,6 +61,7 @@ export class DBusObject {
             interface: 'org.freedesktop.DBus.Introspectable',
             method: 'Introspect'
         })
+        console.log(introspectXML)
         const introspectObject: any = await parseXMLString(introspectXML)
         const node: any = introspectObject.node
         const interfaces: any[] = node.interface ? node.interface : []

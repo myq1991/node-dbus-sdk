@@ -17,6 +17,8 @@ import {RequestNameFlags} from './lib/RequestNameFlags'
 import {RequestNameResultCode} from './lib/RequestNameResultCode'
 import {ServiceNotFoundError} from './lib/Errors'
 import EventEmitter from 'node:events'
+import {ReplyOpts} from './types/ReplyOpts'
+import {EmitSignalOpts} from './types/EmitSignalOpts'
 
 export class DBus extends EventEmitter {
 
@@ -107,6 +109,44 @@ export class DBus extends EventEmitter {
         this.#connection.write(data)
     }
 
+    public emitSignal(opts: EmitSignalOpts): void {
+        this.write(DBusMessage.encode({
+            serial: this.#serial++,
+            type: DBusMessageType.SIGNAL,
+            flags: DBusMessageFlags.NO_REPLY_EXPECTED,
+            sender: this.#uniqueName,
+            path: opts.objectPath,
+            interfaceName: opts.interface,
+            member: opts.signal,
+            destination: opts.destination,
+            signature: opts.signature ? opts.signature : undefined
+        }, ...opts.data ? opts.data : []))
+    }
+
+    public reply(opts: ReplyOpts): void {
+        if (opts.data instanceof Error) {
+            this.write(DBusMessage.encode({
+                serial: this.#serial++,
+                replySerial: opts.replySerial,
+                type: DBusMessageType.ERROR,
+                flags: DBusMessageFlags.NO_REPLY_EXPECTED,
+                sender: this.#uniqueName,
+                destination: opts.destination,
+                errorName: opts.data.name,
+                signature: opts.signature ? opts.signature : undefined
+            }, opts.data.message))
+        } else {
+            this.write(DBusMessage.encode({
+                serial: this.#serial++,
+                replySerial: opts.replySerial,
+                type: DBusMessageType.METHOD_RETURN,
+                flags: DBusMessageFlags.NO_REPLY_EXPECTED,
+                sender: this.#uniqueName,
+                destination: opts.destination,
+                signature: opts.signature ? opts.signature : undefined
+            }, ...opts.data ? opts.data : []))
+        }
+    }
 
     public invoke(opts: InvokeOpts, noReply: true): void
     public async invoke(opts: InvokeOpts, noReply: false): Promise<any[]>
@@ -258,7 +298,160 @@ export class DBus extends EventEmitter {
                     })
                     return deprecatedSignalRuleStrings.forEach((deprecatedSignalRuleString: string): void => this.offSignal(deprecatedSignalRuleString))
                 case DBusMessageType.METHOD_CALL:
+                    console.log(message)
                     //TODO
+                    this.reply({
+                        destination: message.header.sender,
+                        replySerial: message.header.serial,
+                        signature: 's',
+                        data: ['<node>\n' +
+                        '  <interface name="org.freedesktop.DBus">\n' +
+                        '    <method name="Hello">\n' +
+                        '      <arg direction="out" type="s"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="RequestName">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="in" type="u"/>\n' +
+                        '      <arg direction="out" type="u"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="ReleaseName">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="u"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="StartServiceByName">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="in" type="u"/>\n' +
+                        '      <arg direction="out" type="u"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="UpdateActivationEnvironment">\n' +
+                        '      <arg direction="in" type="a{ss}"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="NameHasOwner">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="b"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="ListNames">\n' +
+                        '      <arg direction="out" type="as"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="ListActivatableNames">\n' +
+                        '      <arg direction="out" type="as"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="AddMatch">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="RemoveMatch">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetNameOwner">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="s"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="ListQueuedOwners">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="as"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetConnectionUnixUser">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="u"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetConnectionUnixProcessID">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="u"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetAdtAuditSessionData">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="ay"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetConnectionSELinuxSecurityContext">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="ay"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetConnectionAppArmorSecurityContext">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="s"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="ReloadConfig">\n' +
+                        '    </method>\n' +
+                        '    <method name="GetId">\n' +
+                        '      <arg direction="out" type="s"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetConnectionCredentials">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="a{sv}"/>\n' +
+                        '    </method>\n' +
+                        '    <property name="Features" type="as" access="read">\n' +
+                        '      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>\n' +
+                        '    </property>\n' +
+                        '    <property name="Interfaces" type="as" access="read">\n' +
+                        '      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>\n' +
+                        '    </property>\n' +
+                        '    <signal name="NameOwnerChanged">\n' +
+                        '      <arg type="s"/>\n' +
+                        '      <arg type="s"/>\n' +
+                        '      <arg type="s"/>\n' +
+                        '    </signal>\n' +
+                        '    <signal name="NameLost">\n' +
+                        '      <arg type="s"/>\n' +
+                        '    </signal>\n' +
+                        '    <signal name="NameAcquired">\n' +
+                        '      <arg type="s"/>\n' +
+                        '    </signal>\n' +
+                        '    <signal name="ActivatableServicesChanged">\n' +
+                        '    </signal>\n' +
+                        '  </interface>\n' +
+                        '  <interface name="org.freedesktop.DBus.Properties">\n' +
+                        '    <method name="Get">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="v"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetAll">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="a{sv}"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="Set">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="in" type="v"/>\n' +
+                        '    </method>\n' +
+                        '    <signal name="PropertiesChanged">\n' +
+                        '      <arg type="s" name="interface_name"/>\n' +
+                        '      <arg type="a{sv}" name="changed_properties"/>\n' +
+                        '      <arg type="as" name="invalidated_properties"/>\n' +
+                        '    </signal>\n' +
+                        '  </interface>\n' +
+                        '  <interface name="org.freedesktop.DBus.Introspectable">\n' +
+                        '    <method name="Introspect">\n' +
+                        '      <arg direction="out" type="s"/>\n' +
+                        '    </method>\n' +
+                        '  </interface>\n' +
+                        '  <interface name="org.freedesktop.DBus.Monitoring">\n' +
+                        '    <method name="BecomeMonitor">\n' +
+                        '      <arg direction="in" type="as"/>\n' +
+                        '      <arg direction="in" type="u"/>\n' +
+                        '    </method>\n' +
+                        '  </interface>\n' +
+                        '  <interface name="org.freedesktop.DBus.Debug.Stats">\n' +
+                        '    <method name="GetStats">\n' +
+                        '      <arg direction="out" type="a{sv}"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetConnectionStats">\n' +
+                        '      <arg direction="in" type="s"/>\n' +
+                        '      <arg direction="out" type="a{sv}"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="GetAllMatchRules">\n' +
+                        '      <arg direction="out" type="a{sas}"/>\n' +
+                        '    </method>\n' +
+                        '  </interface>\n' +
+                        '  <interface name="org.freedesktop.DBus.Peer">\n' +
+                        '    <method name="GetMachineId">\n' +
+                        '      <arg direction="out" type="s"/>\n' +
+                        '    </method>\n' +
+                        '    <method name="Ping">\n' +
+                        '    </method>\n' +
+                        '  </interface>\n' +
+                        '</node>']
+                    })
                     return
             }
         })

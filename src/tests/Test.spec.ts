@@ -22,24 +22,26 @@ setImmediate(async (): Promise<void> => {
     //     .on('*', console.log)
     // console.log(await dbus.listServices())
     const serv = await dbus.getService('org.ptswitch.pad')
-    const obj = await serv.getObject('/slot1/port1/stc')
+    // const obj = await serv.getObject('/slot1/port1/stc')
+    const obj = await serv.getObject('/slot1/port1')
 
-    // const serv = await dbus.getService('org.sigxcpu.Feedback')
-    // const obj = await serv.getObject('/org/sigxcpu/Feedback')
-    // console.log(await serv.listObjects())
-
+    //
+    // // const serv = await dbus.getService('org.sigxcpu.Feedback')
+    // // const obj = await serv.getObject('/org/sigxcpu/Feedback')
+    // // console.log(await serv.listObjects())
+    //
     // const iface = await obj.getInterface('pad.stc')
-    const iface = await obj.getInterface('org.freedesktop.DBus.Properties')
-
-    // iface.signal.on('*',console.log)
-    iface.signal.on('PropertiesChanged', console.log)
-
-
-    // console.log(iface.listProperties())
-    // console.log(await iface.property.serialNo.get())
+    // const iface1 = await obj.getInterface('org.freedesktop.DBus.Properties')
+    //
+    // // iface.signal.on('*',console.log)
+    // iface1.signal.on('PropertiesChanged', console.log)
+    //
+    //
+    // // console.log(iface.listProperties())
+    // // console.log(await iface.property.serialNo.get())
     // console.log(await iface.method.portSetRate(100))
-    // console.log(iface.noReplyMethod.portSetRate(100))
-    // iface.method.xxxx
-    // console.log((await obj.listInterfaces()))
-    // console.log(await obj.listInterfaces())
+    // // console.log(iface.noReplyMethod.portSetRate(100))
+    // // iface.method.xxxx
+    // // console.log((await obj.listInterfaces()))
+    // // console.log(await obj.listInterfaces())
 })
