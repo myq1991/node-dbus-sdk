@@ -20,8 +20,13 @@ setImmediate(async (): Promise<void> => {
     })
         .on('PropertiesChanged', console.log)
         .on('*', console.log)
-    console.log(await dbus.listServices())
-    const serv=await dbus.getService('org.ptswitch.pad')
-    // const serv=await dbus.getService('org.sigxcpu.Feedback')
+    // console.log(await dbus.listServices())
+    // const serv = await dbus.getService('org.ptswitch.pad')
+    // const obj = await serv.getObject('/slot1/port1/stc')
+
+    const serv=await dbus.getService('org.sigxcpu.Feedback')
+    // const obj=await serv.getObject('/org/sigxcpu/Feedback')
     console.log(await serv.listObjects())
+
+    // console.log(await obj.introspect())
 })

@@ -36,7 +36,7 @@ export class DBusService {
                 method: 'Introspect'
             })
             if (!xmlResponse) return []
-            const parsedObject = await parseXMLString(xmlResponse)
+            const parsedObject: any = await parseXMLString(xmlResponse)
             if (!parsedObject?.node?.interface) emptyObjectPaths.push(objectPath)
             if (!parsedObject?.node?.node) return []
             const nodeNames: string[] = (parsedObject.node.node as { $: { name: string } }[]).map((node: {
@@ -52,7 +52,7 @@ export class DBusService {
             result.forEach((item: string[]): void => item.forEach((value: string): number => objectPaths.push(value)))
             return objectPaths
         }
-        const allObjectPaths: string[] = [...new Set(...(await getSubNodes()))]
+        const allObjectPaths: string[] = [...new Set(await getSubNodes())]
         if (!allObjectPaths.includes('/')) allObjectPaths.push('/')//将根路径加入列表
         return allObjectPaths.concat(emptyObjectPaths).filter(v => !allObjectPaths.includes(v) || !emptyObjectPaths.includes(v))
     }

@@ -2,6 +2,14 @@ import {DBusObjectOpts} from './types/DBusObjectOpts'
 import {DBusInterface} from './DBusInterface'
 import {DBus} from './DBus'
 import {DBusService} from './DBusService'
+import {parseStringPromise as parseXMLString} from 'xml2js'
+import {IntrospectNode} from './types/IntrospectNode'
+import {IntrospectInterface} from './types/IntrospectInterface'
+import {IntrospectMethod} from './types/IntrospectMethod'
+import {IntrospectProperty} from './types/IntrospectProperty'
+import {IntrospectSignal} from './types/IntrospectSignal'
+import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
+import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
 
 export class DBusObject {
 
@@ -18,6 +26,70 @@ export class DBusObject {
         this.dbus = this.opts.dbus
         this.service = this.opts.dbusService
         this.name = this.opts.objectPath
+    }
+
+    /**
+     * Introspect object
+     */
+    public async introspect(): Promise<IntrospectNode> {
+        let introspectXML: string
+        [introspectXML] = await this.dbus.invoke({
+            service: this.service.name,
+            objectPath: this.name,
+            interface: 'org.freedesktop.DBus.Introspectable',
+            method: 'Introspect'
+        })
+        const introspectObject: any = await parseXMLString(introspectXML)
+        const node: any = introspectObject.node
+        const interfaces: any[] = node.interface ? node.interface : []
+        return {
+            interface: interfaces.map(interfaceInfo => {
+                const method: any[] = interfaceInfo.method ? interfaceInfo.method : []
+                const property: any[] = interfaceInfo.property ? interfaceInfo.property : []
+                const signal: any[] = interfaceInfo.signal ? interfaceInfo.signal : []
+                const introspectInterface: IntrospectInterface = {
+                    name: interfaceInfo.$.name,
+                    method: method.map(methodInfo => {
+                        const arg: any[] = methodInfo.arg ? methodInfo.arg : []
+                        const introspectMethod: IntrospectMethod = {
+                            name: methodInfo.$.name,
+                            arg: arg.map(methodArgInfo => {
+                                const introspectMethodArgument: IntrospectMethodArgument = {
+                                    name: methodArgInfo.$.name,
+                                    type: methodArgInfo.$.type,
+                                    direction: methodArgInfo.$.direction
+                                }
+                                return introspectMethodArgument
+                            })
+                        }
+                        return introspectMethod
+                    }),
+                    property: property.map(propertyInfo => {
+                        const introspectProperty: IntrospectProperty = {
+                            name: propertyInfo.$.name,
+                            type: propertyInfo.$.type,
+                            access: propertyInfo.$.access
+                        }
+                        return introspectProperty
+                    }),
+                    signal: signal.map(signalInfo => {
+                        const arg: any[] = signalInfo.arg ? signalInfo.arg : []
+                        const introspectSignal: IntrospectSignal = {
+                            name: signalInfo.$.name,
+                            arg: arg.map(signalArgInfo => {
+                                const introspectSignalArgument: IntrospectSignalArgument = {
+                                    name: signalArgInfo.$.name,
+                                    type: signalArgInfo.$.type
+                                }
+                                return introspectSignalArgument
+                            })
+                        }
+                        return introspectSignal
+                    })
+                }
+                return introspectInterface
+            })
+        }
     }
 
     /**
