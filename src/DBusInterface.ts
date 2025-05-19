@@ -16,7 +16,7 @@ import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 
 export class DBusInterface {
 
-    #signalEmitter: DBusSignalEmitter | null = null
+    #signalEmitter: DBusSignalEmitter
 
     protected readonly opts: DBusInterfaceOpts
 
