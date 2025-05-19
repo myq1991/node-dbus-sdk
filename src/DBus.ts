@@ -27,7 +27,7 @@ export class DBus {
 
     #inflightCalls: Record<number, [(response: any[]) => void, (error: Error) => void]> = {}
 
-    #signalEmitters: Set<WeakRef<DBusSignalEmitter>> = new Set()
+    #signalEmitters: Set<DBusSignalEmitter> = new Set()
 
     #signalRulesMap: Map<Record<string, string>, string> = new Map()
 
@@ -119,7 +119,7 @@ export class DBus {
         if (uniqueId !== '*') matchSignalRules.push(`sender=${uniqueId}`)
         if (objectPath !== '*') matchSignalRules.push(`path=${objectPath}`)
         if (interfaceName !== '*') matchSignalRules.push(`interface=${interfaceName}`)
-        matchSignalRules.push(`member=${signalName}`)
+        if (signalName !== '*') matchSignalRules.push(`member=${signalName}`)
         return matchSignalRules.join(',')
     }
 
@@ -139,8 +139,9 @@ export class DBus {
     }
 
     public createSignalEmitter(opts: CreateSignalEmitterOpts): DBusSignalEmitter {
-        const emitter: DBusSignalEmitter = new DBusSignalEmitter(
+        return new DBusSignalEmitter(
             opts,
+            this.#signalEmitters,
             (
                 service: string | '*',
                 objectPath: string | '*',
@@ -153,9 +154,6 @@ export class DBus {
                 signalName
             )
         )
-        const emitterRef: WeakRef<DBusSignalEmitter> = new WeakRef(emitter)
-        this.#signalEmitters.add(emitterRef)
-        return emitter
     }
 
     /**
@@ -183,10 +181,8 @@ export class DBus {
                     const signalName: string = message.header.member
                     const signalArgs: any[] = message.body
                     const emitResults: boolean[] = []
-                    this.#signalEmitters.forEach((emitterRef: WeakRef<DBusSignalEmitter>): void => {
+                    this.#signalEmitters.forEach((emitter: DBusSignalEmitter): void => {
                         emitResults.push(((): boolean => {
-                            const emitter: DBusSignalEmitter | undefined = emitterRef.deref()
-                            if (!emitter) return this.#signalEmitters.delete(emitterRef)
                             if (emitter.uniqueId !== '*' && emitter.uniqueId !== sender) return false
                             if (emitter.objectPath !== '*' && emitter.objectPath !== objectPath) return false
                             if (emitter.interface !== '*' && emitter.interface !== interfaceName) return false

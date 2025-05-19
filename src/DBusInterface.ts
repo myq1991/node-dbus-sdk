@@ -12,8 +12,12 @@ import {NoReplyModeMethodCall} from './types/NoReplyModeMethodCall'
 import {PropertyOperation} from './types/PropertyOperation'
 import {DBusPropertyAccess} from './lib/DBusPropertyAccess'
 import {AccessPropertyForbiddenError} from './lib/Errors'
+import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 
 export class DBusInterface {
+
+    #signalEmitter: DBusSignalEmitter | null = null
+
     protected readonly opts: DBusInterfaceOpts
 
     protected readonly dbus: DBus
@@ -103,6 +107,15 @@ export class DBusInterface {
             }
         })
         return properties
+    }
+
+    public get signal(): DBusSignalEmitter {
+        if (!this.#signalEmitter) this.#signalEmitter = this.dbus.createSignalEmitter({
+            uniqueId: this.service.uniqueId,
+            objectPath: this.object.name,
+            interface: this.name
+        })
+        return this.#signalEmitter
     }
 
     public listMethods(): IntrospectMethod[] {
