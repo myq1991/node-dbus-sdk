@@ -96,8 +96,8 @@ export class DBusObject {
      * List all interface names
      */
     public async listInterfaces(): Promise<string[]> {
-        //TODO
-        return []
+        const introspectResult: IntrospectNode = await this.introspect()
+        return introspectResult.interface.map((iface: IntrospectInterface): string => iface.name)
     }
 
     /**

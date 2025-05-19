@@ -24,9 +24,10 @@ setImmediate(async (): Promise<void> => {
     // const serv = await dbus.getService('org.ptswitch.pad')
     // const obj = await serv.getObject('/slot1/port1/stc')
 
-    const serv=await dbus.getService('org.sigxcpu.Feedback')
-    // const obj=await serv.getObject('/org/sigxcpu/Feedback')
-    console.log(await serv.listObjects())
+    const serv = await dbus.getService('org.sigxcpu.Feedback')
+    const obj = await serv.getObject('/org/sigxcpu/Feedback')
+    // console.log(await serv.listObjects())
 
-    // console.log(await obj.introspect())
+    console.log(await obj.introspect())
+    console.log(await obj.listInterfaces())
 })
