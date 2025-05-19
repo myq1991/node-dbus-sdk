@@ -16,8 +16,9 @@ import {ServiceBasicInfo} from './types/ServiceBasicInfo'
 import {RequestNameFlags} from './lib/RequestNameFlags'
 import {RequestNameResultCode} from './lib/RequestNameResultCode'
 import {ServiceNotFoundError} from './lib/Errors'
+import EventEmitter from 'node:events'
 
-export class DBus {
+export class DBus extends EventEmitter {
 
     #connection: DBusConnection
 
@@ -53,27 +54,37 @@ export class DBus {
         const updateEmitterUniqueName: (this: DBusSignalEmitter, newUniqueName: string) => void = function (this: DBusSignalEmitter, newUniqueName: string): void {
             this.updateUniqueName(newUniqueName)
         }
-        dbusManageInterface.signal.on('NameOwnerChanged', (name: string, oldOwner: string, newOwner: string): void => {
-            this.#weakServiceSet.forEach((serviceWeakRef: WeakRef<DBusService>): void => {
-                const dbusService: DBusService | undefined = serviceWeakRef.deref()
-                if (!dbusService) {
-                    this.#weakServiceSet.delete(serviceWeakRef)
-                    return
-                }
-                if (dbusService.name !== name) return
-                if (dbusService.uniqueName !== newOwner) updateServiceUniqueName.call(dbusService, newOwner)
+        dbusManageInterface.signal
+            .on('NameOwnerChanged', (name: string, oldOwner: string, newOwner: string): void => {
+                this.emit('NameOwnerChanged', name, oldOwner, newOwner)
+                this.#weakServiceSet.forEach((serviceWeakRef: WeakRef<DBusService>): void => {
+                    const dbusService: DBusService | undefined = serviceWeakRef.deref()
+                    if (!dbusService) {
+                        this.#weakServiceSet.delete(serviceWeakRef)
+                        return
+                    }
+                    if (dbusService.name !== name) return
+                    if (dbusService.uniqueName !== newOwner) updateServiceUniqueName.call(dbusService, newOwner)
+                })
+                this.#signalEmitterWeakRefSet.forEach((emitterRef: WeakRef<DBusSignalEmitter>): void => {
+                    const emitter: DBusSignalEmitter | undefined = emitterRef.deref()
+                    if (!emitter) {
+                        this.#signalEmitterWeakRefSet.delete(emitterRef)
+                        return
+                    }
+                    if (emitter.uniqueName !== oldOwner) return
+                    updateEmitterUniqueName.call(emitter, newOwner)
+                })
+                if (!!name && !oldOwner && !!newOwner) this.emit('online', name)
+                if (!!name && !!oldOwner && !newOwner) this.emit('offline', name)
+                if (!!name && !!oldOwner && !!newOwner) this.emit('replaced', name)
             })
-            this.#signalEmitterWeakRefSet.forEach((emitterRef: WeakRef<DBusSignalEmitter>): void => {
-                const emitter: DBusSignalEmitter | undefined = emitterRef.deref()
-                if (!emitter) {
-                    this.#signalEmitterWeakRefSet.delete(emitterRef)
-                    return
-                }
-                if (emitter.uniqueName !== oldOwner) return
-                updateEmitterUniqueName.call(emitter, newOwner)
+            .on('NameLost', (name: string): void => {
+                this.emit('NameLost', name)
             })
-            
-        })
+            .on('NameAcquired', (name: string): void => {
+                this.emit('NameAcquired', name)
+            })
         return this
     }
 
@@ -203,6 +214,7 @@ export class DBus {
      * @param connection
      */
     constructor(connection: DBusConnection) {
+        super()
         this.#connection = connection
         this.#connection.on('message', (message: DBusMessage): void => {
             switch (message.header.type) {
@@ -250,6 +262,54 @@ export class DBus {
                     return
             }
         })
+    }
+
+    public on(eventName: 'online', listener: (name: string) => void): this
+    public on(eventName: 'offline', listener: (name: string) => void): this
+    public on(eventName: 'replaced', listener: (name: string) => void): this
+    public on(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
+    public on(eventName: 'NameLost', listener: (name: string) => void): this
+    public on(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public on(eventName: string, listener: (...args: any[]) => void): this
+    public on(eventName: string, listener: (...args: any[]) => void): this {
+        super.on(eventName, listener)
+        return this
+    }
+
+    public once(eventName: 'online', listener: (name: string) => void): this
+    public once(eventName: 'offline', listener: (name: string) => void): this
+    public once(eventName: 'replaced', listener: (name: string) => void): this
+    public once(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
+    public once(eventName: 'NameLost', listener: (name: string) => void): this
+    public once(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public once(eventName: string, listener: (...args: any[]) => void): this
+    public once(eventName: string, listener: (...args: any[]) => void): this {
+        super.once(eventName, listener)
+        return this
+    }
+
+    public off(eventName: 'online', listener: (name: string) => void): this
+    public off(eventName: 'offline', listener: (name: string) => void): this
+    public off(eventName: 'replaced', listener: (name: string) => void): this
+    public off(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
+    public off(eventName: 'NameLost', listener: (name: string) => void): this
+    public off(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public off(eventName: string, listener: (...args: any[]) => void): this
+    public off(eventName: string, listener: (...args: any[]) => void): this {
+        super.off(eventName, listener)
+        return this
+    }
+
+    public removeListener(eventName: 'online', listener: (name: string) => void): this
+    public removeListener(eventName: 'offline', listener: (name: string) => void): this
+    public removeListener(eventName: 'replaced', listener: (name: string) => void): this
+    public removeListener(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
+    public removeListener(eventName: 'NameLost', listener: (name: string) => void): this
+    public removeListener(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public removeListener(eventName: string, listener: (...args: any[]) => void): this
+    public removeListener(eventName: string, listener: (...args: any[]) => void): this {
+        super.removeListener(eventName, listener)
+        return this
     }
 
     public addMatch(rule: string): void {
