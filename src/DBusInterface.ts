@@ -1,11 +1,25 @@
 import {DBusInterfaceOpts} from './types/DBusInterfaceOpts'
+import {DBus} from './DBus'
+import {DBusService} from './DBusService'
+import {DBusObject} from './DBusObject'
 
 export class DBusInterface {
     protected readonly opts: DBusInterfaceOpts
 
+    protected readonly dbus: DBus
+
+    protected readonly service: DBusService
+
+    protected readonly object: DBusObject
+
+    public readonly name: string
+
     constructor(opts: DBusInterfaceOpts) {
         this.opts = opts
-        //TODO
+        this.name = this.opts.iface
+        this.dbus = this.opts.dbus
+        this.service = this.opts.dbusService
+        this.object = this.opts.dbusObject
     }
 
     public async getMethods() {

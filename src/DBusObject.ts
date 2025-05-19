@@ -43,7 +43,8 @@ export class DBusObject {
     public async getInterface(iface: string): Promise<DBusInterface> {
         return new DBusInterface({
             ...this.opts,
-            iface: iface
+            iface: iface,
+            dbusObject: this
         })
     }
 }
