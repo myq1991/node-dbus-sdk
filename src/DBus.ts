@@ -400,7 +400,9 @@ export class DBus {
         ])
         if (!activeNames.includes(service) && !activatableNames.includes(service)) throw new ServiceNotFoundError(`Service ${service} not found`)
         if (activatableNames.includes(service) && !activeNames.includes(service)) await this.startServiceByName(service)
-        return new DBusService({dbus: this, service: service})
+        const uniqueId: string | undefined = await this.getNameOwner(service)
+        if (!uniqueId) throw new ServiceNotFoundError(`Service ${service} has not connection`)
+        return new DBusService({dbus: this, service: service, uniqueId: uniqueId})
     }
 
     /**

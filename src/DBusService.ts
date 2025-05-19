@@ -5,37 +5,19 @@ import {parseStringPromise as parseXMLString} from 'xml2js'
 
 export class DBusService {
 
-    #uniqueId?: string
-
     protected readonly opts: DBusServiceOpts
 
     protected readonly dbus: DBus
 
     public readonly name: string
 
-    public get uniqueId(): string | undefined {
-        return this.#uniqueId
-    }
+    public readonly uniqueId: string
 
     constructor(opts: DBusServiceOpts) {
         this.opts = opts
         this.dbus = opts.dbus
         this.name = opts.service
-    }
-
-    protected async updateUniqueId(): Promise<void> {
-        try {
-            [this.#uniqueId] = await this.dbus.invoke({
-                service: 'org.freedesktop.DBus',
-                objectPath: '/org/freedesktop/DBus',
-                interface: 'org.freedesktop.DBus',
-                method: 'GetNameOwner',
-                signature: 's',
-                args: [this.name]
-            })
-        } catch (e) {
-            this.#uniqueId = undefined
-        }
+        this.uniqueId = opts.uniqueId
     }
 
     /**
@@ -71,7 +53,6 @@ export class DBusService {
             return objectPaths
         }
         const allObjectPaths: string[] = [...new Set(...(await getSubNodes()))]
-        await this.updateUniqueId()
         if (!allObjectPaths.includes('/')) allObjectPaths.push('/')//将根路径加入列表
         return allObjectPaths.concat(emptyObjectPaths).filter(v => !allObjectPaths.includes(v) || !emptyObjectPaths.includes(v))
     }
@@ -91,7 +72,8 @@ export class DBusService {
     public async getObject(objectPath: string): Promise<DBusObject> {
         return new DBusObject({
             ...this.opts,
-            objectPath: objectPath
+            objectPath: objectPath,
+            dbusService: this
         })
     }
 }

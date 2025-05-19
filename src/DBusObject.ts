@@ -1,12 +1,23 @@
 import {DBusObjectOpts} from './types/DBusObjectOpts'
 import {DBusInterface} from './DBusInterface'
+import {DBus} from './DBus'
+import {DBusService} from './DBusService'
 
 export class DBusObject {
+
     protected readonly opts: DBusObjectOpts
+
+    protected readonly dbus: DBus
+
+    protected readonly service: DBusService
+
+    public readonly name: string
 
     constructor(opts: DBusObjectOpts) {
         this.opts = opts
-        //TODO
+        this.dbus = this.opts.dbus
+        this.service = this.opts.dbusService
+        this.name = this.opts.objectPath
     }
 
     /**
