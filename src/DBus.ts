@@ -21,7 +21,7 @@ export class DBus {
 
     #connection: DBusConnection
 
-    #uniqueId: string
+    #uniqueName: string
 
     #serial: number = 1
 
@@ -37,14 +37,26 @@ export class DBus {
      */
     public static async connect(opts: ConnectOpts): Promise<DBus> {
         const bus: DBus = new DBus(await DBusConnection.createConnection(opts))
-        const [uniqueId] = await bus.invoke({
+        await bus.initialize()
+        return bus
+    }
+
+    protected async initialize(): Promise<void> {
+        await this.hello()
+        const dbusManageInterface: DBusInterface = await this.getInterface('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus')
+        dbusManageInterface.signal.on('NameOwnerChanged', (name: string, oldOwner: string, newOwner: string): void => {
+            console.log(name, oldOwner, newOwner)
+        })
+    }
+
+    protected async hello(): Promise<void> {
+        const [uniqueName] = await this.invoke({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
             method: 'Hello'
         })
-        bus.#uniqueId = uniqueId
-        return bus
+        this.#uniqueName = uniqueName
     }
 
     /**
@@ -114,23 +126,23 @@ export class DBus {
         })
     }
 
-    protected formatMatchSignalRule(uniqueId: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string): string {
+    protected formatMatchSignalRule(uniqueName: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string): string {
         const matchSignalRules: string[] = ['type=signal']
-        if (uniqueId !== '*') matchSignalRules.push(`sender=${uniqueId}`)
+        if (uniqueName !== '*') matchSignalRules.push(`sender=${uniqueName}`)
         if (objectPath !== '*') matchSignalRules.push(`path=${objectPath}`)
         if (interfaceName !== '*') matchSignalRules.push(`interface=${interfaceName}`)
         if (signalName !== '*') matchSignalRules.push(`member=${signalName}`)
         return matchSignalRules.join(',')
     }
 
-    protected onSignal(uniqueId: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*'): void {
+    protected onSignal(uniqueName: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*'): void {
         const rules: Record<string, string> = {
-            uniqueId: uniqueId,
+            uniqueName: uniqueName,
             objectPath: objectPath,
             interfaceName: interfaceName,
             signalName: signalName
         }
-        this.#signalRulesMap.set(rules, this.formatMatchSignalRule(uniqueId, objectPath, interfaceName, signalName))
+        this.#signalRulesMap.set(rules, this.formatMatchSignalRule(uniqueName, objectPath, interfaceName, signalName))
         return this.addMatch(this.#signalRulesMap.get(rules)!)
     }
 
@@ -183,7 +195,7 @@ export class DBus {
                     const emitResults: boolean[] = []
                     this.#signalEmitters.forEach((emitter: DBusSignalEmitter): void => {
                         emitResults.push(((): boolean => {
-                            if (emitter.uniqueId !== '*' && emitter.uniqueId !== sender) return false
+                            if (emitter.uniqueName !== '*' && emitter.uniqueName !== sender) return false
                             if (emitter.objectPath !== '*' && emitter.objectPath !== objectPath) return false
                             if (emitter.interface !== '*' && emitter.interface !== interfaceName) return false
                             if (!emitter.eventNames().includes(signalName) && !emitter.eventNames().includes('*')) return false
@@ -195,7 +207,7 @@ export class DBus {
                     if (emitResults.find((result: boolean): boolean => result)) return
                     const deprecatedSignalRuleStrings: string[] = []
                     this.#signalRulesMap.forEach((signalRuleString: string, rule: Record<string, string>): void => {
-                        if (rule.uniqueId !== '*' && rule.uniqueId !== sender) return
+                        if (rule.uniqueName !== '*' && rule.uniqueName !== sender) return
                         if (rule.objectPath !== '*' && rule.objectPath !== objectPath) return
                         if (rule.interfaceName !== '*' && rule.interfaceName !== interfaceName) return
                         if (rule.signalName !== '*' && rule.signalName !== signalName) return
@@ -358,15 +370,15 @@ export class DBus {
         const serviceNames: string[] = [...new Set([...activeServiceNames, ...activatableServiceNames])]
         return await Promise.all(serviceNames.map((serviceName: string): Promise<ServiceBasicInfo> => {
             return new Promise(async (resolve): Promise<void> => {
-                let uniqueId: string | undefined
+                let uniqueName: string | undefined
                 let pid: number | undefined
-                [uniqueId, pid] = await Promise.all([
+                [uniqueName, pid] = await Promise.all([
                     this.getNameOwner(serviceName),
                     this.getConnectionUnixProcessID(serviceName)
                 ])
                 return resolve({
                     name: serviceName,
-                    uniqueId: uniqueId,
+                    uniqueName: uniqueName,
                     active: activeServiceNames.includes(serviceName),
                     activatable: activatableServiceNames.includes(serviceName),
                     pid: pid
@@ -396,9 +408,9 @@ export class DBus {
         ])
         if (!activeNames.includes(service) && !activatableNames.includes(service)) throw new ServiceNotFoundError(`Service ${service} not found`)
         if (activatableNames.includes(service) && !activeNames.includes(service)) await this.startServiceByName(service)
-        const uniqueId: string | undefined = await this.getNameOwner(service)
-        if (!uniqueId) throw new ServiceNotFoundError(`Service ${service} has not connection`)
-        return new DBusService({dbus: this, service: service, uniqueId: uniqueId})
+        const uniqueName: string | undefined = await this.getNameOwner(service)
+        if (!uniqueName) throw new ServiceNotFoundError(`Service ${service} has not connection`)
+        return new DBusService({dbus: this, service: service, uniqueName: uniqueName})
     }
 
     /**

@@ -1,6 +1,6 @@
 export interface ServiceBasicInfo {
     name: string
-    uniqueId?: string
+    uniqueName?: string
     active: boolean
     activatable: boolean
     pid?: number

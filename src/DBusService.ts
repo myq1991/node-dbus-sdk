@@ -11,13 +11,13 @@ export class DBusService {
 
     public readonly name: string
 
-    public readonly uniqueId: string
+    public readonly uniqueName: string
 
     constructor(opts: DBusServiceOpts) {
         this.opts = opts
         this.dbus = opts.dbus
         this.name = opts.service
-        this.uniqueId = opts.uniqueId
+        this.uniqueName = opts.uniqueName
     }
 
     /**

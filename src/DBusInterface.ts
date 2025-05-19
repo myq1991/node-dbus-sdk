@@ -111,7 +111,7 @@ export class DBusInterface {
 
     public get signal(): DBusSignalEmitter {
         if (!this.#signalEmitter) this.#signalEmitter = this.dbus.createSignalEmitter({
-            uniqueId: this.service.uniqueId,
+            uniqueName: this.service.uniqueName,
             objectPath: this.object.name,
             interface: this.name
         })

@@ -7,7 +7,7 @@ export class DBusSignalEmitter extends EventEmitter {
 
     protected readonly onSignalHandler: (service: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*') => void
 
-    public readonly uniqueId: string | '*'
+    public readonly uniqueName: string | '*'
 
     public readonly objectPath: string | '*'
 
@@ -17,7 +17,7 @@ export class DBusSignalEmitter extends EventEmitter {
         super()
         this.#signalEmitters = signalEmitters
         this.onSignalHandler = onSignalHandler
-        this.uniqueId = opts.uniqueId
+        this.uniqueName = opts.uniqueName
         this.objectPath = opts.objectPath
         this.interface = opts.interface
     }
@@ -31,7 +31,7 @@ export class DBusSignalEmitter extends EventEmitter {
     }
 
     public addListener(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueId, this.objectPath, this.interface, eventName)
+        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
         super.addListener(eventName, listener)
         this.updateSignalEmitters()
         return this
@@ -66,28 +66,28 @@ export class DBusSignalEmitter extends EventEmitter {
     }
 
     public on(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueId, this.objectPath, this.interface, eventName)
+        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
         super.on(eventName, listener)
         this.updateSignalEmitters()
         return this
     }
 
     public once(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueId, this.objectPath, this.interface, eventName)
+        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
         super.once(eventName, listener)
         this.updateSignalEmitters()
         return this
     }
 
     public prependListener(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueId, this.objectPath, this.interface, eventName)
+        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
         super.prependListener(eventName, listener)
         this.updateSignalEmitters()
         return this
     }
 
     public prependOnceListener(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueId, this.objectPath, this.interface, eventName)
+        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
         super.prependOnceListener(eventName, listener)
         this.updateSignalEmitters()
         return this
