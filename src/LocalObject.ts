@@ -2,6 +2,8 @@ import {LocalInterface} from './LocalInterface'
 import {LocalInterfaceExistsError} from './lib/Errors'
 import {DBus} from './DBus'
 import {LocalService} from './LocalService'
+import {IntrospectNode} from './types/IntrospectNode'
+import {IntrospectInterface} from './types/IntrospectInterface'
 
 export class LocalObject {
 
@@ -26,6 +28,16 @@ export class LocalObject {
 
     public setService(service: LocalService | undefined): void {
         this.service = service
+    }
+
+    public get introspectNode(): IntrospectNode {
+        const interfaces: IntrospectInterface[] = []
+        this.#interfaceMap.forEach((localInterface: LocalInterface): void => {
+            interfaces.push(localInterface.introspectInterface)
+        })
+        return {
+            interface: interfaces
+        }
     }
 
     public addInterface(localInterface: LocalInterface) {
@@ -57,5 +69,11 @@ export class LocalObject {
             }
         }
         return removeSuccess
+    }
+
+    public listInterfaces(): Record<string, LocalInterface> {
+        const interfaces: Record<string, LocalInterface> = {}
+        this.#interfaceMap.forEach((localInterface: LocalInterface, interfaceName: string): LocalInterface => interfaces[interfaceName] = localInterface)
+        return interfaces
     }
 }

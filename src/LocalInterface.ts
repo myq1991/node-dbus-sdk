@@ -1,5 +1,5 @@
 import {DBusPropertyAccess} from './lib/DBusPropertyAccess'
-import {DefineMethodOpts} from './types/DefineMethodOpts'
+import {DefineMethodArgumentOpts, DefineMethodOpts} from './types/DefineMethodOpts'
 import {DefinePropertyOpts} from './types/DefinePropertyOpts'
 import {DefineSignalOpts} from './types/DefineSignalOpts'
 import {IntrospectMethod} from './types/IntrospectMethod'
@@ -15,6 +15,7 @@ import {
 import {DBus} from './DBus'
 import {LocalObject} from './LocalObject'
 import {LocalService} from './LocalService'
+import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 
 export class LocalInterface {
 
@@ -75,7 +76,17 @@ export class LocalInterface {
         this.#definedMethods[opts.name] = opts.method
         this.#introspectMethods.push({
             name: opts.name,
-            arg: [...(opts.inputArgs ? opts.inputArgs : []), ...(opts.outputArgs ? opts.outputArgs : [])]
+            arg: [
+                ...(opts.inputArgs ? opts.inputArgs.map((inputArg: DefineMethodArgumentOpts): IntrospectMethodArgument => ({
+                    name: inputArg.name,
+                    type: inputArg.type,
+                    direction: 'in'
+                })) : []),
+                ...(opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): IntrospectMethodArgument => ({
+                    name: outputArg.name,
+                    type: outputArg.type,
+                    direction: 'out'
+                })) : [])]
         })
     }
 
