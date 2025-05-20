@@ -1,6 +1,49 @@
+import {DBusPropertyAccess} from './lib/DBusPropertyAccess'
+import {DefineMethodOpts} from './types/DefineMethodOpts'
+import {DefinePropertyOpts} from './types/DefinePropertyOpts'
+import {DefineSignalOpts} from './types/DefineSignalOpts'
+import {IntrospectMethod} from './types/IntrospectMethod'
+import {IntrospectProperty} from './types/IntrospectProperty'
+import {IntrospectSignal} from './types/IntrospectSignal'
+import {IntrospectInterface} from './types/IntrospectInterface'
+import EventEmitter from 'node:events'
+import {
+    LocalInterfaceMethodDefinedError, LocalInterfaceMethodNotFoundError,
+    LocalInterfacePropertyDefinedError, LocalInterfacePropertyNotFoundError,
+    LocalInterfaceSignalDefinedError
+} from './lib/Errors'
+import {DBus} from './DBus'
+import {LocalObject} from './LocalObject'
+import {LocalService} from './LocalService'
+
 export class LocalInterface {
 
     readonly #name: string
+
+    #introspectMethods: IntrospectMethod[] = []
+
+    #definedMethods: Record<string, (...args: any[]) => Promise<any | any[]> | any | any[]> = {}
+
+    #introspectProperties: IntrospectProperty[] = []
+
+    #definedProperties: Record<string, {
+        getter?: () => Promise<any> | any
+        setter?: (value: any) => Promise<void> | void
+    }> = {}
+
+    #introspectSignals: IntrospectSignal[] = []
+
+    #definedSignals: Record<string, {
+        listener: (...args: any[]) => void,
+        eventEmitter: EventEmitter
+    }> = {}
+
+    public object: LocalObject | undefined
+
+    public get dbus(): DBus | undefined {
+        if (!this.object) return
+        return this.object.dbus
+    }
 
     public get name(): string {
         return this.#name
@@ -10,5 +53,101 @@ export class LocalInterface {
         this.#name = interfaceName
     }
 
+    public setObject(localObject: LocalObject | undefined): void {
+        this.object = localObject
+    }
 
+    public get introspectInterface(): IntrospectInterface {
+        return {
+            name: this.#name,
+            method: this.#introspectMethods,
+            property: this.#introspectProperties,
+            signal: this.#introspectSignals
+        }
+    }
+
+    protected notifyObject(): void {
+        //TODO
+    }
+
+    public defineMethod(opts: DefineMethodOpts): void {
+        if (this.#definedMethods[opts.name]) throw new LocalInterfaceMethodDefinedError(`Method ${opts.name} is already defined`)
+        this.#definedMethods[opts.name] = opts.method
+        this.#introspectMethods.push({
+            name: opts.name,
+            arg: [...(opts.inputArgs ? opts.inputArgs : []), ...(opts.outputArgs ? opts.outputArgs : [])]
+        })
+    }
+
+    public removeMethod(name: string): void {
+        delete this.#definedMethods[name]
+        this.#introspectMethods = this.#introspectMethods.filter((introspectMethod: IntrospectMethod): boolean => introspectMethod.name !== name)
+    }
+
+    public defineProperty(opts: DefinePropertyOpts): void {
+        if (!opts.setter && !opts.getter) return
+        if (this.#definedProperties[opts.name]) throw new LocalInterfacePropertyDefinedError(`Property ${opts.name} is already defined`)
+        let access: DBusPropertyAccess = DBusPropertyAccess.READWRITE
+        if (opts.getter) access = DBusPropertyAccess.READ
+        if (opts.setter) access = DBusPropertyAccess.WRITE
+        if (opts.getter && opts.setter) access = DBusPropertyAccess.READWRITE
+        this.#definedProperties[opts.name] = {
+            getter: opts.getter,
+            setter: opts.setter
+        }
+        this.#introspectProperties.push({
+            name: opts.name,
+            type: opts.type,
+            access: access
+        })
+    }
+
+    public removeProperty(name: string): void {
+        delete this.#definedProperties[name]
+        this.#introspectProperties = this.#introspectProperties.filter((introspectProperty: IntrospectProperty): boolean => introspectProperty.name !== name)
+    }
+
+    public defineSignal(opts: DefineSignalOpts): void {
+        if (this.#definedSignals[opts.name]) throw new LocalInterfaceSignalDefinedError(`Signal ${opts.name} is already defined`)
+        const signature: string | undefined = opts.arg?.map(arg => arg.type).join('')
+        this.#definedSignals[opts.name] = {
+            listener: (...args: any[]): void => {
+                if (!this.dbus || !this.object) return
+                this.dbus.emitSignal({
+                    objectPath: this.object.name,
+                    interface: this.#name,
+                    signal: opts.name,
+                    signature: signature,
+                    data: args
+                })
+            },
+            eventEmitter: opts.eventEmitter
+        }
+        this.#introspectSignals.push({
+            name: opts.name,
+            arg: opts.arg ? opts.arg : []
+        })
+        this.#definedSignals[opts.name].eventEmitter.on(opts.name, this.#definedSignals[opts.name].listener)
+    }
+
+    public removeSignal(name: string): void {
+        if (this.#definedSignals[name]) this.#definedSignals[name].eventEmitter.removeListener(name, this.#definedSignals[name].listener)
+        delete this.#definedSignals[name]
+        this.#introspectSignals = this.#introspectSignals.filter((introspectSignal: IntrospectSignal): boolean => introspectSignal.name !== name)
+    }
+
+    public async callMethod(name: string, ...args: any[]): Promise<any | any[]> {
+        if (!this.#definedMethods[name]) throw new LocalInterfaceMethodNotFoundError(`Method ${name} not found`)
+        return await this.#definedMethods[name](...args)
+    }
+
+    public async setProperty(name: string, value: any): Promise<void> {
+        if (!this.#definedProperties[name]) throw new LocalInterfacePropertyNotFoundError(`Property ${name} not found`)
+        if (this.#definedProperties[name].setter) this.#definedProperties[name].setter(value)
+    }
+
+    public async getProperty(name: string): Promise<any> {
+        if (!this.#definedProperties[name]) throw new LocalInterfacePropertyNotFoundError(`Property ${name} not found`)
+        if (this.#definedProperties[name].getter) return this.#definedProperties[name].getter()
+    }
 }

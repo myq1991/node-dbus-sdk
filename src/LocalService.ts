@@ -10,7 +10,9 @@ export class LocalService {
 
     readonly #objectMap: Map<string, LocalObject> = new Map()
 
-    #dbus: DBus
+    readonly #emptyObjectMap: Map<string, LocalObject> = new Map()
+
+    public dbus: DBus
 
     public get name(): string {
         return this.#name
@@ -30,15 +32,15 @@ export class LocalService {
     }
 
     public async run(opts: ConnectOpts): Promise<void> {
-        this.#dbus = await DBus.connect(opts)
-        this.#dbus.on('methodCall', this.#methodCallHandler)
-        await this.#dbus.requestName(this.#name)
+        this.dbus = await DBus.connect(opts)
+        this.dbus.on('methodCall', this.#methodCallHandler)
+        await this.dbus.requestName(this.#name)
     }
 
     public async stop(): Promise<void> {
-        await this.#dbus.releaseName(this.#name)
-        this.#dbus.off('methodCall', this.#methodCallHandler)
-        await this.#dbus.disconnect()
+        await this.dbus.releaseName(this.#name)
+        this.dbus.off('methodCall', this.#methodCallHandler)
+        await this.dbus.disconnect()
     }
 
     public addObject(localObject: LocalObject) {
@@ -49,20 +51,23 @@ export class LocalService {
                 return
             }
         }
+        localObject.setService(this)
         this.#objectMap.set(localObject.name, localObject)
     }
 
     public removeObject(localObject: LocalObject): boolean
     public removeObject(localObjectPath: string): boolean
     public removeObject(inp: LocalObject | string): boolean {
-        let removeSuccess: boolean = false
+        let removeSuccess: boolean
         if (typeof inp === 'string') {
+            this.#objectMap.get(inp)?.setService(undefined)
             removeSuccess = this.#objectMap.delete(inp)
         } else {
             const result: [string, LocalObject] | undefined = [...this.#objectMap.entries()].find(([localObjectPath, localObject]): boolean => localObject === inp)
             if (!result) {
                 removeSuccess = false
             } else {
+                result[1].setService(undefined)
                 removeSuccess = this.#objectMap.delete(result[0])
             }
         }

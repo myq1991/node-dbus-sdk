@@ -84,7 +84,37 @@ export class AccessPropertyForbiddenError extends Error implements NodeJS.ErrnoE
 }
 
 export class LocalObjectPathExistsError extends Error implements NodeJS.ErrnoException {
-    errno: number = 1016
+    errno: number = 1017
     code: string = 'E_LOCAL_OBJECT_EXISTS'
+}
+
+export class LocalInterfaceExistsError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1018
+    code: string = 'E_LOCAL_INTERFACE_EXISTS'
+}
+
+export class LocalInterfaceMethodDefinedError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1019
+    code: string = 'E_LOCAL_INTERFACE_METHOD_DEFINED'
+}
+
+export class LocalInterfacePropertyDefinedError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1020
+    code: string = 'E_LOCAL_INTERFACE_PROPERTY_DEFINED'
+}
+
+export class LocalInterfaceSignalDefinedError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1021
+    code: string = 'E_LOCAL_INTERFACE_SIGNAL_DEFINED'
+}
+
+export class LocalInterfaceMethodNotFoundError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1022
+    code: string = 'E_LOCAL_INTERFACE_METHOD_NOT_FOUND'
+}
+
+export class LocalInterfacePropertyNotFoundError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1023
+    code: string = 'E_LOCAL_INTERFACE_PROPERTY_NOT_FOUND'
 }
 
