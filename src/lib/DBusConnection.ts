@@ -369,9 +369,10 @@ export class DBusConnection extends EventEmitter {
 
     /**
      * End DBus connection
+     * @param callback
      */
-    public end(): this {
-        this.#stream.end()
+    public end(callback?: () => void): this {
+        this.#stream.end(callback)
         return this
     }
 

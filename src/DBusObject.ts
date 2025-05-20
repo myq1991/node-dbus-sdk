@@ -54,14 +54,12 @@ export class DBusObject {
      * Introspect object
      */
     public async introspect(): Promise<IntrospectNode> {
-        let introspectXML: string
-        [introspectXML] = await this.dbus.invoke({
+        const [introspectXML] = await this.dbus.invoke({
             service: this.service.name,
             objectPath: this.name,
             interface: 'org.freedesktop.DBus.Introspectable',
             method: 'Introspect'
         })
-        console.log(introspectXML)
         const introspectObject: any = await parseXMLString(introspectXML)
         const node: any = introspectObject.node
         const interfaces: any[] = node.interface ? node.interface : []

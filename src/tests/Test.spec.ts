@@ -5,13 +5,22 @@ import {DBusSignedValue} from '../lib/DBusSignedValue'
 import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {DBusMessageEndianness} from '../lib/DBusMessageEndianness'
 import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
+import {runExposeService} from './ExposeService.spec'
 
 // runDBusBufferTestSet()
 
 setImmediate(async (): Promise<void> => {
+
+    await runExposeService()
+
     // const dbus=await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
     const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     console.log('success')
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+    const serv = await dbus.getService('org.test.service')
+    const obj = await serv.getObject('/')
+    console.log(await obj.getInterface('xxx.xxx'))
+
     // dbus.createSignalEmitter({
     //     // uniqueName:'org.ptswitch.pad',
     //     uniqueName: '*',//在DBus上真正发出信号的sender一般为服务的唯一id
@@ -21,8 +30,8 @@ setImmediate(async (): Promise<void> => {
     //     .on('PropertiesChanged', console.log)
     //     .on('*', console.log)
     // console.log(await dbus.listServices())
-    const serv = await dbus.getService('org.ptswitch.pad')
-    const obj = await serv.getObject('/slot1/port1/stc')
+    // const serv = await dbus.getService('org.ptswitch.pad')
+    // const obj = await serv.getObject('/slot1/port1/stc')
     // const obj = await serv.getObject('/slot1/port1')
 
     //
@@ -31,7 +40,7 @@ setImmediate(async (): Promise<void> => {
     // // console.log(await serv.listObjects())
     //
     // const iface = await obj.getInterface('pad.stc')
-    const iface1 = await obj.getInterface('org.freedesktop.DBus.Properties')
+    // const iface1 = await obj.getInterface('org.freedesktop.DBus.Properties')
     //
     // // iface.signal.on('*',console.log)
     // iface1.signal.on('PropertiesChanged', console.log)

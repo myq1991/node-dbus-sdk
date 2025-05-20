@@ -41,6 +41,10 @@ export class DBus extends EventEmitter {
 
     #dbusManageInterface: DBusInterface
 
+    public get uniqueName(): string {
+        return this.#uniqueName
+    }
+
     /**
      * Connect to DBus
      * @param opts
@@ -327,8 +331,7 @@ export class DBus extends EventEmitter {
                     })
                     return deprecatedSignalRuleStrings.forEach((deprecatedSignalRuleString: string): void => this.offSignal(deprecatedSignalRuleString))
                 case DBusMessageType.METHOD_CALL:
-                    console.log(message)
-                    //TODO
+                    this.emit('methodCall', message)
                     return
             }
         })
@@ -337,6 +340,7 @@ export class DBus extends EventEmitter {
     public on(eventName: 'online', listener: (name: string) => void): this
     public on(eventName: 'offline', listener: (name: string) => void): this
     public on(eventName: 'replaced', listener: (name: string) => void): this
+    public on(eventName: 'methodCall', listener: (message: DBusMessage) => void): this
     public on(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     public on(eventName: 'NameLost', listener: (name: string) => void): this
     public on(eventName: 'NameAcquired', listener: (name: string) => void): this
@@ -349,6 +353,7 @@ export class DBus extends EventEmitter {
     public once(eventName: 'online', listener: (name: string) => void): this
     public once(eventName: 'offline', listener: (name: string) => void): this
     public once(eventName: 'replaced', listener: (name: string) => void): this
+    public once(eventName: 'methodCall', listener: (message: DBusMessage) => void): this
     public once(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     public once(eventName: 'NameLost', listener: (name: string) => void): this
     public once(eventName: 'NameAcquired', listener: (name: string) => void): this
@@ -361,6 +366,7 @@ export class DBus extends EventEmitter {
     public off(eventName: 'online', listener: (name: string) => void): this
     public off(eventName: 'offline', listener: (name: string) => void): this
     public off(eventName: 'replaced', listener: (name: string) => void): this
+    public off(eventName: 'methodCall', listener: (message: DBusMessage) => void): this
     public off(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     public off(eventName: 'NameLost', listener: (name: string) => void): this
     public off(eventName: 'NameAcquired', listener: (name: string) => void): this
@@ -373,6 +379,7 @@ export class DBus extends EventEmitter {
     public removeListener(eventName: 'online', listener: (name: string) => void): this
     public removeListener(eventName: 'offline', listener: (name: string) => void): this
     public removeListener(eventName: 'replaced', listener: (name: string) => void): this
+    public removeListener(eventName: 'methodCall', listener: (message: DBusMessage) => void): this
     public removeListener(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     public removeListener(eventName: 'NameLost', listener: (name: string) => void): this
     public removeListener(eventName: 'NameAcquired', listener: (name: string) => void): this
@@ -513,23 +520,19 @@ export class DBus extends EventEmitter {
         }
     }
 
+    public async disconnect(): Promise<void> {
+        await new Promise<void>(resolve => this.#connection.end(resolve))
+    }
+
     public async listBusNames(): Promise<BusNameBasicInfo[]> {
-        let activeNames: string[]
-        let activatableNames: string[]
-        [
-            activeNames,
-            activatableNames
-        ]
-            = await Promise.all([
+        const [activeNames, activatableNames] = await Promise.all([
             this.listNames(),
             this.listActivatableNames()
         ])
         const names: string[] = [...new Set([...activeNames, ...activatableNames])]
         return await Promise.all(names.map((name: string): Promise<ServiceBasicInfo> => {
             return new Promise(async (resolve): Promise<void> => {
-                let uniqueName: string | undefined
-                let pid: number | undefined
-                [uniqueName, pid] = await Promise.all([
+                const [uniqueName, pid] = await Promise.all([
                     this.getNameOwner(name),
                     this.getConnectionUnixProcessID(name)
                 ])
@@ -565,9 +568,7 @@ export class DBus extends EventEmitter {
      * @param service
      */
     public async getService(service: string): Promise<DBusService> {
-        let activeNames: string[]
-        let activatableNames: string[]
-        [activeNames, activatableNames] = await Promise.all([
+        const [activeNames, activatableNames] = await Promise.all([
             this.listNames(),
             this.listActivatableNames()
         ])

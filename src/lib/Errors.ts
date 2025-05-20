@@ -83,4 +83,8 @@ export class AccessPropertyForbiddenError extends Error implements NodeJS.ErrnoE
     code: string = 'E_ACCESS_PROPERTY_FORBIDDEN'
 }
 
+export class LocalObjectPathExistsError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1016
+    code: string = 'E_LOCAL_OBJECT_EXISTS'
+}
 
