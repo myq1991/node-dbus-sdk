@@ -3,6 +3,8 @@ import {ConnectOpts} from './types/ConnectOpts'
 import {DBus} from './DBus'
 import {DBusMessage} from './lib/DBusMessage'
 import {LocalObjectPathExistsError} from './lib/Errors'
+import {IntrospectableInterface} from './lib/IntrospectableInterface'
+import {LocalInterface} from './LocalInterface'
 
 export class LocalService {
 
@@ -10,7 +12,7 @@ export class LocalService {
 
     readonly #objectMap: Map<string, LocalObject> = new Map()
 
-    readonly #emptyObjectMap: Map<string, LocalObject> = new Map()
+    readonly #defaultIntrospectableInterface: IntrospectableInterface = new IntrospectableInterface()
 
     public dbus: DBus
 
@@ -23,12 +25,43 @@ export class LocalService {
     }
 
     #methodCallHandler: (message: DBusMessage) => Promise<void> = async (message: DBusMessage): Promise<void> => {
-        console.log('!!!!!')
-        const targetPath: string = message.header.path
+        const targetObjectPath: string = message.header.path
         const targetInterface: string = message.header.interfaceName
-        // const registeredObjectPaths: string[] = [...this.#objectMap.keys()]
-        // const startWithTargetPaths: string[] = registeredObjectPaths.filter((registeredObjectPath: string): boolean => registeredObjectPath.startsWith(targetPath))
-        // if (!startWithTargetPaths.length) return
+        const targetMethod: string = message.header.member
+        const localObject: LocalObject | undefined = this.findObjectByPath(targetObjectPath)
+        if (localObject) {
+            const localInterface: LocalInterface | undefined = localObject.findInterfaceByName(targetInterface)
+            if (localInterface) {
+                try {
+                    const {signature, result} = await localInterface.callMethod(targetMethod, ...message.body)
+                    return this.dbus.reply({
+                        destination: message.header.sender,
+                        replySerial: message.header.serial,
+                        signature: signature,
+                        data: Array.isArray(result) ? result : [result]
+                    })
+                } catch (e: any) {
+                    return this.dbus.reply({
+                        destination: message.header.sender,
+                        replySerial: message.header.serial,
+                        data: e instanceof Error ? e : new Error(e.toString())
+                    })
+                }
+            }
+        }
+        /**
+         * Introspect
+         */
+        if (targetInterface === 'org.freedesktop.DBus.Introspectable' && targetMethod === 'Introspect') {
+            return this.dbus.reply({
+                destination: message.header.sender,
+                replySerial: message.header.serial,
+                signature: 's',
+                data: [this.#defaultIntrospectableInterface.formatIntrospectXML(targetObjectPath, this.listObjectPaths())]
+            })
+        }
+        //TODO should not arrive here
+        console.log(message)
     }
 
     public async run(opts: ConnectOpts): Promise<void> {
@@ -78,5 +111,13 @@ export class LocalService {
         const objects: Record<string, LocalObject> = {}
         this.#objectMap.forEach((localObject: LocalObject, objectPath: string): LocalObject => objects[objectPath] = localObject)
         return objects
+    }
+
+    public findObjectByPath(objectPath: string): LocalObject | undefined {
+        return this.#objectMap.get(objectPath)
+    }
+
+    public listObjectPaths(): string[] {
+        return [...this.#objectMap.keys()]
     }
 }

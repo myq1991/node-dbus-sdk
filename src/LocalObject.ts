@@ -4,6 +4,7 @@ import {DBus} from './DBus'
 import {LocalService} from './LocalService'
 import {IntrospectNode} from './types/IntrospectNode'
 import {IntrospectInterface} from './types/IntrospectInterface'
+import {IntrospectableInterface} from './lib/IntrospectableInterface'
 
 export class LocalObject {
 
@@ -24,6 +25,7 @@ export class LocalObject {
 
     constructor(objectPath: string) {
         this.#name = objectPath
+        this.addInterface(new IntrospectableInterface())
     }
 
     public setService(service: LocalService | undefined): void {
@@ -75,5 +77,9 @@ export class LocalObject {
         const interfaces: Record<string, LocalInterface> = {}
         this.#interfaceMap.forEach((localInterface: LocalInterface, interfaceName: string): LocalInterface => interfaces[interfaceName] = localInterface)
         return interfaces
+    }
+
+    public findInterfaceByName(name: string): LocalInterface | undefined {
+        return this.#interfaceMap.get(name)
     }
 }

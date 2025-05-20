@@ -41,8 +41,7 @@ export class DBusService {
         const emptyObjectPaths: string[] = []
         const getSubNodes: (objectPath?: string) => Promise<string[]> = async (objectPath: string = '/'): Promise<string[]> => {
             const objectPaths: string[] = objectPath === '/' ? ['/'] : []
-            let xmlResponse: string
-            [xmlResponse] = await this.dbus.invoke({
+            const [xmlResponse] = await this.dbus.invoke({
                 service: this.name,
                 objectPath: objectPath,
                 interface: 'org.freedesktop.DBus.Introspectable',

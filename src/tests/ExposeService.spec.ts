@@ -7,7 +7,8 @@ export async function runExposeService(): Promise<void> {
     let testProp: string = 'you'
     const ee = new EventEmitter()
     const serv = new LocalService('org.test.service')
-    const obj = new LocalObject('/test/obj')
+    // const obj = new LocalObject('/test/obj')
+    const obj = new LocalObject('/')
     const iface = new LocalInterface('test.iface')
     iface.defineProperty({
         name: 'fuck',
@@ -20,7 +21,7 @@ export async function runExposeService(): Promise<void> {
         }
     })
     iface.defineMethod({
-        name: 'fuck_you',
+        name: 'fuckYou',
         inputArgs: [
             {
                 name: 'name',
@@ -50,8 +51,8 @@ export async function runExposeService(): Promise<void> {
     serv.addObject(obj)
 
     await serv.run({busAddress: 'tcp:host=192.168.0.96,port=44444'})
-
-    setInterval(() => {
-        ee.emit('fuckSignal', `${Date.now()}`)
-    }, 3000)
+    //
+    // setInterval(() => {
+    //     ee.emit('fuckSignal', `${Date.now()}`)
+    // }, 3000)
 }

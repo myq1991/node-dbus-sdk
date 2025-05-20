@@ -14,7 +14,6 @@ import {
 } from './lib/Errors'
 import {DBus} from './DBus'
 import {LocalObject} from './LocalObject'
-import {LocalService} from './LocalService'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 
 export class LocalInterface {
@@ -23,7 +22,10 @@ export class LocalInterface {
 
     #introspectMethods: IntrospectMethod[] = []
 
-    #definedMethods: Record<string, (...args: any[]) => Promise<any | any[]> | any | any[]> = {}
+    #definedMethods: Record<string, {
+        signature?: string
+        method: (...args: any[]) => Promise<any | any[]> | any | any[]
+    }> = {}
 
     #introspectProperties: IntrospectProperty[] = []
 
@@ -73,7 +75,10 @@ export class LocalInterface {
 
     public defineMethod(opts: DefineMethodOpts): void {
         if (this.#definedMethods[opts.name]) throw new LocalInterfaceMethodDefinedError(`Method ${opts.name} is already defined`)
-        this.#definedMethods[opts.name] = opts.method
+        this.#definedMethods[opts.name] = {
+            signature: opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): string => outputArg.type).join('') : undefined,
+            method: opts.method
+        }
         this.#introspectMethods.push({
             name: opts.name,
             arg: [
@@ -147,9 +152,17 @@ export class LocalInterface {
         this.#introspectSignals = this.#introspectSignals.filter((introspectSignal: IntrospectSignal): boolean => introspectSignal.name !== name)
     }
 
-    public async callMethod(name: string, ...args: any[]): Promise<any | any[]> {
+    public async callMethod(name: string, ...args: any[]): Promise<{
+        signature?: string
+        result: any
+    }> {
         if (!this.#definedMethods[name]) throw new LocalInterfaceMethodNotFoundError(`Method ${name} not found`)
-        return await this.#definedMethods[name](...args)
+        const methodInfo = this.#definedMethods[name]
+        const result: any = await methodInfo.method(...args)
+        return {
+            signature: methodInfo.signature ? methodInfo.signature : undefined,
+            result: result
+        }
     }
 
     public async setProperty(name: string, value: any): Promise<void> {

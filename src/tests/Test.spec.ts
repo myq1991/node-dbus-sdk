@@ -6,6 +6,7 @@ import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {DBusMessageEndianness} from '../lib/DBusMessageEndianness'
 import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
 import {runExposeService} from './ExposeService.spec'
+import {IntrospectableInterface} from '../lib/IntrospectableInterface'
 
 // runDBusBufferTestSet()
 
@@ -17,9 +18,17 @@ setImmediate(async (): Promise<void> => {
     const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     console.log('success')
     await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
-    const serv = await dbus.getService('org.test.service')
-    const obj = await serv.getObject('/')
-    console.log(await obj.getInterface('xxx.xxx'))
+
+    // // const serv = await dbus.getService('org.sigxcpu.Feedback')
+    // // const obj = await serv.getObject('/org/sigxcpu/Feedback')
+    // // console.log(await obj.introspect())
+    //
+    // const serv = await dbus.getService('org.test.service')
+    // // console.log(await serv.listObjects())
+    // // const obj = await serv.getObject('/')
+    // const obj = await serv.getObject('/test/obj')
+    // const iface=await obj.getInterface('test.iface')
+    // console.log(await iface.method.fuckYou('hello!'))
 
     // dbus.createSignalEmitter({
     //     // uniqueName:'org.ptswitch.pad',
