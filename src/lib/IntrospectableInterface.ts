@@ -20,7 +20,7 @@ export class IntrospectableInterface extends LocalInterface {
         this.defineMethod({
             name: 'Introspect',
             outputArgs: [{
-                name: 'introspectXML',
+                name: 'xml_data',
                 type: 's'
             }],
             method: (): string => this.getIntrospectXML(this.object?.name)
@@ -47,12 +47,13 @@ export class IntrospectableInterface extends LocalInterface {
             const interfaces = localObject.introspectNode.interface.map((introspectableInterface: IntrospectInterface) => {
                 const methods = introspectableInterface.method.map((introspectMethod: IntrospectMethod) => {
                     const args = introspectMethod.arg.map((introspectMethodArgument: IntrospectMethodArgument) => {
+                        const xmlMethodArgObject: Record<string, any> = {
+                            direction: introspectMethodArgument.direction,
+                            type: introspectMethodArgument.type
+                        }
+                        if (introspectMethodArgument.name) xmlMethodArgObject.name = introspectMethodArgument.name
                         return {
-                            $: {
-                                name: introspectMethodArgument.name,
-                                direction: introspectMethodArgument.direction,
-                                type: introspectMethodArgument.type
-                            }
+                            $: xmlMethodArgObject
                         }
                     })
                     const xmlMethodObject: Record<string, any> = {
@@ -73,7 +74,13 @@ export class IntrospectableInterface extends LocalInterface {
                 })
                 const signals = introspectableInterface.signal.map((introspectSignal: IntrospectSignal) => {
                     const args = introspectSignal.arg.map((introspectSignalArgument: IntrospectSignalArgument) => {
-                        return {$: {name: introspectSignalArgument.name, type: introspectSignalArgument.type}}
+                        const xmlSignalArgObject: Record<string, any> = {
+                            type: introspectSignalArgument.type
+                        }
+                        if (introspectSignalArgument.name) xmlSignalArgObject.name = introspectSignalArgument.name
+                        return {
+                            $: introspectSignalArgument
+                        }
                     })
                     const xmlSignalObject: Record<string, any> = {
                         $: {name: introspectSignal.name}

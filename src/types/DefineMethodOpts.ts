@@ -1,5 +1,5 @@
 export interface DefineMethodArgumentOpts {
-    name: string
+    name?: string
     type: string
 }
 

@@ -38,6 +38,14 @@ export async function runExposeService(): Promise<void> {
             return `fuck ${name}!!!`
         }
     })
+    iface.defineMethod({
+        name: 'fuckYou111',
+        inputArgs: [{type: 's'}],
+        outputArgs: [{type: 's'}],
+        method: (name: string): string => {
+            return `fuck ${name}!!!`
+        }
+    })
     iface.defineSignal({
         name: 'fuckSignal',
         arg: [{

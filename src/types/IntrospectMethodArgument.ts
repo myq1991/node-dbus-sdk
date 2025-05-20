@@ -1,5 +1,5 @@
 export interface IntrospectMethodArgument {
-    name: string
+    name?: string
     type: string
     direction: string
 }
