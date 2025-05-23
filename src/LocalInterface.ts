@@ -22,6 +22,7 @@ import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 import {CreateDBusError} from './lib/CreateDBusError'
 import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
+import {Signature} from './lib/Signature'
 
 export class LocalInterface {
 
@@ -325,13 +326,13 @@ export class LocalInterface {
         return this
     }
 
-    public async callMethod(name: string, ...args: any[]): Promise<{
+    public async callMethod(name: string, payloadSignature: string | undefined, ...args: any[]): Promise<{
         signature?: string
         result: any
     }> {
         if (!this.#definedMethods[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownMethod', `Method ${name} not found`)
         const methodInfo = this.#definedMethods[name]
-        //TODO 验证数据类型是否一致
+        if (!Signature.areSignaturesCompatible(methodInfo.inputSignature, payloadSignature)) throw CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The input parameter signature '${payloadSignature}' does not match the expected method signature '${methodInfo.inputSignature}'.`)
         const result: any = await methodInfo.method(...args)
         return {
             signature: methodInfo.outputSignature ? methodInfo.outputSignature : undefined,

@@ -32,12 +32,16 @@ export class LocalService {
         const targetObjectPath: string = message.header.path
         const targetInterface: string = message.header.interfaceName
         const targetMethod: string = message.header.member
+        const payloadSignature: string = message.header.signature
         const localObject: LocalObject | undefined = this.findObjectByPath(targetObjectPath)
         if (localObject) {
             const localInterface: LocalInterface | undefined = localObject.findInterfaceByName(targetInterface)
             if (localInterface) {
                 try {
-                    const {signature, result} = await localInterface.callMethod(targetMethod, ...message.body)
+                    const {
+                        signature,
+                        result
+                    } = await localInterface.callMethod(targetMethod, payloadSignature, ...message.body)
                     const resultSignedValue: DBusSignedValue[] = signature ? [new DBusSignedValue(signature!, result)] : []
                     return this.dbus.reply({
                         destination: message.header.sender,
