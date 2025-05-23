@@ -75,7 +75,6 @@ export class DBusMessage {
         const paddingLen: number = headerLenAligned - totalHeaderLen
         const paddingBuff: Buffer = Buffer.alloc(paddingLen, 0)
         // Combine header, fields, padding, and body
-        console.log(this.header.member, 'bodyBuff:', bodyBuff)
         return Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
     }
 

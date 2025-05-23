@@ -8,6 +8,8 @@ import {SignatureError} from './Errors'
 export class DBusSignedValue {
     // The signature of the DBus value (e.g., 's', 'i', 'a', etc.)
     public readonly $signature: string
+    // The signature of the array item (for 'a' type), if applicable
+    public readonly $arrayItemSignature?: string
     // The value associated with the signature, can be a primitive, DBusSignedValue, or array of DBusSignedValue
     public readonly $value: any | DBusSignedValue | DBusSignedValue[]
 
@@ -155,6 +157,11 @@ export class DBusSignedValue {
             const dataType: DataType = dataTypes[0]
             this.$signature = dataType.type // Extract the type as the signature for single type
 
+            // Set $arrayItemSignature for array type 'a'
+            if (dataType.type === 'a' && dataType.child && dataType.child.length > 0) {
+                this.$arrayItemSignature = dataType.child[0].type
+            }
+
             // Process value based on type
             if (dataType.type === 'v') {
                 // Special handling for variant type
@@ -177,18 +184,23 @@ export class DBusSignedValue {
                             // For dictionary arrays a{...}, support object input
                             if (dataType.child[0].type === '{' && typeof value === 'object' && value !== null) {
                                 const entries: [string, unknown][] = Object.entries(value)
-                                this.$value = entries.map(([key, val]): DBusSignedValue => {
-                                    // Use parsed DataType objects directly to avoid re-parsing
-                                    const keyDataType: DataType | undefined = dataType.child![0].child?.[0]
-                                    const valueDataType: DataType | undefined = dataType.child![0].child?.[1]
-                                    if (!keyDataType || !valueDataType) {
-                                        throw new SignatureError('Invalid dictionary child types')
-                                    }
-                                    const keyObj: DBusSignedValue = new DBusSignedValue(keyDataType, key)
-                                    const valObj: DBusSignedValue = new DBusSignedValue(valueDataType, val)
-                                    // Create a DBusSignedValue for a single dictionary entry {...}
-                                    return new DBusSignedValue(dataType.child![0], [keyObj, valObj])
-                                })
+                                if (entries.length === 0) {
+                                    // If the input is an empty object, create an empty array with the correct signature structure
+                                    this.$value = []
+                                } else {
+                                    this.$value = entries.map(([key, val]): DBusSignedValue => {
+                                        // Use parsed DataType objects directly to avoid re-parsing
+                                        const keyDataType: DataType | undefined = dataType.child![0].child?.[0]
+                                        const valueDataType: DataType | undefined = dataType.child![0].child?.[1]
+                                        if (!keyDataType || !valueDataType) {
+                                            throw new SignatureError('Invalid dictionary child types')
+                                        }
+                                        const keyObj: DBusSignedValue = new DBusSignedValue(keyDataType, key)
+                                        const valObj: DBusSignedValue = new DBusSignedValue(valueDataType, val)
+                                        // Create a DBusSignedValue for a single dictionary entry {...}
+                                        return new DBusSignedValue(dataType.child![0], [keyObj, valObj])
+                                    })
+                                }
                                 break
                             } else if (dataType.child[0].type === 'y' && Buffer.isBuffer(value)) {
                                 // For 'ay' type, convert Buffer to array if provided

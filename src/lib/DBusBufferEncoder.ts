@@ -282,8 +282,9 @@ export class DBusBufferEncoder {
      * Encodes an ARRAY type value
      * Buffer must be 4-byte aligned before calling this method
      * @param signedValues Array elements, each associated with a signature
+     * @param arrayItemSignature Array elements type
      */
-    public writeArray(signedValues: DBusSignedValue[]): this {
+    public writeArray(signedValues: DBusSignedValue[], arrayItemSignature?: string): this {
         this.align(4)
         // Create a temporary encoder to encode array content and calculate its length
         const contentEncoder = new DBusBufferEncoder(this.endianness, Buffer.alloc(0), 1)
@@ -308,7 +309,7 @@ export class DBusBufferEncoder {
         // Append length field to the main buffer
         this.buffer = Buffer.concat([this.buffer, lengthBuffer])
 
-        if (signedValues[0]) switch (signedValues[0].$signature) {
+        if (arrayItemSignature) switch (arrayItemSignature) {
             case '{':
                 this.align(8)
         }
@@ -499,7 +500,7 @@ export class DBusBufferEncoder {
                 return this.writeUnixFD(signedValue.$value)
             // Container data types
             case 'a':
-                return this.writeArray(signedValue.$value)
+                return this.writeArray(signedValue.$value, signedValue.$arrayItemSignature)
             case '(':
                 return this.writeStruct(signedValue.$value)
             case '{':
