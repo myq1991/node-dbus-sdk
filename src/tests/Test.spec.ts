@@ -23,8 +23,12 @@ setImmediate(async (): Promise<void> => {
     const serv = await dbus.getService('org.test.service13')
     const obj = await serv.getObject('/')
     const iface = await obj.getInterface('test.iface')
-    iface.signal.on('fuckSignal', console.log)
+    const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
+    // iface.signal.on('fuckSignal', console.log)
     // console.log(await iface.method.test(123))
+    propIface.signal.on('PropertiesChanged', console.log)
+    await iface.property.fuck.set('aaaaaaa')
+    console.log('set value success')
 
 
     // // const serv = await dbus.getService('org.sigxcpu.Feedback')

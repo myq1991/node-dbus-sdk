@@ -4,9 +4,9 @@ import {DBus} from './DBus'
 import {LocalService} from './LocalService'
 import {IntrospectNode} from './types/IntrospectNode'
 import {IntrospectInterface} from './types/IntrospectInterface'
-import {IntrospectableInterface} from './lib/IntrospectableInterface'
-import {PropertiesInterface} from './lib/PropertiesInterface'
-import {PeerInterface} from './lib/PeerInterface'
+import {IntrospectableInterface} from './lib/common/IntrospectableInterface'
+import {PropertiesInterface} from './lib/common/PropertiesInterface'
+import {PeerInterface} from './lib/common/PeerInterface'
 
 export class LocalObject {
 

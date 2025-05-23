@@ -1,12 +1,12 @@
-import {LocalInterface} from '../LocalInterface'
+import {LocalInterface} from '../../LocalInterface'
 import {Builder} from 'xml2js'
-import {LocalObject} from '../LocalObject'
-import {IntrospectInterface} from '../types/IntrospectInterface'
-import {IntrospectMethod} from '../types/IntrospectMethod'
-import {IntrospectProperty} from '../types/IntrospectProperty'
-import {IntrospectSignal} from '../types/IntrospectSignal'
-import {IntrospectMethodArgument} from '../types/IntrospectMethodArgument'
-import {IntrospectSignalArgument} from '../types/IntrospectSignalArgument'
+import {LocalObject} from '../../LocalObject'
+import {IntrospectInterface} from '../../types/IntrospectInterface'
+import {IntrospectMethod} from '../../types/IntrospectMethod'
+import {IntrospectProperty} from '../../types/IntrospectProperty'
+import {IntrospectSignal} from '../../types/IntrospectSignal'
+import {IntrospectMethodArgument} from '../../types/IntrospectMethodArgument'
+import {IntrospectSignalArgument} from '../../types/IntrospectSignalArgument'
 
 export class IntrospectableInterface extends LocalInterface {
 

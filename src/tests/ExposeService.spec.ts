@@ -14,6 +14,7 @@ export async function runExposeService(): Promise<void> {
     iface.defineProperty({
         name: 'fuck',
         type: 's',
+        emitPropertiesChanged: {emitValue: true},
         getter: () => {
             return testProp
         },
@@ -42,11 +43,13 @@ export async function runExposeService(): Promise<void> {
     iface.defineMethod({
         name: 'test',
         inputArgs: [{type: 'u'}],
-        outputArgs: [{type: 'a{sv}'}],
+        // outputArgs: [{type: 'a{sv}'}],
         // outputArgs: [{type: 'av'}],
+        outputArgs: [{type: 'v'}],
         method: (name: number = 1234) => {
             // throw new Error('fuck!')
             console.log('name:', name)
+            // return name
             // return ['ssss',true,123,3,[1,new DBusSignedValue('s','a'),3]]
             // return ['ssss',true,123,3,[1,2],[3,4]]
             // return ['ssss',true,123,3,[1,2],[3,4]]

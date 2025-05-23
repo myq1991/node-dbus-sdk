@@ -30,7 +30,8 @@ export class LocalInterface {
     #introspectMethods: IntrospectMethod[] = []
 
     #definedMethods: Record<string, {
-        signature?: string
+        inputSignature?: string
+        outputSignature?: string
         method: (...args: any[]) => Promise<any | any[]> | any | any[]
     }> = {}
 
@@ -221,7 +222,8 @@ export class LocalInterface {
         if (this.#definedMethods[opts.name]) throw new LocalInterfaceMethodDefinedError(`Method ${opts.name} is already defined`)
         opts.name = this.validateDBusMethodName(opts.name)
         this.#definedMethods[opts.name] = {
-            signature: opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): string => outputArg.type).join('') : undefined,
+            inputSignature: opts.inputArgs ? opts.inputArgs.map((inputArg: DefineMethodArgumentOpts): string => inputArg.type).join('') : undefined,
+            outputSignature: opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): string => outputArg.type).join('') : undefined,
             method: opts.method
         }
         this.#introspectMethods.push({
@@ -255,10 +257,27 @@ export class LocalInterface {
         if (opts.setter) access = DBusPropertyAccess.WRITE
         if (opts.getter && opts.setter) access = DBusPropertyAccess.READWRITE
         opts.name = this.validateDBusPropertyName(opts.name)
+        const getter: (() => Promise<any> | any) | undefined = opts.getter
+        let setter: ((value: any) => Promise<void> | void) | undefined = undefined
+        if (opts.emitPropertiesChanged && opts.setter) {
+            if ((typeof opts.emitPropertiesChanged === 'boolean' && opts.emitPropertiesChanged) || opts.emitPropertiesChanged.emitValue) {
+                setter = async (value: any): Promise<void> => {
+                    await opts.setter!(value)
+                    const changedProperties: Record<string, any> = {}
+                    changedProperties[opts.name] = value
+                    this.object?.propertiesInterface.emitPropertiesChanged(this.#name, changedProperties, [])
+                }
+            } else {
+                setter = async (value: any): Promise<void> => {
+                    await opts.setter!(value)
+                    this.object?.propertiesInterface.emitPropertiesChanged(this.#name, {}, [opts.name])
+                }
+            }
+        }
         this.#definedProperties[opts.name] = {
             signature: opts.type,
-            getter: opts.getter,
-            setter: opts.setter
+            getter: getter,
+            setter: setter
         }
         this.#introspectProperties.push({
             name: opts.name,
@@ -312,9 +331,10 @@ export class LocalInterface {
     }> {
         if (!this.#definedMethods[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownMethod', `Method ${name} not found`)
         const methodInfo = this.#definedMethods[name]
+        //TODO 验证数据类型是否一致
         const result: any = await methodInfo.method(...args)
         return {
-            signature: methodInfo.signature ? methodInfo.signature : undefined,
+            signature: methodInfo.outputSignature ? methodInfo.outputSignature : undefined,
             result: result
         }
     }

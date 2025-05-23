@@ -1,4 +1,4 @@
-import {LocalInterface} from '../LocalInterface'
+import {LocalInterface} from '../../LocalInterface'
 import {getMachineId} from 'native-machine-id'
 import {randomUUID} from 'node:crypto'
 

@@ -1,8 +1,11 @@
-import {LocalInterface} from '../LocalInterface'
+import {LocalInterface} from '../../LocalInterface'
 import EventEmitter from 'node:events'
-import {CreateDBusError} from './CreateDBusError'
+import {CreateDBusError} from '../CreateDBusError'
 
 export class PropertiesInterface extends LocalInterface {
+
+    protected readonly eventEmitter: EventEmitter = new EventEmitter()
+
     constructor() {
         super('org.freedesktop.DBus.Properties')
         this
@@ -63,7 +66,7 @@ export class PropertiesInterface extends LocalInterface {
                     {name: 'changed_properties', type: 'a{sv}'},
                     {name: 'invalidated_properties', type: 'as'}
                 ],
-                eventEmitter: new EventEmitter()
+                eventEmitter: this.eventEmitter
             })
     }
 
@@ -96,5 +99,9 @@ export class PropertiesInterface extends LocalInterface {
         let result: Record<string, any> = {}
         rawValues.forEach((rawValue: Record<string, any>): Record<string, any> => result = Object.assign(result, rawValue))
         return result
+    }
+
+    public emitPropertiesChanged(interfaceName: string, changedProperties: Record<string, any>, invalidatedProperties: string[] = []): void {
+        this.eventEmitter.emit('PropertiesChanged', interfaceName, changedProperties, invalidatedProperties)
     }
 }
