@@ -216,7 +216,7 @@ export class DBusSignedValue {
 
                     case '{': // Dictionary (single key-value pair)
                         if (dataType.child.length !== 2) {
-                            throw new SignatureError(`Dictionary signature "{}" must have exactly 2 child types`)
+                            throw new SignatureError('Dictionary signature "{}" must have exactly 2 child types')
                         }
                         if (Array.isArray(value)) {
                             // Support array format for key-value pair
