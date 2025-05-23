@@ -22,7 +22,7 @@ export class Signature {
 
         function next(): Types {
             if (index < signature.length) {
-                let c: string = signature[index]
+                const c: string = signature[index]
                 ++index
                 return c as Types
             }
@@ -41,7 +41,7 @@ export class Signature {
                 throw new SignatureError(`Unknown type: "${c}" in signature "${signature}"`)
 
             let ele: Types
-            let res: DataType = {type: c, child: []}
+            const res: DataType = {type: c, child: []}
             switch (c) {
                 case 'a': // array
                     ele = next()
@@ -58,29 +58,9 @@ export class Signature {
             return res
         }
 
-        let ret: DataType[] = []
+        const ret: DataType[] = []
         let c: Types
         while ((c = next()) !== null) ret.push(parseOne(c))
         return ret
-    }
-
-    /**
-     * Data type tree to signature string
-     * @param tree
-     */
-    public static fromTree(tree: DataType[]): string {
-        let signature: string = ''
-        for (let i: number = 0; i < tree.length; ++i) {
-            if (tree[i].child!.length === 0) {
-                signature += tree[i].type
-            } else {
-                if (tree[i].type === 'a') {
-                    signature += `a${this.fromTree(tree[i].child!)}`
-                } else {
-                    signature += tree[i].type + this.fromTree(tree[i].child!) + match[tree[i].type]
-                }
-            }
-        }
-        return signature
     }
 }
