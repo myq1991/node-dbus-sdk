@@ -24,7 +24,7 @@ setImmediate(async (): Promise<void> => {
     const obj = await serv.getObject('/')
     const iface = await obj.getInterface('test.iface')
     iface.signal.on('fuckSignal', console.log)
-    console.log(await iface.method.test(123))
+    // console.log(await iface.method.test(123))
 
 
     // // const serv = await dbus.getService('org.sigxcpu.Feedback')

@@ -49,6 +49,7 @@ export class LocalService {
                     return this.dbus.reply({
                         destination: message.header.sender,
                         replySerial: message.header.serial,
+                        signature: 's',
                         data: this.formatDBusError(e instanceof Error ? e : new Error(e.toString()))
                     })
                 }
