@@ -45,19 +45,19 @@ export async function runExposeService(): Promise<void> {
         outputArgs: [{type: 'a{sv}'}],
         // outputArgs: [{type: 'av'}],
         method: (name: number = 1234) => {
-            throw new Error('fuck!')
+            // throw new Error('fuck!')
             console.log('name:', name)
             // return ['ssss',true,123,3,[1,new DBusSignedValue('s','a'),3]]
             // return ['ssss',true,123,3,[1,2],[3,4]]
             // return ['ssss',true,123,3,[1,2],[3,4]]
             // return [['aaa','bbb'],['ccc',true]]
             // return {name:'123'}
-            return {}
-            // return {
-            //     name: name,
-            //     haha: true,
-            //     sleep: 'oh!'
-            // }
+            // return {}
+            return {
+                name: name,
+                haha: true,
+                sleep: 'oh!'
+            }
             // return {
             //     name: name,
             //     act: 'fuck'
@@ -80,7 +80,7 @@ export async function runExposeService(): Promise<void> {
     // await serv.run({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     await serv.run({busAddress: 'tcp:host=192.168.1.236,port=44444'})
     //
-    // setInterval(() => {
-    //     ee.emit('fuckSignal', `${Date.now()}`)
-    // }, 3000)
+    setInterval(() => {
+        ee.emit('fuckSignal', `${Date.now()}`)
+    }, 3000)
 }

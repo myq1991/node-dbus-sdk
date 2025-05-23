@@ -187,8 +187,8 @@ export class LocalService {
         return objects
     }
 
-    public findObjectByPath(objectPath: string): LocalObject | undefined {
-        return this.#objectMap.get(objectPath)
+    public findObjectByPath<T extends LocalObject = LocalObject>(objectPath: string): T | undefined {
+        return this.#objectMap.get(objectPath) as T
     }
 
     public listObjectPaths(): string[] {

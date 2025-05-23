@@ -25,6 +25,18 @@ export class LocalObject {
         return this.#name
     }
 
+    public get propertiesInterface(): PropertiesInterface {
+        return this.findInterfaceByName<PropertiesInterface>('org.freedesktop.DBus.Properties')!
+    }
+
+    public get introspectableInterface(): IntrospectableInterface {
+        return this.findInterfaceByName<IntrospectableInterface>('org.freedesktop.DBus.Introspectable')!
+    }
+
+    public get peerInterface(): PeerInterface {
+        return this.findInterfaceByName<PeerInterface>('org.freedesktop.DBus.Peer')!
+    }
+
     constructor(objectPath: string) {
         this.#name = this.validateDBusObjectPath(objectPath)
         this.addInterface(new PropertiesInterface())
@@ -148,7 +160,7 @@ export class LocalObject {
         return interfaces
     }
 
-    public findInterfaceByName(name: string): LocalInterface | undefined {
-        return this.#interfaceMap.get(name)
+    public findInterfaceByName<T extends LocalInterface = LocalInterface>(name: string): T | undefined {
+        return this.#interfaceMap.get(name) as T
     }
 }

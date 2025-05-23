@@ -13,6 +13,7 @@ import {PropertyOperation} from './types/PropertyOperation'
 import {DBusPropertyAccess} from './lib/DBusPropertyAccess'
 import {AccessPropertyForbiddenError} from './lib/Errors'
 import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
+import {DBusSignedValue} from './lib/DBusSignedValue'
 
 export class DBusInterface {
 
@@ -46,13 +47,15 @@ export class DBusInterface {
                 const types: string[] = methodInfo.arg
                     .filter((arg: IntrospectMethodArgument): boolean => arg.direction === 'in')
                     .map((arg: IntrospectMethodArgument): string => arg.type)
+                const signature: string | undefined = types.length ? types.join('') : undefined
+                const inputArguments: any[] = signature ? [new DBusSignedValue(signature, args)] : []
                 const result: any[] = await this.dbus.invoke({
                     service: this.service.name,
                     objectPath: this.object.name,
                     interface: this.name,
                     method: methodInfo.name,
-                    signature: types.length ? types.join('') : undefined,
-                    args: args
+                    signature: signature,
+                    args: inputArguments
                 })
                 if (result.length > 1) return result
                 return result[0]

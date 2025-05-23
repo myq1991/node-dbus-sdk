@@ -19,10 +19,12 @@ setImmediate(async (): Promise<void> => {
     console.log('success')
     // await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
     //
-    const serv = await dbus.getService('org.glib.test')
+    // const serv = await dbus.getService('org.glib.test')
+    const serv = await dbus.getService('org.test.service13')
     const obj = await serv.getObject('/')
     const iface = await obj.getInterface('test.iface')
-    console.log(await iface.method.test('testName'))
+    iface.signal.on('fuckSignal', console.log)
+    console.log(await iface.method.test(123))
 
 
     // // const serv = await dbus.getService('org.sigxcpu.Feedback')
