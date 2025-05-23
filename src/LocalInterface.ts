@@ -8,7 +8,10 @@ import {IntrospectSignal} from './types/IntrospectSignal'
 import {IntrospectInterface} from './types/IntrospectInterface'
 import EventEmitter from 'node:events'
 import {
+    LocalInterfaceInvalidMethodNameError,
     LocalInterfaceInvalidNameError,
+    LocalInterfaceInvalidPropertyNameError,
+    LocalInterfaceInvalidSignalNameError,
     LocalInterfaceMethodDefinedError,
     LocalInterfacePropertyDefinedError,
     LocalInterfaceSignalDefinedError
@@ -18,6 +21,7 @@ import {LocalObject} from './LocalObject'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 import {CreateDBusError} from './lib/CreateDBusError'
+import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
 
 export class LocalInterface {
 
@@ -115,6 +119,90 @@ export class LocalInterface {
         return interfaceName
     }
 
+    protected validateDBusMethodName(methodName: string | any): string {
+        // Step 1: Check if the input is a string and not empty
+        if (typeof methodName !== 'string' || methodName.length === 0) {
+            throw new LocalInterfaceInvalidMethodNameError('Method name must be a non-empty string.')
+        }
+
+        // Step 2: Check length limit (maximum 255 bytes, consistent with other DBus name limits)
+        if (methodName.length > 255) {
+            throw new LocalInterfaceInvalidMethodNameError('Method name exceeds 255 bytes.')
+        }
+
+        // Step 3: Check if it starts with a digit
+        if (methodName.match(/^[0-9]/)) {
+            throw new LocalInterfaceInvalidMethodNameError('Method name cannot start with a digit.')
+        }
+
+        // Step 4: Check if it contains only allowed characters (letters, digits, underscore)
+        for (let i = 0; i < methodName.length; i++) {
+            const char = methodName[i]
+            if (!/[a-zA-Z0-9_]/.test(char)) {
+                throw new LocalInterfaceInvalidMethodNameError(`Method name contains invalid character "${char}".`)
+            }
+        }
+
+        // All checks passed, return the method name
+        return methodName
+    }
+
+    protected validateDBusPropertyName(propertyName: string | any): string {
+        // Step 1: Check if the input is a string and not empty
+        if (typeof propertyName !== 'string' || propertyName.length === 0) {
+            throw new LocalInterfaceInvalidPropertyNameError('Property name must be a non-empty string.')
+        }
+
+        // Step 2: Check length limit (maximum 255 bytes, consistent with other DBus name limits)
+        if (propertyName.length > 255) {
+            throw new LocalInterfaceInvalidPropertyNameError('Property name exceeds 255 bytes.')
+        }
+
+        // Step 3: Check if it starts with a digit
+        if (propertyName.match(/^[0-9]/)) {
+            throw new LocalInterfaceInvalidPropertyNameError('Property name cannot start with a digit.')
+        }
+
+        // Step 4: Check if it contains only allowed characters (letters, digits, underscore)
+        for (let i = 0; i < propertyName.length; i++) {
+            const char = propertyName[i]
+            if (!/[a-zA-Z0-9_]/.test(char)) {
+                throw new LocalInterfaceInvalidPropertyNameError(`Property name contains invalid character "${char}".`)
+            }
+        }
+
+        // All checks passed, return the property name
+        return propertyName
+    }
+
+    protected validateDBusSignalName(signalName: string | any): string {
+        // Step 1: Check if the input is a string and not empty
+        if (typeof signalName !== 'string' || signalName.length === 0) {
+            throw new LocalInterfaceInvalidSignalNameError('Signal name must be a non-empty string.')
+        }
+
+        // Step 2: Check length limit (maximum 255 bytes, consistent with other DBus name limits)
+        if (signalName.length > 255) {
+            throw new LocalInterfaceInvalidSignalNameError('Signal name exceeds 255 bytes.')
+        }
+
+        // Step 3: Check if it starts with a digit
+        if (signalName.match(/^[0-9]/)) {
+            throw new LocalInterfaceInvalidSignalNameError('Signal name cannot start with a digit.')
+        }
+
+        // Step 4: Check if it contains only allowed characters (letters, digits, underscore)
+        for (let i = 0; i < signalName.length; i++) {
+            const char = signalName[i]
+            if (!/[a-zA-Z0-9_]/.test(char)) {
+                throw new LocalInterfaceInvalidSignalNameError(`Signal name contains invalid character "${char}".`)
+            }
+        }
+
+        // All checks passed, return the signal name
+        return signalName
+    }
+
     public setObject(localObject: LocalObject | undefined): this {
         this.object = localObject
         return this
@@ -131,6 +219,7 @@ export class LocalInterface {
 
     public defineMethod(opts: DefineMethodOpts): this {
         if (this.#definedMethods[opts.name]) throw new LocalInterfaceMethodDefinedError(`Method ${opts.name} is already defined`)
+        opts.name = this.validateDBusMethodName(opts.name)
         this.#definedMethods[opts.name] = {
             signature: opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): string => outputArg.type).join('') : undefined,
             method: opts.method
@@ -165,6 +254,7 @@ export class LocalInterface {
         if (opts.getter) access = DBusPropertyAccess.READ
         if (opts.setter) access = DBusPropertyAccess.WRITE
         if (opts.getter && opts.setter) access = DBusPropertyAccess.READWRITE
+        opts.name = this.validateDBusPropertyName(opts.name)
         this.#definedProperties[opts.name] = {
             signature: opts.type,
             getter: opts.getter,
@@ -186,7 +276,8 @@ export class LocalInterface {
 
     public defineSignal(opts: DefineSignalOpts): this {
         if (this.#definedSignals[opts.name]) throw new LocalInterfaceSignalDefinedError(`Signal ${opts.name} is already defined`)
-        const signature: string | undefined = opts.args?.map(arg => arg.type).join('')
+        const signature: string | undefined = opts.args?.map((arg: IntrospectSignalArgument): string => arg.type).join('')
+        opts.name = this.validateDBusSignalName(opts.name)
         this.#definedSignals[opts.name] = {
             listener: (...args: any[]): void => {
                 if (!this.dbus || !this.object) return

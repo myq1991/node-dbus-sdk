@@ -123,3 +123,19 @@ export class LocalInterfaceInvalidNameError extends Error implements NodeJS.Errn
     code: string = 'E_INVALID_LOCAL_INTERFACE_NAME'
 }
 
+export class LocalInterfaceInvalidMethodNameError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1025
+    code: string = 'E_INVALID_LOCAL_INTERFACE_METHOD_NAME'
+}
+
+export class LocalInterfaceInvalidPropertyNameError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1026
+    code: string = 'E_INVALID_LOCAL_INTERFACE_PROPERTY_NAME'
+}
+
+export class LocalInterfaceInvalidSignalNameError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1027
+    code: string = 'E_INVALID_LOCAL_INTERFACE_SIGNAL_NAME'
+}
+
+
