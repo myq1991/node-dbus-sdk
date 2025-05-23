@@ -3,8 +3,12 @@ import {DBusMessageEndianness} from '../lib/DBusMessageEndianness'
 import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
 import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {runExposeService} from './ExposeService.spec'
+import {DBusSignedValue} from '../lib/DBusSignedValue'
 
 // runDBusBufferTestSet()
+
+const enc=new DBusBufferEncoder()
+console.log(enc.encode('a{sv}',{}))
 
 setImmediate(async (): Promise<void> => {
 

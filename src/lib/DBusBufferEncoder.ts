@@ -308,7 +308,7 @@ export class DBusBufferEncoder {
         // Append length field to the main buffer
         this.buffer = Buffer.concat([this.buffer, lengthBuffer])
 
-        switch (signedValues[0].$signature) {
+        if (signedValues[0]) switch (signedValues[0].$signature) {
             case '{':
                 this.align(8)
         }

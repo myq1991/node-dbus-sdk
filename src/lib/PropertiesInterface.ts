@@ -1,5 +1,6 @@
 import {LocalInterface} from '../LocalInterface'
 import EventEmitter from 'node:events'
+import {IntrospectProperty} from '../types/IntrospectProperty'
 
 export class PropertiesInterface extends LocalInterface {
     constructor() {
@@ -66,9 +67,14 @@ export class PropertiesInterface extends LocalInterface {
     }
 
     protected async get(interfaceName: string, propertyName: string): Promise<any> {
-        console.log('!!!!!')
         const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
         if (!targetInterface) return undefined
+        const introspectInterfaceProperty: IntrospectProperty | undefined = targetInterface.introspectInterface.property.find(introspectInterfaceProperty => introspectInterfaceProperty.name === propertyName)
+        if (!introspectInterfaceProperty) {
+            const UnknownPropertyError: Error = Error(`Property ${propertyName} not found`)
+            UnknownPropertyError.name = 'org.freedesktop.DBus.Error.UnknownProperty'
+            throw UnknownPropertyError
+        }
         return await targetInterface.getProperty(propertyName)
     }
 

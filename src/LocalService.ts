@@ -5,6 +5,7 @@ import {DBusMessage} from './lib/DBusMessage'
 import {LocalObjectPathExistsError} from './lib/Errors'
 import {IntrospectableInterface} from './lib/IntrospectableInterface'
 import {LocalInterface} from './LocalInterface'
+import {DBusSignedValue} from './lib/DBusSignedValue'
 
 export class LocalService {
 
@@ -25,7 +26,6 @@ export class LocalService {
     }
 
     #methodCallHandler: (message: DBusMessage) => Promise<void> = async (message: DBusMessage): Promise<void> => {
-        console.log('#methodCallHandler', message)
         const targetObjectPath: string = message.header.path
         const targetInterface: string = message.header.interfaceName
         const targetMethod: string = message.header.member
@@ -35,11 +35,13 @@ export class LocalService {
             if (localInterface) {
                 try {
                     const {signature, result} = await localInterface.callMethod(targetMethod, ...message.body)
+                    const resultSignedValue: DBusSignedValue[] = signature ? [new DBusSignedValue(signature!, result)] : []
                     return this.dbus.reply({
                         destination: message.header.sender,
                         replySerial: message.header.serial,
                         signature: signature,
-                        data: Array.isArray(result) ? result : [result]
+                        // data: Array.isArray(result) ? result : [result]
+                        data: resultSignedValue
                     })
                 } catch (e: any) {
                     return this.dbus.reply({
