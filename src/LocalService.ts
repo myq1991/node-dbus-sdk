@@ -72,7 +72,7 @@ export class LocalService {
         })
     }
 
-    protected validateDBusServiceName(serviceName: string): string {
+    protected validateDBusServiceName(serviceName: string | any): string {
         // Step 1: Check if the input is a string and not empty
         if (typeof serviceName !== 'string' || serviceName.length === 0) {
             throw new LocalServiceInvalidNameError('Service name must be a non-empty string.')

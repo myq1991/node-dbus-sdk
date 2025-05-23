@@ -112,3 +112,14 @@ export class LocalServiceInvalidNameError extends Error implements NodeJS.ErrnoE
     errno: number = 1022
     code: string = 'E_INVALID_LOCAL_SERVICE_NAME'
 }
+
+export class LocalObjectInvalidNameError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1023
+    code: string = 'E_INVALID_LOCAL_OBJECT_NAME'
+}
+
+export class LocalInterfaceInvalidNameError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1024
+    code: string = 'E_INVALID_LOCAL_INTERFACE_NAME'
+}
+

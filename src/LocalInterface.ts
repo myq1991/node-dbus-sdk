@@ -8,6 +8,7 @@ import {IntrospectSignal} from './types/IntrospectSignal'
 import {IntrospectInterface} from './types/IntrospectInterface'
 import EventEmitter from 'node:events'
 import {
+    LocalInterfaceInvalidNameError,
     LocalInterfaceMethodDefinedError,
     LocalInterfacePropertyDefinedError,
     LocalInterfaceSignalDefinedError
@@ -56,7 +57,62 @@ export class LocalInterface {
     }
 
     constructor(interfaceName: string) {
-        this.#name = interfaceName
+        this.#name = this.validateDBusInterfaceName(interfaceName)
+    }
+
+    protected validateDBusInterfaceName(interfaceName: string | any): string {
+        // Step 1: Check if the input is a string and not empty
+        if (typeof interfaceName !== 'string' || interfaceName.length === 0) {
+            throw new LocalInterfaceInvalidNameError('Interface name must be a non-empty string.')
+        }
+
+        // Step 2: Check length limit (maximum 255 bytes)
+        if (interfaceName.length > 255) {
+            throw new LocalInterfaceInvalidNameError('Interface name exceeds 255 bytes.')
+        }
+
+        // Step 3: Check if it starts or ends with a dot, or contains consecutive dots
+        if (interfaceName.startsWith('.')) {
+            throw new LocalInterfaceInvalidNameError('Interface name cannot start with a dot.')
+        }
+        if (interfaceName.endsWith('.')) {
+            throw new LocalInterfaceInvalidNameError('Interface name cannot end with a dot.')
+        }
+        if (interfaceName.includes('..')) {
+            throw new LocalInterfaceInvalidNameError('Interface name cannot contain consecutive dots.')
+        }
+
+        // Step 4: Split the interface name into elements and check if there are at least 2 elements
+        const elements = interfaceName.split('.')
+        if (elements.length < 2) {
+            throw new LocalInterfaceInvalidNameError('Interface name must have at least two elements separated by dots.')
+        }
+
+        // Step 5: Validate each element
+        for (let i = 0; i < elements.length; i++) {
+            const element = elements[i]
+
+            // Check if element is empty
+            if (element.length === 0) {
+                throw new LocalInterfaceInvalidNameError(`Element at position ${i + 1} is empty.`)
+            }
+
+            // Check if element starts with a digit
+            if (element.match(/^[0-9]/)) {
+                throw new LocalInterfaceInvalidNameError(`Element "${element}" at position ${i + 1} cannot start with a digit.`)
+            }
+
+            // Check if element contains only allowed characters (letters, digits, underscore)
+            for (let j = 0; j < element.length; j++) {
+                const char = element[j]
+                if (!/[a-zA-Z0-9_]/.test(char)) {
+                    throw new LocalInterfaceInvalidNameError(`Element "${element}" at position ${i + 1} contains invalid character "${char}".`)
+                }
+            }
+        }
+
+        // All checks passed, return the interface name
+        return interfaceName
     }
 
     public setObject(localObject: LocalObject | undefined): this {

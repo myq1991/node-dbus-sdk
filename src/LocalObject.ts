@@ -1,5 +1,5 @@
 import {LocalInterface} from './LocalInterface'
-import {LocalInterfaceExistsError} from './lib/Errors'
+import {LocalInterfaceExistsError, LocalObjectInvalidNameError} from './lib/Errors'
 import {DBus} from './DBus'
 import {LocalService} from './LocalService'
 import {IntrospectNode} from './types/IntrospectNode'
@@ -26,10 +26,71 @@ export class LocalObject {
     }
 
     constructor(objectPath: string) {
-        this.#name = objectPath
+        this.#name = this.validateDBusObjectPath(objectPath)
         this.addInterface(new PropertiesInterface())
         this.addInterface(new IntrospectableInterface())
         this.addInterface(new PeerInterface())
+    }
+
+    protected validateDBusObjectPath(objectPath: string | any): string {
+        // Step 1: Check if the input is a string and not empty
+        if (typeof objectPath !== 'string' || objectPath.length === 0) {
+            throw new LocalObjectInvalidNameError('Object path must be a non-empty string.')
+        }
+
+        // Step 2: Check length limit (maximum 255 bytes, consistent with bus name limit)
+        if (objectPath.length > 255) {
+            throw new LocalObjectInvalidNameError('Object path exceeds 255 bytes.')
+        }
+
+        // Step 3: Check if it starts with a slash
+        if (!objectPath.startsWith('/')) {
+            throw new LocalObjectInvalidNameError('Object path must start with a slash (/).')
+        }
+
+        // Step 4: Special case: root path "/"
+        if (objectPath === '/') {
+            return objectPath
+        }
+
+        // Step 5: Check if it ends with a slash (disallowed except for root path)
+        if (objectPath.endsWith('/')) {
+            throw new LocalObjectInvalidNameError('Object path cannot end with a slash (except for root path /).')
+        }
+
+        // Step 6: Check for consecutive slashes
+        if (objectPath.includes('//')) {
+            throw new LocalObjectInvalidNameError('Object path cannot contain consecutive slashes (//).')
+        }
+
+        // Step 7: Split the object path into elements (remove leading slash first)
+        const elements = objectPath.slice(1).split('/')
+
+        // Step 8: Validate each element
+        for (let i = 0; i < elements.length; i++) {
+            const element = elements[i]
+
+            // Check if element is empty (should not happen after previous checks, but for safety)
+            if (element.length === 0) {
+                throw new LocalObjectInvalidNameError(`Element at position ${i + 1} is empty.`)
+            }
+
+            // Check if element starts with a digit
+            if (element.match(/^[0-9]/)) {
+                throw new LocalObjectInvalidNameError(`Element "${element}" at position ${i + 1} cannot start with a digit.`)
+            }
+
+            // Check if element contains only allowed characters (letters, digits, underscore)
+            for (let j = 0; j < element.length; j++) {
+                const char = element[j]
+                if (!/[a-zA-Z0-9_]/.test(char)) {
+                    throw new LocalObjectInvalidNameError(`Element "${element}" at position ${i + 1} contains invalid character "${char}".`)
+                }
+            }
+        }
+
+        // All checks passed, return the object path
+        return objectPath
     }
 
     public setService(service: LocalService | undefined): this {
