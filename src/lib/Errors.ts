@@ -108,13 +108,7 @@ export class LocalInterfaceSignalDefinedError extends Error implements NodeJS.Er
     code: string = 'E_LOCAL_INTERFACE_SIGNAL_DEFINED'
 }
 
-export class LocalInterfaceMethodNotFoundError extends Error implements NodeJS.ErrnoException {
+export class LocalServiceInvalidNameError extends Error implements NodeJS.ErrnoException {
     errno: number = 1022
-    code: string = 'E_LOCAL_INTERFACE_METHOD_NOT_FOUND'
+    code: string = 'E_INVALID_LOCAL_SERVICE_NAME'
 }
-
-export class LocalInterfacePropertyNotFoundError extends Error implements NodeJS.ErrnoException {
-    errno: number = 1023
-    code: string = 'E_LOCAL_INTERFACE_PROPERTY_NOT_FOUND'
-}
-

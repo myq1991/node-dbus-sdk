@@ -2,12 +2,15 @@ import {LocalObject} from './LocalObject'
 import {ConnectOpts} from './types/ConnectOpts'
 import {DBus} from './DBus'
 import {DBusMessage} from './lib/DBusMessage'
-import {LocalObjectPathExistsError} from './lib/Errors'
+import {LocalObjectPathExistsError, LocalServiceInvalidNameError} from './lib/Errors'
 import {IntrospectableInterface} from './lib/IntrospectableInterface'
 import {LocalInterface} from './LocalInterface'
 import {DBusSignedValue} from './lib/DBusSignedValue'
+import {CreateDBusError} from './lib/CreateDBusError'
 
 export class LocalService {
+
+    readonly #errorNameRegex: RegExp = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/
 
     readonly #name: string
 
@@ -22,7 +25,7 @@ export class LocalService {
     }
 
     constructor(serviceName: string) {
-        this.#name = serviceName
+        this.#name = this.validateDBusServiceName(serviceName)
     }
 
     #methodCallHandler: (message: DBusMessage) => Promise<void> = async (message: DBusMessage): Promise<void> => {
@@ -40,14 +43,13 @@ export class LocalService {
                         destination: message.header.sender,
                         replySerial: message.header.serial,
                         signature: signature,
-                        // data: Array.isArray(result) ? result : [result]
                         data: resultSignedValue
                     })
                 } catch (e: any) {
                     return this.dbus.reply({
                         destination: message.header.sender,
                         replySerial: message.header.serial,
-                        data: e instanceof Error ? e : new Error(e.toString())
+                        data: this.formatDBusError(e instanceof Error ? e : new Error(e.toString()))
                     })
                 }
             }
@@ -63,8 +65,74 @@ export class LocalService {
                 data: [this.#defaultIntrospectableInterface.formatIntrospectXML(targetObjectPath, this.listObjectPaths())]
             })
         }
-        //TODO should not arrive here
-        console.log(message)
+        return this.dbus.reply({
+            destination: message.header.sender,
+            replySerial: message.header.serial,
+            data: CreateDBusError('org.freedesktop.DBus.Error.UnknownObject', `Object path ${message.header.path} not found`)
+        })
+    }
+
+    protected validateDBusServiceName(serviceName: string): string {
+        // Step 1: Check if the input is a string and not empty
+        if (typeof serviceName !== 'string' || serviceName.length === 0) {
+            throw new LocalServiceInvalidNameError('Service name must be a non-empty string.')
+        }
+
+        // Step 2: Check length limit (maximum 255 bytes)
+        if (serviceName.length > 255) {
+            throw new LocalServiceInvalidNameError('Service name exceeds 255 bytes.')
+        }
+
+        // Step 3: Check if it starts or ends with a dot, or contains consecutive dots
+        if (serviceName.startsWith('.')) {
+            throw new LocalServiceInvalidNameError('Service name cannot start with a dot.')
+        }
+        if (serviceName.endsWith('.')) {
+            throw new LocalServiceInvalidNameError('Service name cannot end with a dot.')
+        }
+        if (serviceName.includes('..')) {
+            throw new LocalServiceInvalidNameError('Service name cannot contain consecutive dots.')
+        }
+
+        // Step 4: Split the service name into elements and check if there are at least 2 elements
+        const elements = serviceName.split('.')
+        if (elements.length < 2) {
+            throw new LocalServiceInvalidNameError('Service name must have at least two elements separated by dots.')
+        }
+
+        // Step 5: Validate each element
+        for (let i = 0; i < elements.length; i++) {
+            const element = elements[i]
+
+            // Check if element is empty
+            if (element.length === 0) {
+                throw new LocalServiceInvalidNameError(`Element at position ${i + 1} is empty.`)
+            }
+
+            // Check if element starts with a hyphen
+            if (element.startsWith('-')) {
+                throw new LocalServiceInvalidNameError(`Element "${element}" at position ${i + 1} cannot start with a hyphen.`)
+            }
+
+            // Check if element contains only allowed characters (letters, digits, underscore, hyphen)
+            for (let j = 0; j < element.length; j++) {
+                const char = element[j]
+                if (!/[a-zA-Z0-9_-]/.test(char)) {
+                    throw new LocalServiceInvalidNameError(`Element "${element}" at position ${i + 1} contains invalid character "${char}".`)
+                }
+            }
+        }
+
+        // All checks passed, return the service name
+        return serviceName
+    }
+
+    protected formatDBusError(error: Error): Error {
+        if (!this.#errorNameRegex.test(error.name)) {
+            error.name = `${this.#name}.${error.name}`
+            if (!this.#errorNameRegex.test(error.name)) error.name = `${this.#name}.Error`
+        }
+        return error
     }
 
     public async run(opts: ConnectOpts): Promise<void> {

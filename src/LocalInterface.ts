@@ -8,14 +8,15 @@ import {IntrospectSignal} from './types/IntrospectSignal'
 import {IntrospectInterface} from './types/IntrospectInterface'
 import EventEmitter from 'node:events'
 import {
-    LocalInterfaceMethodDefinedError, LocalInterfaceMethodNotFoundError,
-    LocalInterfacePropertyDefinedError, LocalInterfacePropertyNotFoundError,
+    LocalInterfaceMethodDefinedError,
+    LocalInterfacePropertyDefinedError,
     LocalInterfaceSignalDefinedError
 } from './lib/Errors'
 import {DBus} from './DBus'
 import {LocalObject} from './LocalObject'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 import {DBusSignedValue} from './lib/DBusSignedValue'
+import {CreateDBusError} from './lib/CreateDBusError'
 
 export class LocalInterface {
 
@@ -162,7 +163,7 @@ export class LocalInterface {
         signature?: string
         result: any
     }> {
-        if (!this.#definedMethods[name]) throw new LocalInterfaceMethodNotFoundError(`Method ${name} not found`)
+        if (!this.#definedMethods[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownMethod', `Method ${name} not found`)
         const methodInfo = this.#definedMethods[name]
         const result: any = await methodInfo.method(...args)
         return {
@@ -172,16 +173,18 @@ export class LocalInterface {
     }
 
     public async setProperty(name: string, value: any): Promise<void> {
-        if (!this.#definedProperties[name]) throw new LocalInterfacePropertyNotFoundError(`Property ${name} not found`)
-        if (this.#definedProperties[name].setter) await this.#definedProperties[name].setter(value)
+        if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
+        if (this.#definedProperties[name].setter) return this.#definedProperties[name].setter(value)
+        throw CreateDBusError('org.freedesktop.DBus.Error.PropertyReadOnly', `Property ${name} is read only`)
     }
 
     public async getProperty(name: string): Promise<any> {
-        if (!this.#definedProperties[name]) throw new LocalInterfacePropertyNotFoundError(`Property ${name} not found`)
+        if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         if (this.#definedProperties[name].getter) {
             const value: any = await this.#definedProperties[name].getter()
             return value === undefined ? value : new DBusSignedValue(this.#definedProperties[name].signature, this.#definedProperties[name].getter())
         }
+        throw CreateDBusError('org.freedesktop.DBus.Error.PropertyWriteOnly', `Property ${name} is write only`)
     }
 
     public methodNames(): string[] {

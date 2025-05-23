@@ -1,6 +1,6 @@
 import {LocalInterface} from '../LocalInterface'
 import EventEmitter from 'node:events'
-import {IntrospectProperty} from '../types/IntrospectProperty'
+import {CreateDBusError} from './CreateDBusError'
 
 export class PropertiesInterface extends LocalInterface {
     constructor() {
@@ -69,19 +69,13 @@ export class PropertiesInterface extends LocalInterface {
 
     protected async get(interfaceName: string, propertyName: string): Promise<any> {
         const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
-        if (!targetInterface) return undefined
-        const introspectInterfaceProperty: IntrospectProperty | undefined = targetInterface.introspectInterface.property.find(introspectInterfaceProperty => introspectInterfaceProperty.name === propertyName)
-        if (!introspectInterfaceProperty) {
-            const UnknownPropertyError: Error = Error(`Property ${propertyName} not found`)
-            UnknownPropertyError.name = 'org.freedesktop.DBus.Error.UnknownProperty'
-            throw UnknownPropertyError
-        }
+        if (!targetInterface) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownInterface', `Interface ${interfaceName} not found`)
         return await targetInterface.getProperty(propertyName)
     }
 
     protected async set(interfaceName: string, propertyName: string, value: any): Promise<void> {
         const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
-        if (!targetInterface) return
+        if (!targetInterface) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownInterface', `Interface ${interfaceName} not found`)
         await targetInterface.setProperty(propertyName, value)
     }
 
