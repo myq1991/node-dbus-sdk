@@ -5,65 +5,66 @@ import {IntrospectProperty} from '../types/IntrospectProperty'
 export class PropertiesInterface extends LocalInterface {
     constructor() {
         super('org.freedesktop.DBus.Properties')
-        this.defineMethod({
-            name: 'Get',
-            inputArgs: [
-                {
+        this
+            .defineMethod({
+                name: 'Get',
+                inputArgs: [
+                    {
+                        name: 'interface_name',
+                        type: 's'
+                    },
+                    {
+                        name: 'property_name',
+                        type: 's'
+                    }
+                ],
+                outputArgs: [
+                    {
+                        name: 'value',
+                        type: 'v'
+                    }
+                ],
+                method: async (interfaceName: string, propertyName: string): Promise<any> => this.get(interfaceName, propertyName)
+            })
+            .defineMethod({
+                name: 'GetAll',
+                inputArgs: [{
                     name: 'interface_name',
                     type: 's'
-                },
-                {
-                    name: 'property_name',
-                    type: 's'
-                }
-            ],
-            outputArgs: [
-                {
-                    name: 'value',
-                    type: 'v'
-                }
-            ],
-            method: async (interfaceName: string, propertyName: string): Promise<any> => this.get(interfaceName, propertyName)
-        })
-        this.defineMethod({
-            name: 'GetAll',
-            inputArgs: [{
-                name: 'interface_name',
-                type: 's'
-            }],
-            outputArgs: [{
-                name: 'properties',
-                type: 'a{sv}'
-            }],
-            method: async (interfaceName: string): Promise<Record<string, any>> => this.getAll(interfaceName)
-        })
-        this.defineMethod({
-            name: 'Set',
-            inputArgs: [
-                {
-                    name: 'interface_name',
-                    type: 's'
-                },
-                {
-                    name: 'property_name',
-                    type: 's'
-                },
-                {
-                    name: 'value',
-                    type: 'v'
-                }
-            ],
-            method: async (interfaceName: string, propertyName: string, value: any): Promise<void> => this.set(interfaceName, propertyName, value)
-        })
-        this.defineSignal({
-            name: 'PropertiesChanged',
-            args: [
-                {name: 'interface_name', type: 's'},
-                {name: 'changed_properties', type: 'a{sv}'},
-                {name: 'invalidated_properties', type: 'as'}
-            ],
-            eventEmitter: new EventEmitter()
-        })
+                }],
+                outputArgs: [{
+                    name: 'properties',
+                    type: 'a{sv}'
+                }],
+                method: async (interfaceName: string): Promise<Record<string, any>> => this.getAll(interfaceName)
+            })
+            .defineMethod({
+                name: 'Set',
+                inputArgs: [
+                    {
+                        name: 'interface_name',
+                        type: 's'
+                    },
+                    {
+                        name: 'property_name',
+                        type: 's'
+                    },
+                    {
+                        name: 'value',
+                        type: 'v'
+                    }
+                ],
+                method: async (interfaceName: string, propertyName: string, value: any): Promise<void> => this.set(interfaceName, propertyName, value)
+            })
+            .defineSignal({
+                name: 'PropertiesChanged',
+                args: [
+                    {name: 'interface_name', type: 's'},
+                    {name: 'changed_properties', type: 'a{sv}'},
+                    {name: 'invalidated_properties', type: 'as'}
+                ],
+                eventEmitter: new EventEmitter()
+            })
     }
 
     protected async get(interfaceName: string, propertyName: string): Promise<any> {

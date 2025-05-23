@@ -7,8 +7,8 @@ import {DBusSignedValue} from '../lib/DBusSignedValue'
 
 // runDBusBufferTestSet()
 
-const enc = new DBusBufferEncoder()
-console.log(enc.encode('a{sv}', {}, true))
+// const enc = new DBusBufferEncoder()
+// console.log(enc.encode('a{sv}', {}, true))
 
 setImmediate(async (): Promise<void> => {
 

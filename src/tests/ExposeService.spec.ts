@@ -41,10 +41,11 @@ export async function runExposeService(): Promise<void> {
     // })
     iface.defineMethod({
         name: 'test',
-        inputArgs: [{type: 'i'}],
+        inputArgs: [{type: 'u'}],
         outputArgs: [{type: 'a{sv}'}],
         // outputArgs: [{type: 'av'}],
         method: (name: number = 1234) => {
+            console.log('name:',name)
             // return ['ssss',true,123,3,[1,new DBusSignedValue('s','a'),3]]
             // return ['ssss',true,123,3,[1,2],[3,4]]
             // return ['ssss',true,123,3,[1,2],[3,4]]

@@ -58,8 +58,9 @@ export class LocalInterface {
         this.#name = interfaceName
     }
 
-    public setObject(localObject: LocalObject | undefined): void {
+    public setObject(localObject: LocalObject | undefined): this {
         this.object = localObject
+        return this
     }
 
     public get introspectInterface(): IntrospectInterface {
@@ -71,7 +72,7 @@ export class LocalInterface {
         }
     }
 
-    public defineMethod(opts: DefineMethodOpts): void {
+    public defineMethod(opts: DefineMethodOpts): this {
         if (this.#definedMethods[opts.name]) throw new LocalInterfaceMethodDefinedError(`Method ${opts.name} is already defined`)
         this.#definedMethods[opts.name] = {
             signature: opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): string => outputArg.type).join('') : undefined,
@@ -91,15 +92,17 @@ export class LocalInterface {
                     direction: 'out'
                 })) : [])]
         })
+        return this
     }
 
-    public removeMethod(name: string): void {
+    public removeMethod(name: string): this {
         delete this.#definedMethods[name]
         this.#introspectMethods = this.#introspectMethods.filter((introspectMethod: IntrospectMethod): boolean => introspectMethod.name !== name)
+        return this
     }
 
-    public defineProperty(opts: DefinePropertyOpts): void {
-        if (!opts.setter && !opts.getter) return
+    public defineProperty(opts: DefinePropertyOpts): this {
+        if (!opts.setter && !opts.getter) return this
         if (this.#definedProperties[opts.name]) throw new LocalInterfacePropertyDefinedError(`Property ${opts.name} is already defined`)
         let access: DBusPropertyAccess = DBusPropertyAccess.READWRITE
         if (opts.getter) access = DBusPropertyAccess.READ
@@ -115,14 +118,16 @@ export class LocalInterface {
             type: opts.type,
             access: access
         })
+        return this
     }
 
-    public removeProperty(name: string): void {
+    public removeProperty(name: string): this {
         delete this.#definedProperties[name]
         this.#introspectProperties = this.#introspectProperties.filter((introspectProperty: IntrospectProperty): boolean => introspectProperty.name !== name)
+        return this
     }
 
-    public defineSignal(opts: DefineSignalOpts): void {
+    public defineSignal(opts: DefineSignalOpts): this {
         if (this.#definedSignals[opts.name]) throw new LocalInterfaceSignalDefinedError(`Signal ${opts.name} is already defined`)
         const signature: string | undefined = opts.args?.map(arg => arg.type).join('')
         this.#definedSignals[opts.name] = {
@@ -143,12 +148,14 @@ export class LocalInterface {
             arg: opts.args ? opts.args : []
         })
         this.#definedSignals[opts.name].eventEmitter.on(opts.name, this.#definedSignals[opts.name].listener)
+        return this
     }
 
-    public removeSignal(name: string): void {
+    public removeSignal(name: string): this {
         if (this.#definedSignals[name]) this.#definedSignals[name].eventEmitter.removeListener(name, this.#definedSignals[name].listener)
         delete this.#definedSignals[name]
         this.#introspectSignals = this.#introspectSignals.filter((introspectSignal: IntrospectSignal): boolean => introspectSignal.name !== name)
+        return this
     }
 
     public async callMethod(name: string, ...args: any[]): Promise<{

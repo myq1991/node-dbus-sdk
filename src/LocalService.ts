@@ -79,16 +79,19 @@ export class LocalService {
         await this.dbus.disconnect()
     }
 
-    public addObject(localObject: LocalObject) {
+    public addObject(localObject: LocalObject): boolean {
+        let addSuccess: boolean = false
         if (this.#objectMap.has(localObject.name)) {
             if (this.#objectMap.get(localObject.name) !== localObject) {
                 throw new LocalObjectPathExistsError(`Local object path ${localObject.name} exists`)
             } else {
-                return
+                return addSuccess
             }
         }
         localObject.setService(this)
         this.#objectMap.set(localObject.name, localObject)
+        addSuccess = true
+        return addSuccess
     }
 
     public removeObject(localObject: LocalObject): boolean

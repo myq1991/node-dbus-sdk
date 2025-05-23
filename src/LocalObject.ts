@@ -30,8 +30,9 @@ export class LocalObject {
         this.addInterface(new IntrospectableInterface())
     }
 
-    public setService(service: LocalService | undefined): void {
+    public setService(service: LocalService | undefined): this {
         this.service = service
+        return this
     }
 
     public get introspectNode(): IntrospectNode {
@@ -44,16 +45,19 @@ export class LocalObject {
         }
     }
 
-    public addInterface(localInterface: LocalInterface) {
+    public addInterface(localInterface: LocalInterface): boolean {
+        let addSuccess: boolean = false
         if (this.#interfaceMap.has(localInterface.name)) {
             if (this.#interfaceMap.get(localInterface.name) !== localInterface) {
                 throw new LocalInterfaceExistsError(`Local interface ${localInterface.name} exists`)
             } else {
-                return
+                return addSuccess
             }
         }
         localInterface.setObject(this)
         this.#interfaceMap.set(localInterface.name, localInterface)
+        addSuccess = true
+        return addSuccess
     }
 
     public removeInterface(interfaceName: string): boolean
