@@ -39,8 +39,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@homebridge/long": "^5.2.1",
-    "@homebridge/put": "^0.0.8",
+    "native-machine-id": "^0.1.3",
     "xml2js": "^0.6.2"
   }
 }

@@ -6,6 +6,7 @@ import {IntrospectNode} from './types/IntrospectNode'
 import {IntrospectInterface} from './types/IntrospectInterface'
 import {IntrospectableInterface} from './lib/IntrospectableInterface'
 import {PropertiesInterface} from './lib/PropertiesInterface'
+import {PeerInterface} from './lib/PeerInterface'
 
 export class LocalObject {
 
@@ -28,6 +29,7 @@ export class LocalObject {
         this.#name = objectPath
         this.addInterface(new PropertiesInterface())
         this.addInterface(new IntrospectableInterface())
+        this.addInterface(new PeerInterface())
     }
 
     public setService(service: LocalService | undefined): this {
