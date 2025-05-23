@@ -177,7 +177,7 @@ export class DBus extends EventEmitter {
                 sender: this.#uniqueName,
                 destination: opts.destination,
                 signature: opts.signature ? opts.signature : undefined
-            }, ...opts.data ? opts.data : []))
+            }, ...(opts.data ? opts.data : [])))
         }
     }
 

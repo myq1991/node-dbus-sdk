@@ -3,6 +3,6 @@ import EventEmitter from 'node:events'
 
 export interface DefineSignalOpts {
     name: string
-    arg?: IntrospectSignalArgument[]
+    args?: IntrospectSignalArgument[]
     eventEmitter: EventEmitter
 }

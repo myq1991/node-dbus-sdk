@@ -25,6 +25,7 @@ export class LocalService {
     }
 
     #methodCallHandler: (message: DBusMessage) => Promise<void> = async (message: DBusMessage): Promise<void> => {
+        console.log('#methodCallHandler', message)
         const targetObjectPath: string = message.header.path
         const targetInterface: string = message.header.interfaceName
         const targetMethod: string = message.header.member

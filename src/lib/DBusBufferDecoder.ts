@@ -420,6 +420,10 @@ export class DBusBufferDecoder {
             byteLength = this.buffer.readUInt32BE(this.offset) // Read length as big-endian
         }
         this.offset += 4 // Increment offset by 4 bytes for length field
+        switch (elementType.type) {
+            case '{':
+                this.align(8)
+        }
         // Calculate the end offset of the array data
         const arrayEndOffset = this.offset + byteLength
         // Extract a sub-buffer for the array data to isolate reading

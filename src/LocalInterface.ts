@@ -15,6 +15,7 @@ import {
 import {DBus} from './DBus'
 import {LocalObject} from './LocalObject'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
+import {DBusSignedValue} from './lib/DBusSignedValue'
 
 export class LocalInterface {
 
@@ -30,6 +31,7 @@ export class LocalInterface {
     #introspectProperties: IntrospectProperty[] = []
 
     #definedProperties: Record<string, {
+        signature: string
         getter?: () => Promise<any> | any
         setter?: (value: any) => Promise<void> | void
     }> = {}
@@ -69,10 +71,6 @@ export class LocalInterface {
         }
     }
 
-    protected notifyObject(): void {
-        //TODO
-    }
-
     public defineMethod(opts: DefineMethodOpts): void {
         if (this.#definedMethods[opts.name]) throw new LocalInterfaceMethodDefinedError(`Method ${opts.name} is already defined`)
         this.#definedMethods[opts.name] = {
@@ -108,6 +106,7 @@ export class LocalInterface {
         if (opts.setter) access = DBusPropertyAccess.WRITE
         if (opts.getter && opts.setter) access = DBusPropertyAccess.READWRITE
         this.#definedProperties[opts.name] = {
+            signature: opts.type,
             getter: opts.getter,
             setter: opts.setter
         }
@@ -125,7 +124,7 @@ export class LocalInterface {
 
     public defineSignal(opts: DefineSignalOpts): void {
         if (this.#definedSignals[opts.name]) throw new LocalInterfaceSignalDefinedError(`Signal ${opts.name} is already defined`)
-        const signature: string | undefined = opts.arg?.map(arg => arg.type).join('')
+        const signature: string | undefined = opts.args?.map(arg => arg.type).join('')
         this.#definedSignals[opts.name] = {
             listener: (...args: any[]): void => {
                 if (!this.dbus || !this.object) return
@@ -141,7 +140,7 @@ export class LocalInterface {
         }
         this.#introspectSignals.push({
             name: opts.name,
-            arg: opts.arg ? opts.arg : []
+            arg: opts.args ? opts.args : []
         })
         this.#definedSignals[opts.name].eventEmitter.on(opts.name, this.#definedSignals[opts.name].listener)
     }
@@ -167,11 +166,27 @@ export class LocalInterface {
 
     public async setProperty(name: string, value: any): Promise<void> {
         if (!this.#definedProperties[name]) throw new LocalInterfacePropertyNotFoundError(`Property ${name} not found`)
-        if (this.#definedProperties[name].setter) this.#definedProperties[name].setter(value)
+        if (this.#definedProperties[name].setter) await this.#definedProperties[name].setter(value)
     }
 
     public async getProperty(name: string): Promise<any> {
         if (!this.#definedProperties[name]) throw new LocalInterfacePropertyNotFoundError(`Property ${name} not found`)
-        if (this.#definedProperties[name].getter) return this.#definedProperties[name].getter()
+        if (this.#definedProperties[name].getter) {
+            const value: any = await this.#definedProperties[name].getter()
+            return value === undefined ? value : new DBusSignedValue(this.#definedProperties[name].signature, this.#definedProperties[name].getter())
+        }
     }
+
+    public methodNames(): string[] {
+        return Object.keys(this.#definedMethods)
+    }
+
+    public propertyNames(): string[] {
+        return Object.keys(this.#definedProperties)
+    }
+
+    public signalNames(): string[] {
+        return Object.keys(this.#definedSignals)
+    }
+
 }

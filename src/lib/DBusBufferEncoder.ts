@@ -285,7 +285,6 @@ export class DBusBufferEncoder {
      */
     public writeArray(signedValues: DBusSignedValue[]): this {
         this.align(4)
-
         // Create a temporary encoder to encode array content and calculate its length
         const contentEncoder = new DBusBufferEncoder(this.endianness, Buffer.alloc(0), 1)
 
@@ -308,6 +307,11 @@ export class DBusBufferEncoder {
 
         // Append length field to the main buffer
         this.buffer = Buffer.concat([this.buffer, lengthBuffer])
+
+        switch (signedValues[0].$signature) {
+            case '{':
+                this.align(8)
+        }
 
         // Append array content to the main buffer
         this.buffer = Buffer.concat([this.buffer, contentBuffer])
@@ -519,11 +523,13 @@ export class DBusBufferEncoder {
      * Encodes a value or set of values based on a DBus signature
      * @param signature The DBus signature defining the type(s) of the value(s)
      * @param value The value(s) to encode, can be raw or already wrapped as DBusSignedValue(s)
+     * @param debug
      * @returns The encoded buffer
      */
-    public encode(signature: string, value: any | DBusSignedValue | DBusSignedValue[]): Buffer {
+    public encode(signature: string, value: any | DBusSignedValue | DBusSignedValue[], debug: boolean = false): Buffer {
         // Parse the input value(s) into signed values based on the signature
         const signedValues: DBusSignedValue[] = DBusSignedValue.parse(signature, value)
+        if (debug) console.log(JSON.stringify(signedValues, null, 2))
         // Encode each signed value
         for (const signedValue of signedValues) {
             this.writeSignedValue(signedValue)

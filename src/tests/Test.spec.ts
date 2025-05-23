@@ -1,23 +1,25 @@
-import {stringify} from 'json5'
 import {DBus} from '../DBus'
-import {runDBusBufferTestSet} from './DBusBuffer.spec'
-import {DBusSignedValue} from '../lib/DBusSignedValue'
-import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {DBusMessageEndianness} from '../lib/DBusMessageEndianness'
 import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
+import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {runExposeService} from './ExposeService.spec'
-import {IntrospectableInterface} from '../lib/IntrospectableInterface'
 
 // runDBusBufferTestSet()
 
 setImmediate(async (): Promise<void> => {
 
     await runExposeService()
-
-    // const dbus=await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
-    const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.0.96,port=44444'})
+    //
+    const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
+    // // const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     console.log('success')
-    await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+    // await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+    //
+    const serv = await dbus.getService('org.glib.test')
+    const obj = await serv.getObject('/')
+    const iface = await obj.getInterface('test.iface')
+    console.log(await iface.method.test('testName'))
+
 
     // // const serv = await dbus.getService('org.sigxcpu.Feedback')
     // // const obj = await serv.getObject('/org/sigxcpu/Feedback')

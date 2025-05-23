@@ -156,7 +156,7 @@ export class DBusMessage {
         const flags: number = headers[2]
         const protocolVersion: number = headers[3]
         const serial: number = headers[5]
-        let fulfillFieldsBuffer: Buffer = Buffer.concat([header.subarray(12), fieldsAndBody.subarray(0, fieldsLength)])
+        const fulfillFieldsBuffer: Buffer = Buffer.concat([header.subarray(12), fieldsAndBody.subarray(0, fieldsLength)])
         const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fulfillFieldsBuffer)
         const [fields] = fieldsDecoder.decode('a(yv)')
         const messageHeader: Partial<DBusMessageHeader> = {
