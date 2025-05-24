@@ -26,6 +26,12 @@ export class DBusObject {
 
     #shareIntrospectInterfaces: IntrospectInterface[] = []
 
+    /**
+     * Constructor for DBusObject.
+     * Initializes the DBus object with the provided options and sets up references to the DBus connection
+     * and service.
+     * @param opts - Configuration options for the DBus object.
+     */
     constructor(opts: DBusObjectOpts) {
         this.opts = opts
         this.dbus = this.opts.dbus
@@ -33,6 +39,14 @@ export class DBusObject {
         this.name = this.opts.objectPath
     }
 
+    /**
+     * Internal method to get a DBus interface by name.
+     * Retrieves or caches introspection data for the specified interface and creates a DBusInterface instance.
+     * @param iface - The name of the interface to retrieve.
+     * @param shareIntrospect - Whether to use shared introspection data to avoid multiple introspections.
+     * @returns A Promise resolving to a DBusInterface instance for the specified interface.
+     * @throws InterfaceNotFoundError if the specified interface is not found.
+     */
     protected async internalGetInterface(iface: string, shareIntrospect: boolean = false): Promise<DBusInterface> {
         let introspectInterfaces: IntrospectInterface[]
         if (shareIntrospect) {
@@ -51,7 +65,10 @@ export class DBusObject {
     }
 
     /**
-     * Introspect object
+     * Introspects the DBus object to retrieve its structure and metadata.
+     * Invokes the Introspect method on the DBus object to get XML data, parses it, and constructs
+     * an IntrospectNode object with details about interfaces, methods, properties, and signals.
+     * @returns A Promise resolving to an IntrospectNode object representing the object's introspection data.
      */
     public async introspect(): Promise<IntrospectNode> {
         const [introspectXML] = await this.dbus.invoke({
@@ -114,7 +131,9 @@ export class DBusObject {
     }
 
     /**
-     * List all interface names
+     * Lists all interface names available on this DBus object.
+     * Performs introspection to retrieve the list of interfaces and optionally caches the result.
+     * @returns A Promise resolving to an array of interface names as strings.
      */
     public async listInterfaces(): Promise<string[]> {
         const introspectResult: IntrospectNode = await this.introspect()
@@ -123,7 +142,9 @@ export class DBusObject {
     }
 
     /**
-     * Get all interfaces from object
+     * Retrieves all DBus interfaces available on this object.
+     * Uses shared introspection data to efficiently create DBusInterface instances for all interfaces.
+     * @returns A Promise resolving to an array of DBusInterface instances for all interfaces on this object.
      */
     public async getInterfaces(): Promise<DBusInterface[]> {
         this.#shareIntrospect = true
@@ -135,8 +156,10 @@ export class DBusObject {
     }
 
     /**
-     * Get interface from object
-     * @param iface
+     * Retrieves a specific DBus interface by name from this object.
+     * @param iface - The name of the interface to retrieve.
+     * @returns A Promise resolving to a DBusInterface instance for the specified interface.
+     * @throws InterfaceNotFoundError if the specified interface is not found.
      */
     public async getInterface(iface: string): Promise<DBusInterface> {
         return await this.internalGetInterface(iface, false)
