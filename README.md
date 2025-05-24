@@ -48,6 +48,51 @@ This project is a comprehensive TypeScript library for interacting with DBus, a 
 - **LocalObject**: Represents a local DBus object, associating interfaces and supporting introspection.
 - **LocalInterface**: Defines custom DBus interfaces with methods, properties, and signals for local service implementation.
 
+## Type Conversion and Handling Philosophy
+
+### DBus to TypeScript Type Mapping
+
+One of the critical aspects of this library is its handling of data types between the DBus wire format and TypeScript/JavaScript. DBus employs a strict type system defined by signatures, which dictate how data is serialized and deserialized. This library bridges the gap between DBus's type system and TypeScript's dynamic type system through the `DBusSignedValue` class, along with the `DBusBufferEncoder` and `DBusBufferDecoder` classes for serialization and deserialization. Below is the mapping relationship between DBus types and their corresponding TypeScript representations:
+
+- **Basic Types**:
+    - `y` (BYTE): Maps to `number` in TypeScript (0-255 range).
+    - `b` (BOOLEAN): Maps to `boolean` in TypeScript (`true` or `false`).
+    - `n` (INT16): Maps to `number` in TypeScript (16-bit signed integer).
+    - `q` (UINT16): Maps to `number` in TypeScript (16-bit unsigned integer).
+    - `i` (INT32): Maps to `number` in TypeScript (32-bit signed integer).
+    - `u` (UINT32): Maps to `number` in TypeScript (32-bit unsigned integer).
+    - `x` (INT64): Maps to `bigint` in TypeScript (64-bit signed integer).
+    - `t` (UINT64): Maps to `bigint` in TypeScript (64-bit unsigned integer).
+    - `d` (DOUBLE): Maps to `number` in TypeScript (64-bit floating-point).
+    - `s` (STRING): Maps to `string` in TypeScript (UTF-8 encoded).
+    - `o` (OBJECT_PATH): Maps to `string` in TypeScript (with specific format validation).
+    - `g` (SIGNATURE): Maps to `string` in TypeScript (representing a DBus type signature).
+    - `h` (UNIX_FD): Maps to `number` in TypeScript (file descriptor index).
+
+- **Container Types**:
+    - `a` (ARRAY): Maps to `Array<any>` in TypeScript, with elements recursively mapped based on the child type. Special handling for byte arrays (`ay`) maps to `Buffer`.
+    - `(` (STRUCT): Maps to `Array<any>` in TypeScript, representing a sequence of values corresponding to the struct's fields.
+    - `{` (DICT_ENTRY): Maps to an object in TypeScript (e.g., `{ key: value }`), with key and value types recursively mapped. Arrays of dictionary entries (`a{...}`) are often converted to a single object for convenience.
+    - `v` (VARIANT): Maps to `any` in TypeScript, dynamically containing another `DBusSignedValue` with its own type, allowing for runtime type flexibility.
+
+### Type Handling Philosophy
+
+The library's approach to type handling is centered on balancing strict adherence to the DBus specification with the flexibility and usability of TypeScript. Key principles guiding this design include:
+
+1. **Type Safety and Validation**: The library uses the `DBusSignedValue` class to encapsulate both the DBus signature and the corresponding value, ensuring that data adheres to the expected type structure during encoding and decoding. This prevents runtime errors by validating signatures and value compatibility upfront, as seen in methods like `Signature.areSignaturesCompatible` and during parsing in `DBusSignedValue.parse`.
+
+2. **Transparent Conversion**: The library aims to make DBus interactions intuitive for TypeScript developers by automatically converting between DBus wire format and JavaScript's native types. For instance, `DBusBufferDecoder.decode` unwraps `DBusSignedValue` instances into plain JavaScript values, while `DBusBufferEncoder.encode` infers or validates signatures from input data. Special handling for dictionaries (`a{...}`) and byte arrays (`ay`) converts them to objects and `Buffer` respectively, aligning with common JavaScript idioms.
+
+3. **Flexibility with Variants**: DBus's `VARIANT` type (`v`) is handled with dynamic typing in mind, allowing any valid DBus type to be nested within a variant. The library infers types for variants when necessary (`inferType` method in `DBusSignedValue`) and supports nested structures, ensuring developers can work with dynamic data without losing type information.
+
+4. **Alignment and Serialization Precision**: As seen in `DBusBufferDecoder` and `DBusBufferEncoder`, the library strictly adheres to DBus alignment rules (e.g., 4-byte for `INT32`, 8-byte for `STRUCT`) and endianness handling (little or big endian), ensuring correct serialization and deserialization. This low-level precision is abstracted away from the user, who interacts with high-level TypeScript values.
+
+5. **Error Prevention through Signature Matching**: The library prevents type mismatches by validating input and output signatures during method calls and property operations. If a mismatch occurs, a descriptive error (e.g., `SignatureError`) is thrown to guide the developer, as implemented in `LocalInterface.callMethod` and `setProperty`.
+
+6. **Developer Experience**: The design prioritizes a seamless developer experience by minimizing the need for manual type annotations. For example, when defining methods or properties in `LocalInterface`, developers specify DBus signatures (`type` field in `DefinePropertyOpts`), but the library handles the conversion to and from JavaScript types automatically. This reduces cognitive load while maintaining type integrity under the hood.
+
+By encapsulating type complexity within `DBusSignedValue` and providing robust encoding/decoding mechanisms via `DBusBufferEncoder` and `DBusBufferDecoder`, the library ensures that developers can focus on application logic rather than the intricacies of DBus's binary format or type system. This approach makes the library both powerful for advanced use cases (where explicit type control is needed) and accessible for simpler scenarios (where automatic type inference suffices).
+
 ## Quick Start Guide
 
 Below are two practical examples to help you quickly get started with this DBus library. The first example demonstrates how to expose a custom DBus service, and the second shows how to connect to and interact with a DBus service.
@@ -62,7 +107,7 @@ import EventEmitter from 'node:events';
 
 async function runExposeService(): Promise<void> {
     // Initialize a local service with a unique name
-    const service = new LocalService('org.test.service');
+    const service = new LocalService('org.test.service13');
     
     // Create a local object at the root path
     const object = new LocalObject('/');
@@ -129,7 +174,7 @@ async function runClient(): Promise<void> {
     console.log('Connected to DBus successfully');
     
     // Access a specific service
-    const service = await dbus.getService('org.test.service');
+    const service = await dbus.getService('org.test.service13');
     
     // Get an object from the service
     const object = await service.getObject('/');
