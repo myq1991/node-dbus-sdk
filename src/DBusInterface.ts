@@ -31,6 +31,12 @@ export class DBusInterface {
 
     public readonly name: string
 
+    /**
+     * Constructor for DBusInterface.
+     * Initializes the DBus interface with the provided options and sets up references to the DBus connection,
+     * service, object, and introspection data.
+     * @param opts - Configuration options for the DBus interface.
+     */
     constructor(opts: DBusInterfaceOpts) {
         this.opts = opts
         this.name = this.opts.iface
@@ -40,6 +46,12 @@ export class DBusInterface {
         this.introspectInterface = this.opts.introspectInterface
     }
 
+    /**
+     * Getter for methods with reply mode.
+     * Dynamically creates an object containing methods that expect a reply from the DBus invocation.
+     * Each method handles input arguments with type signatures and returns the result of the invocation.
+     * @returns A record of method names mapped to their callable implementations with reply mode.
+     */
     public get method(): Record<string, ReplyModeMethodCall> {
         const methods: Record<string, ReplyModeMethodCall> = {}
         this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
@@ -64,6 +76,12 @@ export class DBusInterface {
         return methods
     }
 
+    /**
+     * Getter for methods with no-reply mode.
+     * Dynamically creates an object containing methods that do not expect a reply from the DBus invocation.
+     * These methods are used for fire-and-forget calls.
+     * @returns A record of method names mapped to their callable implementations with no-reply mode.
+     */
     public get noReplyMethod(): Record<string, NoReplyModeMethodCall> {
         const noReplyMethods: Record<string, NoReplyModeMethodCall> = {}
         this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
@@ -84,6 +102,12 @@ export class DBusInterface {
         return noReplyMethods
     }
 
+    /**
+     * Getter for properties of the DBus interface.
+     * Dynamically creates an object containing property operations (get/set) for each property defined in the introspection data.
+     * Access control is enforced based on property access mode (read/write/readwrite).
+     * @returns A record of property names mapped to their get/set operations.
+     */
     public get property(): Record<string, PropertyOperation> {
         const properties: Record<string, PropertyOperation> = {}
         this.listProperties().forEach((propertyInfo: IntrospectProperty): void => {
@@ -112,6 +136,11 @@ export class DBusInterface {
         return properties
     }
 
+    /**
+     * Getter for the DBus signal emitter.
+     * Lazily initializes and returns a signal emitter for emitting signals associated with this interface.
+     * @returns A DBusSignalEmitter instance for handling signal emissions.
+     */
     public get signal(): DBusSignalEmitter {
         if (!this.#signalEmitter) this.#signalEmitter = this.dbus.createSignalEmitter({
             service: this.service.name,
@@ -122,14 +151,26 @@ export class DBusInterface {
         return this.#signalEmitter
     }
 
+    /**
+     * Lists all methods defined in the introspection data for this interface.
+     * @returns An array of IntrospectMethod objects representing the methods of this interface.
+     */
     public listMethods(): IntrospectMethod[] {
         return this.introspectInterface.method
     }
 
+    /**
+     * Lists all properties defined in the introspection data for this interface.
+     * @returns An array of IntrospectProperty objects representing the properties of this interface.
+     */
     public listProperties(): IntrospectProperty[] {
         return this.introspectInterface.property
     }
 
+    /**
+     * Lists all signals defined in the introspection data for this interface.
+     * @returns An array of IntrospectSignal objects representing the signals of this interface.
+     */
     public listSignals(): IntrospectSignal[] {
         return this.introspectInterface.signal
     }
