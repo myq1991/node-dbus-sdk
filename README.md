@@ -235,7 +235,7 @@ runClient().catch(console.error);
 
 `dbus-sdk` is designed for both consuming existing DBus services and creating new ones. Developers can connect to a DBus bus, interact with remote services by invoking methods or listening to signals, and define local services to expose functionality to other processes. Its modular design and type safety make it suitable for complex IPC scenarios in Node.js applications.
 
-For detailed API documentation, refer to the [TypeScript type definitions](https://github.com/myq1991/nodedbus/tree/main/build) or explore the source code on [GitHub](https://github.com/myq1991/nodedbus).
+For detailed API documentation, refer to the [TypeScript type definitions](https://github.com/myq1991/nodedbus/tree/main/doc/API.md) or explore the source code on [GitHub](https://github.com/myq1991/nodedbus).
 
 ## Contributing
 
