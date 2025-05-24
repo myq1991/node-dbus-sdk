@@ -32,6 +32,13 @@ setImmediate(async (): Promise<void> => {
     console.log(await iface.property.fuck.get())
     console.log('set value success')
 
+    setInterval(async () => {
+        try {
+            console.log(await iface.property.fuck.get())
+        } catch (e: any) {
+            console.log(e.message)
+        }
+    }, 3000)
 
     // // const serv = await dbus.getService('org.sigxcpu.Feedback')
     // // const obj = await serv.getObject('/org/sigxcpu/Feedback')

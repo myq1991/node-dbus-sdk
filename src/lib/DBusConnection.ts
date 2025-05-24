@@ -317,6 +317,13 @@ export class DBusConnection extends EventEmitter {
     }
 
     /**
+     * Is connected
+     */
+    public get connected(): boolean {
+        return this.#stream ? !this.#stream.closed : false
+    }
+
+    /**
      * DBus connection constructor
      * @param stream
      * @param authMethod

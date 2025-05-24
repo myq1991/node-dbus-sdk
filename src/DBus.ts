@@ -20,40 +20,98 @@ import EventEmitter from 'node:events'
 import {ReplyOpts} from './types/ReplyOpts'
 import {EmitSignalOpts} from './types/EmitSignalOpts'
 import {BusNameBasicInfo} from './types/BusNameBasicInfo'
+import {CreateDBusError} from './lib/CreateDBusError'
 
+/**
+ * Main class for interacting with a DBus connection.
+ * Provides methods for connecting to DBus, invoking methods, handling signals,
+ * managing services, objects, and interfaces, and other DBus operations.
+ * Extends EventEmitter to emit events for connection status and DBus signals.
+ */
 export class DBus extends EventEmitter {
 
+    /**
+     * The underlying DBus connection instance.
+     * Manages the low-level communication with the DBus daemon.
+     */
     #connection: DBusConnection
 
+    /**
+     * The unique name assigned to this connection by the DBus daemon (e.g., ':1.123').
+     * Set after a successful 'Hello' call during initialization.
+     */
     #uniqueName: string
 
+    /**
+     * A counter for message serial numbers.
+     * Incremented for each message sent to ensure unique identification.
+     */
     #serial: number = 1
 
+    /**
+     * A record of pending method calls awaiting responses.
+     * Maps serial numbers to callback functions for resolving or rejecting the call.
+     */
     #inflightCalls: Record<number, [(response: any[]) => void, (error: Error) => void]> = {}
 
+    /**
+     * A set of WeakRef objects referencing DBusSignalEmitter instances.
+     * Used for garbage collection of signal emitters when they are no longer needed.
+     */
     #signalEmitterWeakRefSet: Set<WeakRef<DBusSignalEmitter>> = new Set()
 
+    /**
+     * A set of active DBusSignalEmitter instances.
+     * Tracks signal emitters for dispatching incoming signals.
+     */
     #signalEmitters: Set<DBusSignalEmitter> = new Set()
 
+    /**
+     * A map of signal matching rules to their formatted rule strings.
+     * Used to manage DBus signal subscription rules.
+     */
     #signalRulesMap: Map<Record<string, string>, string> = new Map()
 
+    /**
+     * A set of WeakRef objects referencing DBusService instances.
+     * Used for garbage collection of services and updating their unique names.
+     */
     #weakServiceSet: Set<WeakRef<DBusService>> = new Set()
 
+    /**
+     * The DBus management interface for interacting with the DBus daemon.
+     * Provides access to standard DBus methods like name management and signal subscription.
+     */
     #dbusManageInterface: DBusInterface
 
+    /**
+     * Getter for the unique name of this DBus connection.
+     *
+     * @returns The unique name assigned by the DBus daemon.
+     */
     public get uniqueName(): string {
         return this.#uniqueName
     }
 
     /**
-     * Connect to DBus
-     * @param opts
+     * Static method to connect to a DBus instance.
+     * Creates a new DBus connection with the provided options and initializes it.
+     *
+     * @param opts - Connection options (e.g., socket, TCP, or stream settings).
+     * @returns A Promise resolving to an initialized DBus instance.
      */
     public static async connect(opts: ConnectOpts): Promise<DBus> {
         const bus: DBus = new DBus(await DBusConnection.createConnection(opts))
         return await bus.initialize()
     }
 
+    /**
+     * Initializes the DBus connection.
+     * Performs a 'Hello' call to get a unique name, sets up the management interface,
+     * and updates services and signal emitters with current name owners.
+     *
+     * @returns A Promise resolving to this DBus instance after initialization.
+     */
     protected async initialize(): Promise<this> {
         await this.hello()
         if (this.#dbusManageInterface) this.#dbusManageInterface.signal.removeAllListeners()
@@ -123,6 +181,12 @@ export class DBus extends EventEmitter {
         return this
     }
 
+    /**
+     * Sends a 'Hello' message to the DBus daemon to obtain a unique connection name.
+     * Sets the unique name for this connection upon successful response.
+     *
+     * @returns A Promise that resolves when the unique name is set.
+     */
     protected async hello(): Promise<void> {
         const [uniqueName] = await this.invoke({
             service: 'org.freedesktop.DBus',
@@ -134,14 +198,23 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Write data to DBus socket
-     * @param data
+     * Writes raw data to the DBus socket.
+     * Throws an error if the connection is not active.
+     *
+     * @param data - The Buffer containing the data to write to the DBus socket.
+     * @throws {Error} If the DBus connection is disconnected.
      */
-    public write(data: Buffer) {
-        //TODO 需要加入错误判断
+    public write(data: Buffer): void {
+        if (!this.#connection.connected) throw CreateDBusError('org.freedesktop.DBus.Error.Disconnected', 'DBus disconnected')
         this.#connection.write(data)
     }
 
+    /**
+     * Emits a DBus signal with the specified options.
+     * Encodes and writes the signal message to the DBus socket.
+     *
+     * @param opts - Options for emitting the signal, including object path, interface, signal name, and data.
+     */
     public emitSignal(opts: EmitSignalOpts): void {
         this.write(DBusMessage.encode({
             serial: this.#serial++,
@@ -156,6 +229,12 @@ export class DBus extends EventEmitter {
         }, ...opts.data ? opts.data : []))
     }
 
+    /**
+     * Sends a reply to a DBus method call.
+     * Handles both successful responses and error replies.
+     *
+     * @param opts - Options for the reply, including serial number, destination, and data or error.
+     */
     public reply(opts: ReplyOpts): void {
         if (opts.data instanceof Error) {
             this.write(DBusMessage.encode({
@@ -181,6 +260,14 @@ export class DBus extends EventEmitter {
         }
     }
 
+    /**
+     * Invokes a DBus method call with the specified options.
+     * Can be used with or without expecting a reply.
+     *
+     * @param opts - Options for the method call, including service, object path, interface, method, and arguments.
+     * @param noReply - Boolean indicating if a reply is expected (default: false).
+     * @returns A Promise resolving to the response data if a reply is expected, otherwise void.
+     */
     public invoke(opts: InvokeOpts, noReply: true): void
     public async invoke(opts: InvokeOpts, noReply: false): Promise<any[]>
     public async invoke(opts: InvokeOpts): Promise<any[]>
@@ -214,6 +301,12 @@ export class DBus extends EventEmitter {
         }
     }
 
+    /**
+     * Retrieves the value of a DBus property using the Properties interface.
+     *
+     * @param opts - Options for getting the property, including service, object path, interface, and property name.
+     * @returns A Promise resolving to the property value.
+     */
     public async getProperty(opts: GetPropertyValueOpts): Promise<any> {
         const [value] = await this.invoke({
             service: opts.service,
@@ -226,6 +319,12 @@ export class DBus extends EventEmitter {
         return value
     }
 
+    /**
+     * Sets the value of a DBus property using the Properties interface.
+     *
+     * @param opts - Options for setting the property, including service, object path, interface, property name, value, and signature.
+     * @returns A Promise that resolves when the property is set.
+     */
     public async setProperty(opts: SetPropertyValueOpts): Promise<void> {
         const signedValue: DBusSignedValue = opts.signature ? new DBusSignedValue('v', new DBusSignedValue(opts.signature, opts.value)) : new DBusSignedValue('v', opts.value)
         await this.invoke({
@@ -238,6 +337,15 @@ export class DBus extends EventEmitter {
         })
     }
 
+    /**
+     * Formats a DBus match rule string for signal subscription.
+     *
+     * @param uniqueName - The sender's unique name or '*' for any.
+     * @param objectPath - The object path or '*' for any.
+     * @param interfaceName - The interface name or '*' for any.
+     * @param signalName - The signal name or '*' for any.
+     * @returns The formatted match rule string.
+     */
     protected formatMatchSignalRule(uniqueName: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string): string {
         const matchSignalRules: string[] = ['type=signal']
         if (uniqueName !== '*') matchSignalRules.push(`sender=${uniqueName}`)
@@ -247,6 +355,14 @@ export class DBus extends EventEmitter {
         return matchSignalRules.join(',')
     }
 
+    /**
+     * Registers a signal subscription rule with the DBus daemon.
+     *
+     * @param uniqueName - The sender's unique name or '*' for any.
+     * @param objectPath - The object path or '*' for any.
+     * @param interfaceName - The interface name or '*' for any.
+     * @param signalName - The signal name or '*' for any.
+     */
     protected onSignal(uniqueName: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*'): void {
         const rules: Record<string, string> = {
             uniqueName: uniqueName,
@@ -258,10 +374,21 @@ export class DBus extends EventEmitter {
         return this.addMatch(this.#signalRulesMap.get(rules)!)
     }
 
+    /**
+     * Removes a signal subscription rule from the DBus daemon.
+     *
+     * @param signalRuleString - The formatted rule string to remove.
+     */
     protected offSignal(signalRuleString: string): void {
         return this.removeMatch(signalRuleString)
     }
 
+    /**
+     * Creates a signal emitter for listening to DBus signals.
+     *
+     * @param opts - Options for creating the signal emitter, including service, object path, and interface.
+     * @returns A DBusSignalEmitter instance for handling signals.
+     */
     public createSignalEmitter(opts: CreateSignalEmitterOpts): DBusSignalEmitter {
         const signalEmitter: DBusSignalEmitter = new DBusSignalEmitter(
             opts,
@@ -283,60 +410,73 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * DBus constructor
-     * @param connection
+     * Constructor for the DBus class.
+     * Sets up the connection and event listeners for messages, connection closure, and errors.
+     *
+     * @param connection - The DBusConnection instance to use for communication.
      */
     constructor(connection: DBusConnection) {
         super()
         this.#connection = connection
-        this.#connection.on('message', (message: DBusMessage): void => {
-            switch (message.header.type) {
-                case DBusMessageType.METHOD_RETURN:
-                    if (!message.header.replySerial) return
-                    if (!this.#inflightCalls[message.header.replySerial]) return
-                    return this.#inflightCalls[message.header.replySerial][0](message.body)
-                case DBusMessageType.ERROR:
-                    if (!message.header.replySerial) return
-                    if (!this.#inflightCalls[message.header.replySerial]) return
-                    const error: Error = new Error(message.body[0] ? message.body[0] : '')
-                    error.name = message.header.errorName ? message.header.errorName : error.name
-                    return this.#inflightCalls[message.header.replySerial][1](error)
-                case DBusMessageType.SIGNAL:
-                    const sender: string = message.header.sender
-                    const objectPath: string = message.header.path
-                    const interfaceName: string = message.header.interfaceName
-                    const signalName: string = message.header.member
-                    const signalArgs: any[] = message.body
-                    const emitResults: boolean[] = []
-                    this.#signalEmitters.forEach((emitter: DBusSignalEmitter): void => {
-                        emitResults.push(((): boolean => {
-                            if (emitter.uniqueName !== '*' && emitter.uniqueName !== sender) return false
-                            if (emitter.objectPath !== '*' && emitter.objectPath !== objectPath) return false
-                            if (emitter.interface !== '*' && emitter.interface !== interfaceName) return false
-                            if (!emitter.eventNames().includes(signalName) && !emitter.eventNames().includes('*')) return false
-                            const emitDirectly: boolean = emitter.emit(signalName, ...signalArgs)
-                            const emitWildcard: boolean = emitter.emit('*', signalName, ...signalArgs)
-                            return emitDirectly || emitWildcard
-                        })())
-                    })
-                    if (emitResults.find((result: boolean): boolean => result)) return
-                    const deprecatedSignalRuleStrings: string[] = []
-                    this.#signalRulesMap.forEach((signalRuleString: string, rule: Record<string, string>): void => {
-                        if (rule.uniqueName !== '*' && rule.uniqueName !== sender) return
-                        if (rule.objectPath !== '*' && rule.objectPath !== objectPath) return
-                        if (rule.interfaceName !== '*' && rule.interfaceName !== interfaceName) return
-                        if (rule.signalName !== '*' && rule.signalName !== signalName) return
-                        deprecatedSignalRuleStrings.push(signalRuleString)
-                        this.#signalRulesMap.delete(rule)
-                    })
-                    return deprecatedSignalRuleStrings.forEach((deprecatedSignalRuleString: string): void => this.offSignal(deprecatedSignalRuleString))
-                case DBusMessageType.METHOD_CALL:
-                    this.emit('methodCall', message)
-                    return
-            }
-        })
+        this.#connection
+            .on('message', (message: DBusMessage): void => {
+                switch (message.header.type) {
+                    case DBusMessageType.METHOD_RETURN:
+                        if (!message.header.replySerial) return
+                        if (!this.#inflightCalls[message.header.replySerial]) return
+                        return this.#inflightCalls[message.header.replySerial][0](message.body)
+                    case DBusMessageType.ERROR:
+                        if (!message.header.replySerial) return
+                        if (!this.#inflightCalls[message.header.replySerial]) return
+                        const error: Error = new Error(message.body[0] ? message.body[0] : '')
+                        error.name = message.header.errorName ? message.header.errorName : error.name
+                        return this.#inflightCalls[message.header.replySerial][1](error)
+                    case DBusMessageType.SIGNAL:
+                        const sender: string = message.header.sender
+                        const objectPath: string = message.header.path
+                        const interfaceName: string = message.header.interfaceName
+                        const signalName: string = message.header.member
+                        const signalArgs: any[] = message.body
+                        const emitResults: boolean[] = []
+                        this.#signalEmitters.forEach((emitter: DBusSignalEmitter): void => {
+                            emitResults.push(((): boolean => {
+                                if (emitter.uniqueName !== '*' && emitter.uniqueName !== sender) return false
+                                if (emitter.objectPath !== '*' && emitter.objectPath !== objectPath) return false
+                                if (emitter.interface !== '*' && emitter.interface !== interfaceName) return false
+                                if (!emitter.eventNames().includes(signalName) && !emitter.eventNames().includes('*')) return false
+                                const emitDirectly: boolean = emitter.emit(signalName, ...signalArgs)
+                                const emitWildcard: boolean = emitter.emit('*', signalName, ...signalArgs)
+                                return emitDirectly || emitWildcard
+                            })())
+                        })
+                        if (emitResults.find((result: boolean): boolean => result)) return
+                        const deprecatedSignalRuleStrings: string[] = []
+                        this.#signalRulesMap.forEach((signalRuleString: string, rule: Record<string, string>): void => {
+                            if (rule.uniqueName !== '*' && rule.uniqueName !== sender) return
+                            if (rule.objectPath !== '*' && rule.objectPath !== objectPath) return
+                            if (rule.interfaceName !== '*' && rule.interfaceName !== interfaceName) return
+                            if (rule.signalName !== '*' && rule.signalName !== signalName) return
+                            deprecatedSignalRuleStrings.push(signalRuleString)
+                            this.#signalRulesMap.delete(rule)
+                        })
+                        return deprecatedSignalRuleStrings.forEach((deprecatedSignalRuleString: string): void => this.offSignal(deprecatedSignalRuleString))
+                    case DBusMessageType.METHOD_CALL:
+                        this.emit('methodCall', message)
+                        return
+                }
+            })
+            .on('close', (): boolean => this.emit('connectionClose'))
+            .on('error', (error: Error): boolean => this.emit('connectionError', error))
     }
 
+    /**
+     * Adds an event listener for various DBus events.
+     * Supports events like connection status, name changes, and method calls.
+     *
+     * @param eventName - The name of the event to listen for.
+     * @param listener - The callback function to execute when the event occurs.
+     * @returns This instance for method chaining.
+     */
     public on(eventName: 'online', listener: (name: string) => void): this
     public on(eventName: 'offline', listener: (name: string) => void): this
     public on(eventName: 'replaced', listener: (name: string) => void): this
@@ -344,12 +484,21 @@ export class DBus extends EventEmitter {
     public on(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     public on(eventName: 'NameLost', listener: (name: string) => void): this
     public on(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public on(eventName: 'connectionClose', listener: () => void): this
+    public on(eventName: 'connectionError', listener: (error: Error) => void): this
     public on(eventName: string, listener: (...args: any[]) => void): this
     public on(eventName: string, listener: (...args: any[]) => void): this {
         super.on(eventName, listener)
         return this
     }
 
+    /**
+     * Adds a one-time event listener for various DBus events.
+     *
+     * @param eventName - The name of the event to listen for.
+     * @param listener - The callback function to execute once when the event occurs.
+     * @returns This instance for method chaining.
+     */
     public once(eventName: 'online', listener: (name: string) => void): this
     public once(eventName: 'offline', listener: (name: string) => void): this
     public once(eventName: 'replaced', listener: (name: string) => void): this
@@ -357,12 +506,21 @@ export class DBus extends EventEmitter {
     public once(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     public once(eventName: 'NameLost', listener: (name: string) => void): this
     public once(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public once(eventName: 'connectionClose', listener: () => void): this
+    public once(eventName: 'connectionError', listener: (error: Error) => void): this
     public once(eventName: string, listener: (...args: any[]) => void): this
     public once(eventName: string, listener: (...args: any[]) => void): this {
         super.once(eventName, listener)
         return this
     }
 
+    /**
+     * Removes an event listener for various DBus events.
+     *
+     * @param eventName - The name of the event to remove the listener from.
+     * @param listener - The callback function to remove.
+     * @returns This instance for method chaining.
+     */
     public off(eventName: 'online', listener: (name: string) => void): this
     public off(eventName: 'offline', listener: (name: string) => void): this
     public off(eventName: 'replaced', listener: (name: string) => void): this
@@ -370,12 +528,21 @@ export class DBus extends EventEmitter {
     public off(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     public off(eventName: 'NameLost', listener: (name: string) => void): this
     public off(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public off(eventName: 'connectionClose', listener: () => void): this
+    public off(eventName: 'connectionError', listener: (error: Error) => void): this
     public off(eventName: string, listener: (...args: any[]) => void): this
     public off(eventName: string, listener: (...args: any[]) => void): this {
         super.off(eventName, listener)
         return this
     }
 
+    /**
+     * Removes a specific event listener (alias for `off`).
+     *
+     * @param eventName - The name of the event to remove the listener from.
+     * @param listener - The callback function to remove.
+     * @returns This instance for method chaining.
+     */
     public removeListener(eventName: 'online', listener: (name: string) => void): this
     public removeListener(eventName: 'offline', listener: (name: string) => void): this
     public removeListener(eventName: 'replaced', listener: (name: string) => void): this
@@ -383,12 +550,19 @@ export class DBus extends EventEmitter {
     public removeListener(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     public removeListener(eventName: 'NameLost', listener: (name: string) => void): this
     public removeListener(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public removeListener(eventName: 'connectionClose', listener: () => void): this
+    public removeListener(eventName: 'connectionError', listener: (error: Error) => void): this
     public removeListener(eventName: string, listener: (...args: any[]) => void): this
     public removeListener(eventName: string, listener: (...args: any[]) => void): this {
         super.removeListener(eventName, listener)
         return this
     }
 
+    /**
+     * Adds a match rule to receive specific signals from the DBus daemon.
+     *
+     * @param rule - The match rule string to specify which signals to receive.
+     */
     public addMatch(rule: string): void {
         this.invoke({
             service: 'org.freedesktop.DBus',
@@ -400,6 +574,11 @@ export class DBus extends EventEmitter {
         }, true)
     }
 
+    /**
+     * Removes a previously added match rule from the DBus daemon.
+     *
+     * @param rule - The match rule string to remove.
+     */
     public removeMatch(rule: string): void {
         this.invoke({
             service: 'org.freedesktop.DBus',
@@ -411,6 +590,12 @@ export class DBus extends EventEmitter {
         }, true)
     }
 
+    /**
+     * Retrieves the unique name of the owner of a given bus name.
+     *
+     * @param name - The bus name to query.
+     * @returns A Promise resolving to the unique name of the owner or undefined if not found.
+     */
     public async getNameOwner(name: string): Promise<string | undefined> {
         try {
             const [owner] = await this.invoke({
@@ -427,6 +612,11 @@ export class DBus extends EventEmitter {
         }
     }
 
+    /**
+     * Lists all activatable bus names (services that can be started).
+     *
+     * @returns A Promise resolving to an array of activatable bus names.
+     */
     public async listActivatableNames(): Promise<string[]> {
         const [activatableNames] = await this.invoke({
             service: 'org.freedesktop.DBus',
@@ -437,6 +627,11 @@ export class DBus extends EventEmitter {
         return activatableNames
     }
 
+    /**
+     * Lists all currently active bus names.
+     *
+     * @returns A Promise resolving to an array of active bus names.
+     */
     public async listNames(): Promise<string[]> {
         const [names] = await this.invoke({
             service: 'org.freedesktop.DBus',
@@ -447,6 +642,12 @@ export class DBus extends EventEmitter {
         return names
     }
 
+    /**
+     * Checks if a given bus name currently has an owner.
+     *
+     * @param name - The bus name to check.
+     * @returns A Promise resolving to a boolean indicating if the name has an owner.
+     */
     public async nameHasOwner(name: string): Promise<boolean> {
         const [hasOwner] = await this.invoke({
             service: 'org.freedesktop.DBus',
@@ -459,6 +660,13 @@ export class DBus extends EventEmitter {
         return hasOwner
     }
 
+    /**
+     * Requests ownership of a bus name with specified flags.
+     *
+     * @param name - The bus name to request.
+     * @param flags - Optional flags for the request (default: DBUS_NAME_FLAG_DEFAULT).
+     * @returns A Promise resolving to the result code of the request.
+     */
     public async requestName(name: string, flags: RequestNameFlags = RequestNameFlags.DBUS_NAME_FLAG_DEFAULT): Promise<RequestNameResultCode> {
         const [res] = await this.invoke({
             service: 'org.freedesktop.DBus',
@@ -471,6 +679,12 @@ export class DBus extends EventEmitter {
         return res
     }
 
+    /**
+     * Releases ownership of a bus name.
+     *
+     * @param name - The bus name to release.
+     * @returns A Promise resolving to the result code of the release operation.
+     */
     public async releaseName(name: string): Promise<number> {
         const [res] = await this.invoke({
             service: 'org.freedesktop.DBus',
@@ -483,6 +697,11 @@ export class DBus extends EventEmitter {
         return res
     }
 
+    /**
+     * Reloads the DBus daemon configuration.
+     *
+     * @returns A Promise that resolves when the configuration is reloaded.
+     */
     public async reloadConfig(): Promise<void> {
         await this.invoke({
             service: 'org.freedesktop.DBus',
@@ -492,6 +711,13 @@ export class DBus extends EventEmitter {
         })
     }
 
+    /**
+     * Starts a service by its bus name.
+     *
+     * @param name - The bus name of the service to start.
+     * @param flags - Optional flags for starting the service (default: 0).
+     * @returns A Promise resolving to the result code of the start operation.
+     */
     public async startServiceByName(name: string, flags: number = 0): Promise<number> {
         const [res] = await this.invoke({
             service: 'org.freedesktop.DBus',
@@ -504,6 +730,12 @@ export class DBus extends EventEmitter {
         return res
     }
 
+    /**
+     * Retrieves the Unix process ID of a connection by its bus name.
+     *
+     * @param name - The bus name of the connection.
+     * @returns A Promise resolving to the process ID or undefined if not found.
+     */
     public async getConnectionUnixProcessID(name: string): Promise<number | undefined> {
         try {
             const [pid] = await this.invoke({
@@ -520,10 +752,20 @@ export class DBus extends EventEmitter {
         }
     }
 
+    /**
+     * Disconnects from the DBus daemon.
+     *
+     * @returns A Promise that resolves when the connection is closed.
+     */
     public async disconnect(): Promise<void> {
         await new Promise<void>(resolve => this.#connection.end(resolve))
     }
 
+    /**
+     * Lists all bus names, including active and activatable ones, with detailed information.
+     *
+     * @returns A Promise resolving to an array of bus name information objects.
+     */
     public async listBusNames(): Promise<BusNameBasicInfo[]> {
         const [activeNames, activatableNames] = await Promise.all([
             this.listNames(),
@@ -548,7 +790,9 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * List all services
+     * Lists all services (bus names that are not unique connection names).
+     *
+     * @returns A Promise resolving to an array of service information objects.
      */
     public async listServices(): Promise<ServiceBasicInfo[]> {
         const busNameInfos: BusNameBasicInfo[] = await this.listBusNames()
@@ -556,7 +800,9 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Get all services
+     * Retrieves all services as DBusService instances.
+     *
+     * @returns A Promise resolving to an array of DBusService instances.
      */
     public async getServices(): Promise<DBusService[]> {
         const serviceBasicInfos: ServiceBasicInfo[] = await this.listServices()
@@ -564,8 +810,12 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Get service
-     * @param service
+     * Retrieves a specific service by its bus name.
+     * Starts the service if it is activatable but not active.
+     *
+     * @param service - The bus name of the service to retrieve.
+     * @returns A Promise resolving to a DBusService instance.
+     * @throws {ServiceNotFoundError} If the service is not found or has no connection.
      */
     public async getService(service: string): Promise<DBusService> {
         const [activeNames, activatableNames] = await Promise.all([
@@ -582,19 +832,23 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Get object
-     * @param service
-     * @param objectPath
+     * Retrieves a specific DBus object by service and object path.
+     *
+     * @param service - The bus name of the service.
+     * @param objectPath - The object path to retrieve.
+     * @returns A Promise resolving to a DBusObject instance.
      */
     public async getObject(service: string, objectPath: string): Promise<DBusObject> {
         return (await this.getService(service)).getObject(objectPath)
     }
 
     /**
-     * Get Interface
-     * @param service
-     * @param objectPath
-     * @param iface
+     * Retrieves a specific DBus interface by service, object path, and interface name.
+     *
+     * @param service - The bus name of the service.
+     * @param objectPath - The object path of the object.
+     * @param iface - The interface name to retrieve.
+     * @returns A Promise resolving to a DBusInterface instance.
      */
     public async getInterface(service: string, objectPath: string, iface: string): Promise<DBusInterface> {
         return (await this.getObject(service, objectPath)).getInterface(iface)

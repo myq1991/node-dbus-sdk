@@ -83,7 +83,7 @@ export async function runExposeService(): Promise<void> {
     // await serv.run({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     await serv.run({busAddress: 'tcp:host=192.168.1.236,port=44444'})
     //
-    setInterval(() => {
-        ee.emit('fuckSignal', `${Date.now()}`)
-    }, 3000)
+    // setInterval(() => {
+    //     ee.emit('fuckSignal', `${Date.now()}`)
+    // }, 3000)
 }
