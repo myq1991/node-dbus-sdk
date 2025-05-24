@@ -1,7 +1,7 @@
 import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {stringify} from 'json5'
 import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
-import {DBusMessageEndianness} from '../lib/DBusMessageEndianness'
+import {DBusMessageEndianness} from '../lib/enums/DBusMessageEndianness'
 import {DBusSignedValue} from '../lib/DBusSignedValue'
 
 const endianness: DBusMessageEndianness = DBusMessageEndianness.LE

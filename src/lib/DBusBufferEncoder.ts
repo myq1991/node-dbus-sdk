@@ -1,4 +1,4 @@
-import {DBusMessageEndianness} from './DBusMessageEndianness'
+import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 import {ObjectPathError, SignatureError} from './Errors'
 import {DBusSignedValue} from './DBusSignedValue'
 

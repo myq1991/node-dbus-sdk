@@ -1,4 +1,4 @@
-import {DBusPropertyAccess} from './lib/DBusPropertyAccess'
+import {DBusPropertyAccess} from './lib/enums/DBusPropertyAccess'
 import {DefineMethodArgumentOpts, DefineMethodOpts} from './types/DefineMethodOpts'
 import {DefinePropertyOpts} from './types/DefinePropertyOpts'
 import {DefineSignalOpts} from './types/DefineSignalOpts'

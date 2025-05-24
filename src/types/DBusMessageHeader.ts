@@ -1,5 +1,5 @@
-import {DBusMessageType} from '../lib/DBusMessageType'
-import {DBusMessageFlags} from '../lib/DBusMessageFlags'
+import {DBusMessageType} from '../lib/enums/DBusMessageType'
+import {DBusMessageFlags} from '../lib/enums/DBusMessageFlags'
 
 /**
  * Interface defining the structure of a DBus message header.

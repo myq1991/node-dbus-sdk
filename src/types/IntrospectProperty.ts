@@ -1,4 +1,4 @@
-import {DBusPropertyAccess} from '../lib/DBusPropertyAccess'
+import {DBusPropertyAccess} from '../lib/enums/DBusPropertyAccess'
 
 /**
  * Interface defining the structure of introspection data for a DBus property.

@@ -62,7 +62,7 @@ export class DBusConnection extends EventEmitter {
         const keyrings: string = await readFile(filename, {encoding: 'ascii'})
         const lines: string[] = keyrings.split('\n')
         for (let l: number = 0; l < lines.length; ++l) {
-            let data: string[] = lines[l].split(' ')
+            const data: string[] = lines[l].split(' ')
             if (data.length > 2 && id === data[0]) return data[2]
         }
         throw new UserPermissionError('Cookie not found')
@@ -80,7 +80,7 @@ export class DBusConnection extends EventEmitter {
         const uid: number = opts?.uid ? opts.uid : process?.hasOwnProperty('getuid') ? process.getuid!() : 0
         const id: string = Buffer.from(uid.toString(), 'ascii').toString('hex')
         let authError: Error = new AuthError('No auth methods available')
-        for (let authMethod of authMethods) {
+        for (const authMethod of authMethods) {
             try {
                 return [authMethod, uid.toString(), await this.tryAuth(stream, authMethod, id)]
             } catch (e: any) {

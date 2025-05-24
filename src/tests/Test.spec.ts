@@ -1,5 +1,5 @@
 import {DBus} from '../DBus'
-import {DBusMessageEndianness} from '../lib/DBusMessageEndianness'
+import {DBusMessageEndianness} from '../lib/enums/DBusMessageEndianness'
 import {DBusBufferDecoder} from '../lib/DBusBufferDecoder'
 import {DBusBufferEncoder} from '../lib/DBusBufferEncoder'
 import {runExposeService} from './ExposeService.spec'

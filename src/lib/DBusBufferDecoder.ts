@@ -1,4 +1,4 @@
-import {DBusMessageEndianness} from './DBusMessageEndianness'
+import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 import {DBusSignedValue} from './DBusSignedValue'
 import {Signature} from './Signature'
 import {DataType} from '../types/DataType'
