@@ -1,4 +1,4 @@
-# NodeDBus
+# Node DBus SDK
 
 ## Introduction
 
@@ -102,7 +102,7 @@ Below are two practical examples to help you quickly get started with this DBus 
 This example shows how to create and run a local DBus service with a custom interface, method, property, and signal.
 
 ```typescript
-import { LocalService, LocalInterface, LocalObject } from 'nodedbus';
+import { LocalService, LocalInterface, LocalObject } from 'dbus-sdk';
 import EventEmitter from 'node:events';
 
 async function runExposeService(): Promise<void> {
@@ -166,7 +166,7 @@ runExposeService().catch(console.error);
 This example demonstrates how to connect to a DBus bus, access a service, and interact with its objects, properties, and signals.
 
 ```typescript
-import { DBus } from 'nodedbus';
+import { DBus } from 'dbus-sdk';
 
 async function runClient(): Promise<void> {
     // Connect to a DBus bus (adjust the bus address as needed)

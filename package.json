@@ -1,8 +1,9 @@
 {
-  "name": "nodedbus",
+  "name": "dbus-sdk",
   "version": "1.0.0",
-  "description": "Node DBus",
-  "main": "index.js",
+  "description": "Node DBus SDK",
+  "main": "build/NodeDBusSDK.js",
+  "types": "build/NodeDBusSDK.d.ts",
   "scripts": {
     "clean": "shx rm -rf ./build",
     "build": "tsc",
