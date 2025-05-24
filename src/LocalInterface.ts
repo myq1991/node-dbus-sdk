@@ -469,6 +469,14 @@ export class LocalInterface {
         return DBusSignedValue.parse(this.#definedProperties[name].signature, propertyValue)[0]
     }
 
+    public async getManagedProperties(): Promise<Record<string, DBusSignedValue>> {
+        const record: Record<string, DBusSignedValue> = {}
+        for (const propertyName of this.propertyNames()) {
+            record[propertyName] = await this.getPropertySignedValue(propertyName)
+        }
+        return record
+    }
+
     /**
      * Lists the names of all defined methods on this interface.
      * @returns An array of method names as strings.

@@ -212,7 +212,10 @@ export class LocalService {
         localObject.setService(this)
         this.#objectMap.set(localObject.name, localObject)
         addSuccess = true
-        //TODO 向ObjectManager发事件
+        localObject
+            .getManagedInterfaces()
+            .then((managedInterfaces: Record<string, Record<string, DBusSignedValue>>): void => this.objectManager?.interfacesAdded(localObject, managedInterfaces))
+            .catch((): void => this.objectManager?.interfacesAdded(localObject, {}))
         return addSuccess
     }
 

@@ -18,10 +18,10 @@ export class ObjectManagerInterface extends LocalInterface {
             .defineSignal({
                 name: 'InterfacesAdded',
                 args: [
-                    {
-                        name: 'object_path',
-                        type: 'o'
-                    },
+                    // {
+                    //     name: 'object_path',
+                    //     type: 'o'
+                    // },
                     {
                         name: 'interfaces_and_properties',
                         type: 'a{sa{sv}}'
@@ -50,23 +50,16 @@ export class ObjectManagerInterface extends LocalInterface {
         const objects: Record<string, LocalObject> | undefined = this.object?.service?.listObjects()
         if (!objects) return managedObjects
         for (const objectPath in objects) {
-            const managedObjectInterfaces: Record<string, Record<string, any>> = {}
             const object: LocalObject = objects[objectPath]
-            const interfaces: Record<string, LocalInterface> = object.listInterfaces()
-            for (const interfaceName in interfaces) {
-                const managedObjectInterfaceProperties: Record<string, any> = {}
-                for (const propertyName of interfaces[interfaceName].propertyNames()) {
-                    managedObjectInterfaceProperties[propertyName] = await interfaces[interfaceName].getPropertySignedValue(propertyName)
-                }
-                managedObjectInterfaces[interfaceName] = managedObjectInterfaceProperties
-            }
-            managedObjects[objectPath] = managedObjectInterfaces
+            managedObjects[objectPath] = await object.getManagedInterfaces()
         }
         return managedObjects
     }
 
     public interfacesAdded(localObject: LocalObject, interfacesAndProperties: Record<string, Record<string, any>>): void {
-        this.#eventEmitter.emit('InterfacesAdded', localObject.name, interfacesAndProperties)
+        // this.#eventEmitter.emit('InterfacesAdded', localObject.name, interfacesAndProperties)
+        this.#eventEmitter.emit('InterfacesAdded', localObject.name, {})//TODO 发出去的信号解析有问题
+        // this.#eventEmitter.emit('InterfacesAdded',  interfacesAndProperties)
     }
 
     public interfacesRemoved(localObject: LocalObject, interfaces: string[]): void {

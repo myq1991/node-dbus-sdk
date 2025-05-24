@@ -7,6 +7,7 @@ import {IntrospectInterface} from './types/IntrospectInterface'
 import {IntrospectableInterface} from './lib/common/IntrospectableInterface'
 import {PropertiesInterface} from './lib/common/PropertiesInterface'
 import {PeerInterface} from './lib/common/PeerInterface'
+import {DBusSignedValue} from './lib/DBusSignedValue'
 
 export class LocalObject {
 
@@ -232,6 +233,10 @@ export class LocalObject {
         return interfaces
     }
 
+    public interfaceNames(): string[] {
+        return [...this.#interfaceMap.keys()]
+    }
+
     /**
      * Finds a LocalInterface by its name.
      * @param name - The name of the interface to find.
@@ -239,5 +244,13 @@ export class LocalObject {
      */
     public findInterfaceByName<T extends LocalInterface = LocalInterface>(name: string): T | undefined {
         return this.#interfaceMap.get(name) as T
+    }
+
+    public async getManagedInterfaces(): Promise<Record<string, Record<string, DBusSignedValue>>> {
+        const record: Record<string, Record<string, DBusSignedValue>> = {}
+        for (const interfaceName of this.interfaceNames()) {
+            record[interfaceName] = await this.#interfaceMap.get(interfaceName)!.getManagedProperties()
+        }
+        return record
     }
 }
