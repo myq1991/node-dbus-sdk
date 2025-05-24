@@ -1,4 +1,7 @@
 ### Node template
+#Jetbrains
+.idea
+
 # Logs
 logs
 *.log
