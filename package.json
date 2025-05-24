@@ -1,7 +1,7 @@
 {
   "name": "dbus-sdk",
   "version": "1.0.1",
-  "description": "Node DBus SDK",
+  "description": "A Node.js SDK for interacting with DBus, enabling seamless service calling and exposure with TypeScript support",
   "main": "build/NodeDBusSDK.js",
   "types": "build/NodeDBusSDK.d.ts",
   "scripts": {
@@ -16,7 +16,15 @@
     "url": "git+https://github.com/myq1991/nodedbus.git"
   },
   "keywords": [
-    "DBus"
+    "dbus",
+    "node",
+    "nodejs",
+    "ipc",
+    "typescript",
+    "sdk",
+    "linux",
+    "dbus-service",
+    "interprocess-communication"
   ],
   "author": "alex.ma",
   "license": "MIT",
