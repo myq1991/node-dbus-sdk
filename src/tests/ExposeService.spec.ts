@@ -13,7 +13,7 @@ export async function runExposeService(): Promise<void> {
     const iface = new LocalInterface('test.iface')
     iface.defineProperty({
         name: 'fuck',
-        type: 's',
+        type: 'av',
         emitPropertiesChanged: {emitValue: true},
         getter: () => {
             return testProp

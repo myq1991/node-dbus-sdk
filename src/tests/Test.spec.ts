@@ -27,7 +27,9 @@ setImmediate(async (): Promise<void> => {
     // iface.signal.on('fuckSignal', console.log)
     // console.log(await iface.method.test(123))
     propIface.signal.on('PropertiesChanged', console.log)
-    await iface.property.fuck.set('aaaaaaa')
+    // await iface.property.fuck.set(12345678)
+    await iface.property.fuck.set([12345678])
+    console.log(await iface.property.fuck.get())
     console.log('set value success')
 
 

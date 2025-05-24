@@ -23,6 +23,8 @@ import {DBusSignedValue} from './lib/DBusSignedValue'
 import {CreateDBusError} from './lib/CreateDBusError'
 import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
 import {Signature} from './lib/Signature'
+import {DBusBufferEncoder} from './lib/DBusBufferEncoder'
+import {DBusBufferDecoder} from './lib/DBusBufferDecoder'
 
 export class LocalInterface {
 
@@ -342,6 +344,13 @@ export class LocalInterface {
 
     public async setProperty(name: string, value: any): Promise<void> {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
+        try {
+            const encoder: DBusBufferEncoder = new DBusBufferEncoder()
+            const decoder: DBusBufferDecoder = new DBusBufferDecoder(encoder.endianness, encoder.encode(this.#definedProperties[name].signature, value))
+            ;[value] = decoder.decode(this.#definedProperties[name].signature)
+        } catch (e) {
+            throw CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The property signature '${this.#definedProperties[name].signature}' does not match its value.`)
+        }
         if (this.#definedProperties[name].setter) return this.#definedProperties[name].setter(value)
         throw CreateDBusError('org.freedesktop.DBus.Error.PropertyReadOnly', `Property ${name} is read only`)
     }
