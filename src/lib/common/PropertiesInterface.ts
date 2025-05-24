@@ -101,7 +101,7 @@ export class PropertiesInterface extends LocalInterface {
     protected async get(interfaceName: string, propertyName: string): Promise<any> {
         const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
         if (!targetInterface) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownInterface', `Interface ${interfaceName} not found`)
-        return await targetInterface.getProperty(propertyName)
+        return await targetInterface.getPropertySignedValue(propertyName)
     }
 
     /**

@@ -7,6 +7,8 @@ import {IntrospectableInterface} from './lib/common/IntrospectableInterface'
 import {LocalInterface} from './LocalInterface'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 import {CreateDBusError} from './lib/CreateDBusError'
+import {RootObject} from './lib/common/RootObject'
+import {ObjectManagerInterface} from './lib/common/ObjectManagerInterface'
 
 export class LocalService {
 
@@ -19,6 +21,10 @@ export class LocalService {
     readonly #defaultIntrospectableInterface: IntrospectableInterface = new IntrospectableInterface()
 
     public dbus: DBus
+
+    public get objectManager(): ObjectManagerInterface | undefined {
+        return this.findObjectByPath('/')?.findInterfaceByName('org.freedesktop.DBus.ObjectManager')
+    }
 
     /**
      * Getter for the name of this local service.
@@ -35,6 +41,7 @@ export class LocalService {
      */
     constructor(serviceName: string) {
         this.#name = this.validateDBusServiceName(serviceName)
+        this.addObject(new RootObject())
     }
 
     /**
@@ -205,6 +212,7 @@ export class LocalService {
         localObject.setService(this)
         this.#objectMap.set(localObject.name, localObject)
         addSuccess = true
+        //TODO 向ObjectManager发事件
         return addSuccess
     }
 
@@ -246,6 +254,7 @@ export class LocalService {
                 removeSuccess = this.#objectMap.delete(result[0])
             }
         }
+        //TODO 向ObjectManager发事件
         return removeSuccess
     }
 

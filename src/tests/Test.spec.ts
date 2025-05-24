@@ -20,25 +20,25 @@ setImmediate(async (): Promise<void> => {
     // await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
     //
     // const serv = await dbus.getService('org.glib.test')
-    const serv = await dbus.getService('org.test.service13')
-    const obj = await serv.getObject('/')
-    const iface = await obj.getInterface('test.iface')
-    const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
-    // iface.signal.on('fuckSignal', console.log)
-    // console.log(await iface.method.test(123))
-    propIface.signal.on('PropertiesChanged', console.log)
-    // await iface.property.fuck.set(12345678)
-    await iface.property.fuck.set([12345678])
-    console.log(await iface.property.fuck.get())
-    console.log('set value success')
-
-    setInterval(async () => {
-        try {
-            console.log(await iface.property.fuck.get())
-        } catch (e: any) {
-            console.log(e.message)
-        }
-    }, 3000)
+    // const serv = await dbus.getService('org.test.service13')
+    // const obj = await serv.getObject('/test/obj')
+    // const iface = await obj.getInterface('test.iface')
+    // const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
+    // // iface.signal.on('fuckSignal', console.log)
+    // // console.log(await iface.method.test(123))
+    // propIface.signal.on('PropertiesChanged', console.log)
+    // // await iface.property.fuck.set(12345678)
+    // await iface.property.fuck.set([12345678])
+    // console.log(await iface.property.fuck.get())
+    // console.log('set value success')
+    //
+    // setInterval(async () => {
+    //     try {
+    //         console.log(await iface.property.fuck.get())
+    //     } catch (e: any) {
+    //         console.log(e.message)
+    //     }
+    // }, 3000)
 
     // // const serv = await dbus.getService('org.sigxcpu.Feedback')
     // // const obj = await serv.getObject('/org/sigxcpu/Feedback')

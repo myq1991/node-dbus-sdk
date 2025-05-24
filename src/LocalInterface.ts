@@ -464,6 +464,11 @@ export class LocalInterface {
         throw CreateDBusError('org.freedesktop.DBus.Error.PropertyWriteOnly', `Property ${name} is write only`)
     }
 
+    public async getPropertySignedValue(name: string): Promise<DBusSignedValue> {
+        const propertyValue: any = await this.getProperty(name)
+        return DBusSignedValue.parse(this.#definedProperties[name].signature, propertyValue)[0]
+    }
+
     /**
      * Lists the names of all defined methods on this interface.
      * @returns An array of method names as strings.

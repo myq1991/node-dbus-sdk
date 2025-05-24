@@ -5,11 +5,11 @@ import EventEmitter from 'node:events'
 import {DBusSignedValue} from '../lib/DBusSignedValue'
 
 export async function runExposeService(): Promise<void> {
-    let testProp: string = 'you'
+    let testProp: string[] = ['you']
     const ee = new EventEmitter()
     const serv = new LocalService('org.test.service13')
     // const obj = new LocalObject('/test/obj')
-    const obj = new LocalObject('/')
+    const obj = new LocalObject('/test/obj')
     const iface = new LocalInterface('test.iface')
     iface.defineProperty({
         name: 'fuck',
@@ -18,7 +18,7 @@ export async function runExposeService(): Promise<void> {
         getter: () => {
             return testProp
         },
-        setter: (value: string) => {
+        setter: (value: string[]) => {
             testProp = value
         }
     })
@@ -78,10 +78,14 @@ export async function runExposeService(): Promise<void> {
     })
 
     obj.addInterface(iface)
-    serv.addObject(obj)
 
     // await serv.run({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     await serv.run({busAddress: 'tcp:host=192.168.1.236,port=44444'})
+
+    setTimeout(() => {
+        serv.addObject(obj)
+    }, 20000)
+
     //
     // setInterval(() => {
     //     ee.emit('fuckSignal', `${Date.now()}`)
