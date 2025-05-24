@@ -55,19 +55,38 @@ export class LocalInterface {
 
     public object: LocalObject | undefined
 
+    /**
+     * Getter for the DBus instance associated with this interface's object.
+     * @returns The DBus instance if the object is defined, otherwise undefined.
+     */
     public get dbus(): DBus | undefined {
         if (!this.object) return
         return this.object.dbus
     }
 
+    /**
+     * Getter for the name of this interface.
+     * @returns The interface name as a string.
+     */
     public get name(): string {
         return this.#name
     }
 
+    /**
+     * Constructor for LocalInterface.
+     * Initializes the interface with a validated name.
+     * @param interfaceName - The name of the interface to be validated and set.
+     */
     constructor(interfaceName: string) {
         this.#name = this.validateDBusInterfaceName(interfaceName)
     }
 
+    /**
+     * Validates a DBus interface name based on DBus naming rules.
+     * @param interfaceName - The name to validate.
+     * @returns The validated interface name if it passes all checks.
+     * @throws LocalInterfaceInvalidNameError if the name does not meet DBus naming criteria.
+     */
     protected validateDBusInterfaceName(interfaceName: string | any): string {
         // Step 1: Check if the input is a string and not empty
         if (typeof interfaceName !== 'string' || interfaceName.length === 0) {
@@ -123,6 +142,12 @@ export class LocalInterface {
         return interfaceName
     }
 
+    /**
+     * Validates a DBus method name based on DBus naming rules.
+     * @param methodName - The name to validate.
+     * @returns The validated method name if it passes all checks.
+     * @throws LocalInterfaceInvalidMethodNameError if the name does not meet DBus naming criteria.
+     */
     protected validateDBusMethodName(methodName: string | any): string {
         // Step 1: Check if the input is a string and not empty
         if (typeof methodName !== 'string' || methodName.length === 0) {
@@ -151,6 +176,12 @@ export class LocalInterface {
         return methodName
     }
 
+    /**
+     * Validates a DBus property name based on DBus naming rules.
+     * @param propertyName - The name to validate.
+     * @returns The validated property name if it passes all checks.
+     * @throws LocalInterfaceInvalidPropertyNameError if the name does not meet DBus naming criteria.
+     */
     protected validateDBusPropertyName(propertyName: string | any): string {
         // Step 1: Check if the input is a string and not empty
         if (typeof propertyName !== 'string' || propertyName.length === 0) {
@@ -179,6 +210,12 @@ export class LocalInterface {
         return propertyName
     }
 
+    /**
+     * Validates a DBus signal name based on DBus naming rules.
+     * @param signalName - The name to validate.
+     * @returns The validated signal name if it passes all checks.
+     * @throws LocalInterfaceInvalidSignalNameError if the name does not meet DBus naming criteria.
+     */
     protected validateDBusSignalName(signalName: string | any): string {
         // Step 1: Check if the input is a string and not empty
         if (typeof signalName !== 'string' || signalName.length === 0) {
@@ -207,11 +244,20 @@ export class LocalInterface {
         return signalName
     }
 
+    /**
+     * Sets the LocalObject associated with this interface.
+     * @param localObject - The LocalObject to associate with this interface, or undefined to clear the association.
+     * @returns The instance of this LocalInterface for method chaining.
+     */
     public setObject(localObject: LocalObject | undefined): this {
         this.object = localObject
         return this
     }
 
+    /**
+     * Getter for the introspection data of this interface.
+     * @returns An IntrospectInterface object containing the name, methods, properties, and signals defined for this interface.
+     */
     public get introspectInterface(): IntrospectInterface {
         return {
             name: this.#name,
@@ -221,6 +267,12 @@ export class LocalInterface {
         }
     }
 
+    /**
+     * Defines a new method for this interface.
+     * @param opts - Options for defining the method, including name, input/output arguments, and the method implementation.
+     * @returns The instance of this LocalInterface for method chaining.
+     * @throws LocalInterfaceMethodDefinedError if the method is already defined.
+     */
     public defineMethod(opts: DefineMethodOpts): this {
         if (this.#definedMethods[opts.name]) throw new LocalInterfaceMethodDefinedError(`Method ${opts.name} is already defined`)
         opts.name = this.validateDBusMethodName(opts.name)
@@ -246,12 +298,23 @@ export class LocalInterface {
         return this
     }
 
+    /**
+     * Removes a defined method from this interface.
+     * @param name - The name of the method to remove.
+     * @returns The instance of this LocalInterface for method chaining.
+     */
     public removeMethod(name: string): this {
         delete this.#definedMethods[name]
         this.#introspectMethods = this.#introspectMethods.filter((introspectMethod: IntrospectMethod): boolean => introspectMethod.name !== name)
         return this
     }
 
+    /**
+     * Defines a new property for this interface.
+     * @param opts - Options for defining the property, including name, type, access mode, and getter/setter functions.
+     * @returns The instance of this LocalInterface for method chaining.
+     * @throws LocalInterfacePropertyDefinedError if the property is already defined.
+     */
     public defineProperty(opts: DefinePropertyOpts): this {
         if (!opts.setter && !opts.getter) return this
         if (this.#definedProperties[opts.name]) throw new LocalInterfacePropertyDefinedError(`Property ${opts.name} is already defined`)
@@ -290,12 +353,23 @@ export class LocalInterface {
         return this
     }
 
+    /**
+     * Removes a defined property from this interface.
+     * @param name - The name of the property to remove.
+     * @returns The instance of this LocalInterface for method chaining.
+     */
     public removeProperty(name: string): this {
         delete this.#definedProperties[name]
         this.#introspectProperties = this.#introspectProperties.filter((introspectProperty: IntrospectProperty): boolean => introspectProperty.name !== name)
         return this
     }
 
+    /**
+     * Defines a new signal for this interface.
+     * @param opts - Options for defining the signal, including name, arguments, and associated event emitter.
+     * @returns The instance of this LocalInterface for method chaining.
+     * @throws LocalInterfaceSignalDefinedError if the signal is already defined.
+     */
     public defineSignal(opts: DefineSignalOpts): this {
         if (this.#definedSignals[opts.name]) throw new LocalInterfaceSignalDefinedError(`Signal ${opts.name} is already defined`)
         const signature: string | undefined = opts.args?.map((arg: IntrospectSignalArgument): string => arg.type).join('')
@@ -321,6 +395,11 @@ export class LocalInterface {
         return this
     }
 
+    /**
+     * Removes a defined signal from this interface.
+     * @param name - The name of the signal to remove.
+     * @returns The instance of this LocalInterface for method chaining.
+     */
     public removeSignal(name: string): this {
         if (this.#definedSignals[name]) this.#definedSignals[name].eventEmitter.removeListener(name, this.#definedSignals[name].listener)
         delete this.#definedSignals[name]
@@ -328,6 +407,14 @@ export class LocalInterface {
         return this
     }
 
+    /**
+     * Calls a defined method on this interface.
+     * @param name - The name of the method to call.
+     * @param payloadSignature - The signature of the input arguments.
+     * @param args - The arguments to pass to the method.
+     * @returns A Promise resolving to an object with the method's output signature and result.
+     * @throws DBus error if the method is not found or if the input signature does not match.
+     */
     public async callMethod(name: string, payloadSignature: string | undefined, ...args: any[]): Promise<{
         signature?: string
         result: any
@@ -342,6 +429,13 @@ export class LocalInterface {
         }
     }
 
+    /**
+     * Sets the value of a defined property on this interface.
+     * @param name - The name of the property to set.
+     * @param value - The value to set for the property.
+     * @returns A Promise that resolves when the property is set.
+     * @throws DBus error if the property is not found, the value signature does not match, or the property is read-only.
+     */
     public async setProperty(name: string, value: any): Promise<void> {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         try {
@@ -355,6 +449,12 @@ export class LocalInterface {
         throw CreateDBusError('org.freedesktop.DBus.Error.PropertyReadOnly', `Property ${name} is read only`)
     }
 
+    /**
+     * Gets the value of a defined property on this interface.
+     * @param name - The name of the property to get.
+     * @returns A Promise resolving to the property value.
+     * @throws DBus error if the property is not found or is write-only.
+     */
     public async getProperty(name: string): Promise<any> {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         if (this.#definedProperties[name].getter) {
@@ -364,14 +464,26 @@ export class LocalInterface {
         throw CreateDBusError('org.freedesktop.DBus.Error.PropertyWriteOnly', `Property ${name} is write only`)
     }
 
+    /**
+     * Lists the names of all defined methods on this interface.
+     * @returns An array of method names as strings.
+     */
     public methodNames(): string[] {
         return Object.keys(this.#definedMethods)
     }
 
+    /**
+     * Lists the names of all defined properties on this interface.
+     * @returns An array of property names as strings.
+     */
     public propertyNames(): string[] {
         return Object.keys(this.#definedProperties)
     }
 
+    /**
+     * Lists the names of all defined signals on this interface.
+     * @returns An array of signal names as strings.
+     */
     public signalNames(): string[] {
         return Object.keys(this.#definedSignals)
     }
