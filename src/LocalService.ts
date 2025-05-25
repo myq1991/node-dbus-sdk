@@ -1,5 +1,4 @@
 import {LocalObject} from './LocalObject'
-import {ConnectOpts} from './types/ConnectOpts'
 import {DBus} from './DBus'
 import {DBusMessage} from './lib/DBusMessage'
 import {LocalObjectPathExistsError, LocalServiceInvalidNameError} from './lib/Errors'
@@ -9,6 +8,9 @@ import {DBusSignedValue} from './lib/DBusSignedValue'
 import {CreateDBusError} from './lib/CreateDBusError'
 import {RootObject} from './lib/common/RootObject'
 import {ObjectManagerInterface} from './lib/common/ObjectManagerInterface'
+import {RunServiceOpts} from './types/RunServiceOpts'
+import {RequestNameFlags} from './lib/enums/RequestNameFlags'
+import {RequestNameResultCode} from './lib/enums/RequestNameResultCode'
 
 /**
  * A class representing a local DBus service.
@@ -228,15 +230,16 @@ export class LocalService {
      * Connects to a DBus bus and starts the service.
      * Establishes a connection to the bus using the provided options, registers the method call handler
      * to process incoming requests, and requests ownership of the service name on the bus to make it
-     * available for clients to interact with.
+     * available for clients to interact with, using configurable flags for name request behavior.
      *
-     * @param opts - Connection options for the DBus bus (e.g., socket path, TCP details).
-     * @returns A Promise that resolves when the service is successfully running and connected to the bus.
+     * @param opts - Connection options for the DBus bus (e.g., socket path, TCP details) and optional flags for name request behavior.
+     * @returns A Promise that resolves to a RequestNameResultCode indicating the result of the service name request.
      */
-    public async run(opts: ConnectOpts): Promise<void> {
+    public async run(opts: RunServiceOpts): Promise<RequestNameResultCode> {
+        const flags: RequestNameFlags = opts.flags !== undefined ? opts.flags : RequestNameFlags.DBUS_NAME_FLAG_DEFAULT
         this.dbus = await DBus.connect(opts) // Connect to the DBus bus
         this.dbus.on('methodCall', this.#methodCallHandler) // Register handler for incoming method calls
-        await this.dbus.requestName(this.#name) // Request ownership of the service name
+        return await this.dbus.requestName(this.#name, flags) // Request ownership of the service name with specified flags
     }
 
     /**
