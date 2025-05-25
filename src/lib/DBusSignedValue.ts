@@ -4,21 +4,41 @@ import {SignatureError} from './Errors'
 
 /**
  * A class representing a DBus signed value with a specific signature and associated data.
+ * This class wraps a value with its corresponding DBus type signature, enabling proper
+ * encoding and decoding of DBus messages. It supports both basic types (e.g., integers, strings)
+ * and container types (e.g., arrays, structs, dictionaries) as defined by the DBus specification.
  */
 export class DBusSignedValue {
-    // The signature of the DBus value (e.g., 's', 'i', 'a', etc.)
+    /**
+     * The signature of the DBus value (e.g., 's' for string, 'i' for integer, 'a' for array).
+     * This identifies the type of data stored in the value according to the DBus type system.
+     */
     public readonly $signature: string
-    // The signature of the array item (for 'a' type), if applicable
+
+    /**
+     * The signature of the array item (for 'a' type), if applicable.
+     * This is used to specify the type of elements within an array, particularly useful
+     * for distinguishing different array contents (e.g., 'ay' for byte array).
+     */
     public readonly $arrayItemSignature?: string
-    // The value associated with the signature, can be a primitive, DBusSignedValue, or array of DBusSignedValue
+
+    /**
+     * The value associated with the signature.
+     * Can be a primitive (e.g., number, string), a single DBusSignedValue (for nested types like variants),
+     * or an array of DBusSignedValue instances (for containers like arrays or structs).
+     */
     public readonly $value: any | DBusSignedValue | DBusSignedValue[]
 
     /**
      * Static method to parse a DBus signature and value into an array of DBusSignedValue objects.
-     * Distinguishes between independent parameter sequences (e.g., 'si') and structs (e.g., '(si)').
-     * @param signature - The DBus signature string (e.g., 's', 'si', '(si)', 'as').
-     * @param value - The value or values corresponding to the signature.
+     * Distinguishes between independent parameter sequences (e.g., 'si' for string and integer)
+     * and structs (e.g., '(si)' for a struct containing string and integer).
+     * This method is useful for creating properly typed DBus values from raw data.
+     *
+     * @param signature - The DBus signature string (e.g., 's', 'si', '(si)', 'as') defining the type structure.
+     * @param value - The value or values corresponding to the signature, can be raw data or already DBusSignedValue.
      * @returns An array of DBusSignedValue objects representing the parsed signature and value.
+     * @throws {SignatureError} If the value structure does not match the signature or is invalid.
      */
     public static parse(signature: string, value: any | DBusSignedValue | DBusSignedValue[]): DBusSignedValue[] {
         // Parse the signature string into an array of DataType objects
@@ -31,9 +51,9 @@ export class DBusSignedValue {
             // If the signature has multiple types and is not a struct, treat it as an independent parameter sequence (e.g., 'si')
             let values: any[]
             if (Array.isArray(value)) {
-                values = value
+                values = value // Use array directly if provided
             } else if (typeof value === 'object' && value !== null) {
-                values = Object.values(value)
+                values = Object.values(value) // Convert object to array of values if provided as object
             } else {
                 throw new SignatureError(`Expected array or object for multi-type signature, got: ${typeof value}`)
             }
@@ -59,7 +79,9 @@ export class DBusSignedValue {
 
     /**
      * Static method to convert an array of DBusSignedValue objects back to plain JavaScript objects.
-     * Recursively processes nested structures and removes DBus signature metadata.
+     * Recursively processes nested structures (arrays, structs, dictionaries) and removes DBus
+     * signature metadata to return raw values suitable for general use.
+     *
      * @param values - An array of DBusSignedValue objects to convert.
      * @returns An array of plain JavaScript values representing the data without DBus signatures.
      */
@@ -69,8 +91,10 @@ export class DBusSignedValue {
 
     /**
      * Private static method to recursively convert a single DBusSignedValue object to a plain JavaScript value.
+     * Handles different DBus types (basic, array, dictionary, struct, variant) and unwraps nested structures.
+     *
      * @param value - The DBusSignedValue object to convert.
-     * @returns The plain JavaScript value.
+     * @returns The plain JavaScript value extracted from the DBusSignedValue.
      */
     private static convertToPlain(value: DBusSignedValue): any {
         // If the value is a basic type (not a composite type), return the raw value
@@ -78,7 +102,7 @@ export class DBusSignedValue {
             return value.$value
         }
 
-        // Handle different signature types
+        // Handle different signature types for container structures
         switch (value.$signature) {
             case 'a': // Array
                 const arrayValues: any[] = (value.$value as DBusSignedValue[]).map(item => DBusSignedValue.convertToPlain(item))
@@ -92,6 +116,7 @@ export class DBusSignedValue {
                     // Convert to Buffer for byte array
                     return Buffer.from(arrayValues as number[])
                 }
+                // Handle empty dictionary array case
                 if (!arrayValues.length && value.$arrayItemSignature === '{') {
                     return {}
                 }
@@ -120,8 +145,12 @@ export class DBusSignedValue {
 
     /**
      * Constructor for creating a DBusSignedValue object from a signature and value.
-     * @param signature - The DBus signature, as a string, DataType, or array of DataType.
-     * @param value - The value associated with the signature.
+     * Processes the signature (string, DataType, or array of DataType) and associates it with the provided value,
+     * handling basic types, structs, arrays, dictionaries, and variants appropriately.
+     *
+     * @param signature - The DBus signature, as a string (e.g., 's'), a single DataType, or an array of DataType for structs.
+     * @param value - The value associated with the signature, can be raw data, DBusSignedValue, or array of values.
+     * @throws {SignatureError} If the value structure does not match the signature or if the type is unsupported.
      */
     constructor(signature: string | DataType | DataType[], value: any | DBusSignedValue | DBusSignedValue[]) {
         // Handle signature input: parse string to DataType array, or use directly if already DataType or array
@@ -136,9 +165,9 @@ export class DBusSignedValue {
             this.$signature = '(' // Struct signature
             let structValues: any[]
             if (Array.isArray(value)) {
-                structValues = value
+                structValues = value // Use array directly if provided
             } else if (typeof value === 'object' && value !== null) {
-                structValues = Object.values(value)
+                structValues = Object.values(value) // Convert object to array of values if provided as object
             } else {
                 throw new SignatureError(`Expected array or object for struct signature "()", got: ${typeof value}`)
             }
@@ -263,7 +292,7 @@ export class DBusSignedValue {
                     case '(': // Struct
                         let structValues: any[]
                         if (Array.isArray(value)) {
-                            structValues = value
+                            structValues = value // Use array directly if provided
                         } else if (typeof value === 'object' && value !== null) {
                             // If input is an object, convert to array based on value order
                             structValues = Object.values(value)
@@ -290,7 +319,7 @@ export class DBusSignedValue {
                         throw new SignatureError(`Unsupported composite type: "${dataType.type}"`)
                 }
             } else {
-                // Basic type, store value directly
+                // Basic type, store value directly without further wrapping
                 this.$value = value
             }
         }
@@ -298,8 +327,11 @@ export class DBusSignedValue {
 
     /**
      * Private method to infer the DBus signature type from a value for variant type 'v'.
-     * @param value - The value to infer the type from.
-     * @returns The inferred DBus signature string.
+     * Analyzes the type and structure of the value to determine an appropriate DBus signature.
+     * Handles basic types (strings, numbers), arrays, buffers, and objects for dictionary inference.
+     *
+     * @param value - The value to infer the type from, can be any JavaScript value.
+     * @returns The inferred DBus signature string (e.g., 's' for string, 'ai' for integer array).
      */
     private inferType(value: any): string {
         // If value is already a DBusSignedValue instance, use its signature
@@ -365,7 +397,7 @@ export class DBusSignedValue {
             // Prefer to infer as dictionary array a{sv}, with string keys and variant values
             return 'a{sv}'
         } else {
-            // Default to string type
+            // Default to string type for unsupported or unknown types
             return 's'
         }
     }

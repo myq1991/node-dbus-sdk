@@ -7,30 +7,37 @@ import {AlignmentError, InvalidValueError, ReadBufferError, SignatureError} from
 /**
  * A decoder for reading DBus data from a binary buffer, following the DBus wire format.
  * Supports various DBus data types with proper alignment and endianness handling.
+ * This class provides methods to decode basic types (e.g., integers, strings) and
+ * container types (e.g., arrays, structs) as per the DBus specification.
  */
 export class DBusBufferDecoder {
     /**
      * The endianness of the buffer data (Little Endian or Big Endian).
-     * Default is Little Endian (LE) as specified by DBusMessageEndianness.LE.
+     * Default is Little Endian (LE) as specified by DBusMessageEndianness.LE,
+     * which determines how multi-byte values are read from the buffer.
      */
     public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.LE
 
     /**
      * The binary buffer containing the DBus data to be decoded.
+     * This holds the raw bytes that the decoder reads from during operation.
      */
     protected buffer: Buffer
 
     /**
      * The current reading position (offset) in the buffer.
-     * Incremented as data is read from the buffer.
+     * Incremented as data is read from the buffer, tracking the progress of decoding.
      */
     protected offset: number = 0
 
     /**
      * Creates a new DBusBufferDecoder instance.
-     * @param endianness The endianness to use for reading multi-byte values (default: Little Endian).
-     * @param buffer The binary buffer containing the DBus data to decode.
-     * @param alignment Optional initial alignment boundary to align the offset to (e.g., 4 or 8 bytes).
+     * Initializes the decoder with the specified endianness and buffer,
+     * optionally aligning the initial offset to a boundary.
+     *
+     * @param endianness - The endianness to use for reading multi-byte values (default: Little Endian).
+     * @param buffer - The binary buffer containing the DBus data to decode.
+     * @param alignment - Optional initial alignment boundary to align the offset to (e.g., 4 or 8 bytes).
      */
     constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, buffer: Buffer, alignment?: number) {
         this.endianness = endianness
@@ -41,9 +48,12 @@ export class DBusBufferDecoder {
 
     /**
      * Aligns the current offset to the specified byte boundary.
-     * This ensures that data reads start at the correct position as per DBus alignment rules.
-     * @param alignment The byte boundary to align to (e.g., 1, 2, 4, 8).
+     * This ensures that data reads start at the correct position as per DBus alignment rules,
+     * adding padding bytes to the offset if necessary.
+     *
+     * @param alignment - The byte boundary to align to (e.g., 1, 2, 4, 8).
      * @returns The instance itself for method chaining.
+     * @throws {AlignmentError} If the aligned offset would exceed the buffer length.
      * @protected
      */
     protected align(alignment: number): this {
@@ -64,7 +74,9 @@ export class DBusBufferDecoder {
     /**
      * Reads a BYTE type value from the buffer.
      * BYTE is an 8-bit unsigned integer with no specific alignment requirement (1-byte alignment).
-     * @returns The byte value (0-255) wrapped in a DBusSignedValue instance.
+     *
+     * @returns The byte value (0-255) wrapped in a DBusSignedValue instance with signature 'y'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read a BYTE.
      */
     public readByte(): DBusSignedValue {
         this.align(1) // Ensure 1-byte alignment (no practical effect since BYTE has no alignment requirement)
@@ -81,7 +93,10 @@ export class DBusBufferDecoder {
     /**
      * Reads a BOOLEAN type value from the buffer.
      * BOOLEAN is stored as a 32-bit unsigned integer (0 for false, 1 for true) and requires 4-byte alignment.
-     * @returns The boolean value (true or false) wrapped in a DBusSignedValue instance.
+     *
+     * @returns The boolean value (true or false) wrapped in a DBusSignedValue instance with signature 'b'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read a BOOLEAN.
+     * @throws {InvalidValueError} If the read value is neither 0 nor 1.
      */
     public readBoolean(): DBusSignedValue {
         this.align(4) // Ensure 4-byte alignment for the 32-bit integer
@@ -109,7 +124,9 @@ export class DBusBufferDecoder {
     /**
      * Reads an INT16 type value from the buffer.
      * INT16 is a 16-bit signed integer and requires 2-byte alignment.
-     * @returns The 16-bit signed integer value wrapped in a DBusSignedValue instance.
+     *
+     * @returns The 16-bit signed integer value wrapped in a DBusSignedValue instance with signature 'n'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read an INT16.
      */
     public readInt16(): DBusSignedValue {
         this.align(2) // Ensure 2-byte alignment for the 16-bit integer
@@ -131,7 +148,9 @@ export class DBusBufferDecoder {
     /**
      * Reads a UINT16 type value from the buffer.
      * UINT16 is a 16-bit unsigned integer and requires 2-byte alignment.
-     * @returns The 16-bit unsigned integer value wrapped in a DBusSignedValue instance.
+     *
+     * @returns The 16-bit unsigned integer value wrapped in a DBusSignedValue instance with signature 'q'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read a UINT16.
      */
     public readUInt16(): DBusSignedValue {
         this.align(2) // Ensure 2-byte alignment for the 16-bit integer
@@ -153,7 +172,9 @@ export class DBusBufferDecoder {
     /**
      * Reads an INT32 type value from the buffer.
      * INT32 is a 32-bit signed integer and requires 4-byte alignment.
-     * @returns The 32-bit signed integer value wrapped in a DBusSignedValue instance.
+     *
+     * @returns The 32-bit signed integer value wrapped in a DBusSignedValue instance with signature 'i'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read an INT32.
      */
     public readInt32(): DBusSignedValue {
         this.align(4) // Ensure 4-byte alignment for the 32-bit integer
@@ -175,7 +196,9 @@ export class DBusBufferDecoder {
     /**
      * Reads a UINT32 type value from the buffer.
      * UINT32 is a 32-bit unsigned integer and requires 4-byte alignment.
-     * @returns The 32-bit unsigned integer value wrapped in a DBusSignedValue instance.
+     *
+     * @returns The 32-bit unsigned integer value wrapped in a DBusSignedValue instance with signature 'u'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read a UINT32.
      */
     public readUInt32(): DBusSignedValue {
         this.align(4) // Ensure 4-byte alignment for the 32-bit integer
@@ -197,7 +220,9 @@ export class DBusBufferDecoder {
     /**
      * Reads an INT64 type value from the buffer.
      * INT64 is a 64-bit signed integer and requires 8-byte alignment.
-     * @returns The 64-bit signed integer value as a bigint wrapped in a DBusSignedValue instance.
+     *
+     * @returns The 64-bit signed integer value as a bigint wrapped in a DBusSignedValue instance with signature 'x'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read an INT64.
      */
     public readInt64(): DBusSignedValue {
         this.align(8) // Ensure 8-byte alignment for the 64-bit integer
@@ -219,7 +244,9 @@ export class DBusBufferDecoder {
     /**
      * Reads a UINT64 type value from the buffer.
      * UINT64 is a 64-bit unsigned integer and requires 8-byte alignment.
-     * @returns The 64-bit unsigned integer value as a bigint wrapped in a DBusSignedValue instance.
+     *
+     * @returns The 64-bit unsigned integer value as a bigint wrapped in a DBusSignedValue instance with signature 't'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read a UINT64.
      */
     public readUInt64(): DBusSignedValue {
         this.align(8) // Ensure 8-byte alignment for the 64-bit integer
@@ -241,7 +268,9 @@ export class DBusBufferDecoder {
     /**
      * Reads a DOUBLE type value from the buffer.
      * DOUBLE is a 64-bit double-precision floating-point number and requires 8-byte alignment.
-     * @returns The double-precision floating-point value wrapped in a DBusSignedValue instance.
+     *
+     * @returns The double-precision floating-point value wrapped in a DBusSignedValue instance with signature 'd'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read a DOUBLE.
      */
     public readDouble(): DBusSignedValue {
         this.align(8) // Ensure 8-byte alignment for the 64-bit double
@@ -263,7 +292,9 @@ export class DBusBufferDecoder {
     /**
      * Reads a UNIX_FD type value from the buffer.
      * UNIX_FD is a 32-bit unsigned integer representing a file descriptor index and requires 4-byte alignment.
-     * @returns The file descriptor index wrapped in a DBusSignedValue instance.
+     *
+     * @returns The file descriptor index wrapped in a DBusSignedValue instance with signature 'h'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read a UNIX_FD.
      */
     public readUnixFD(): DBusSignedValue {
         this.align(4) // Ensure 4-byte alignment for the 32-bit integer
@@ -286,7 +317,10 @@ export class DBusBufferDecoder {
      * Reads a STRING type value from the buffer.
      * STRING consists of a 32-bit length field followed by UTF-8 encoded characters and a null terminator.
      * The length field requires 4-byte alignment.
-     * @returns The string value wrapped in a DBusSignedValue instance.
+     *
+     * @returns The string value wrapped in a DBusSignedValue instance with signature 's'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read the STRING length or content.
+     * @throws {ReadBufferError} If the null terminator is not found or is invalid.
      */
     public readString(): DBusSignedValue {
         this.align(4) // Ensure 4-byte alignment for the length field
@@ -327,7 +361,10 @@ export class DBusBufferDecoder {
      * Reads an OBJECT_PATH type value from the buffer.
      * OBJECT_PATH is a string with specific formatting rules, stored like STRING with a 32-bit length field.
      * The length field requires 4-byte alignment.
-     * @returns The object path as a string wrapped in a DBusSignedValue instance.
+     *
+     * @returns The object path as a string wrapped in a DBusSignedValue instance with signature 'o'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read the OBJECT_PATH length or content.
+     * @throws {ReadBufferError} If the null terminator is not found or is invalid.
      */
     public readObjectPath(): DBusSignedValue {
         this.align(4) // Ensure 4-byte alignment for the length field
@@ -367,7 +404,10 @@ export class DBusBufferDecoder {
     /**
      * Reads a SIGNATURE type value from the buffer.
      * SIGNATURE is a string of type codes with a 1-byte length field and no specific alignment requirement.
-     * @returns The signature as a string wrapped in a DBusSignedValue instance.
+     *
+     * @returns The signature as a string wrapped in a DBusSignedValue instance with signature 'g'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read the SIGNATURE length or content.
+     * @throws {ReadBufferError} If the null terminator is not found or is invalid.
      */
     public readSignature(): DBusSignedValue {
         // No alignment needed for 1-byte length field
@@ -403,8 +443,10 @@ export class DBusBufferDecoder {
      * Reads an ARRAY type value from the buffer.
      * ARRAY starts with a 32-bit length field (total byte length of array data) and requires 4-byte alignment.
      * Elements are read within a sub-buffer to isolate alignment.
-     * @param elementType The DataType of the array elements, required for parsing elements.
-     * @returns The array of elements wrapped in a DBusSignedValue instance.
+     *
+     * @param elementType - The DataType of the array elements, required for parsing elements.
+     * @returns The array of elements wrapped in a DBusSignedValue instance with signature 'a{elementType}'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read the ARRAY length or content.
      */
     public readArray(elementType: DataType): DBusSignedValue {
         this.align(4) // Ensure 4-byte alignment for the length field
@@ -422,7 +464,7 @@ export class DBusBufferDecoder {
         this.offset += 4 // Increment offset by 4 bytes for length field
         switch (elementType.type) {
             case '{':
-                this.align(8)
+                this.align(8) // Special case: dictionary entries require 8-byte alignment
         }
         // Calculate the end offset of the array data
         const arrayEndOffset = this.offset + byteLength
@@ -444,8 +486,10 @@ export class DBusBufferDecoder {
     /**
      * Reads a STRUCT type value from the buffer.
      * STRUCT is a sequence of fields and requires 8-byte alignment at the start.
-     * @param fieldTypes The DataType array representing the types of struct fields.
-     * @returns The struct value as an array of fields wrapped in a DBusSignedValue instance.
+     *
+     * @param fieldTypes - The DataType array representing the types of struct fields.
+     * @returns The struct value as an array of fields wrapped in a DBusSignedValue instance with signature '('.
+     * @throws {SignatureError} If field types are not provided or empty.
      */
     public readStruct(fieldTypes?: DataType[]): DBusSignedValue {
         this.align(8) // Ensure 8-byte alignment for struct start as per DBus specification
@@ -469,9 +513,11 @@ export class DBusBufferDecoder {
     /**
      * Reads a DICT_ENTRY type value from the buffer.
      * DICT_ENTRY is a key-value pair used in dictionaries and requires 8-byte alignment at the start.
-     * @param keyType The DataType representing the key type of the dictionary entry.
-     * @param valueType The DataType representing the value type of the dictionary entry.
-     * @returns The dictionary entry value as a key-value pair wrapped in a DBusSignedValue instance.
+     *
+     * @param keyType - The DataType representing the key type of the dictionary entry.
+     * @param valueType - The DataType representing the value type of the dictionary entry.
+     * @returns The dictionary entry value as a key-value pair wrapped in a DBusSignedValue instance with signature '{'.
+     * @throws {SignatureError} If key or value types are not provided.
      */
     public readDictEntry(keyType?: DataType, valueType?: DataType): DBusSignedValue {
         this.align(8) // Ensure 8-byte alignment for dict entry start as per DBus specification
@@ -493,7 +539,10 @@ export class DBusBufferDecoder {
     /**
      * Reads a VARIANT type value from the buffer.
      * VARIANT is a dynamic type container with a signature field followed by data, no specific alignment required.
-     * @returns The variant value wrapped in a DBusSignedValue instance.
+     *
+     * @returns The variant value wrapped in a DBusSignedValue instance with signature 'v'.
+     * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read the VARIANT signature or content.
+     * @throws {SignatureError} If the variant signature does not describe exactly one type.
      */
     public readVariant(): DBusSignedValue {
         // No alignment needed for variant (signature length field is 1 byte)
@@ -526,9 +575,12 @@ export class DBusBufferDecoder {
 
     /**
      * Reads a single value from the buffer based on the provided DataType.
-     * Dispatches the reading to the appropriate method based on the type.
-     * @param type The DataType describing the type to read.
-     * @returns The value wrapped in a DBusSignedValue instance.
+     * Dispatches the reading to the appropriate method based on the type signature.
+     * Handles both basic and container types recursively.
+     *
+     * @param type - The DataType describing the type to read from the buffer.
+     * @returns The value wrapped in a DBusSignedValue instance with the appropriate signature.
+     * @throws {SignatureError} If the type is unsupported or has invalid child types for containers.
      */
     public readSignedValue(type: DataType): DBusSignedValue {
         // Switch based on the type code to call the appropriate read method
@@ -589,8 +641,10 @@ export class DBusBufferDecoder {
     /**
      * Reads multiple values from the buffer based on the provided signature string.
      * The signature is parsed into DataType(s), and values are read accordingly.
-     * @param signature The DBus signature string describing the type(s) to read.
+     *
+     * @param signature - The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
      * @returns An array of DBusSignedValue instances representing the read values.
+     * @throws {SignatureError} If the signature is empty or invalid.
      */
     public toSignedValues(signature: string): DBusSignedValue[] {
         // Parse the signature string into an array of DataType objects
@@ -612,9 +666,11 @@ export class DBusBufferDecoder {
 
     /**
      * Decodes values from the buffer based on the provided signature and converts them to plain JavaScript values.
-     * This method unwraps DBusSignedValue instances into their raw values.
-     * @param signature The DBus signature string describing the type(s) to read.
+     * This method unwraps DBusSignedValue instances into their raw values for easier use.
+     *
+     * @param signature - The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
      * @returns An array of plain JavaScript values extracted from the decoded DBusSignedValue instances.
+     * @throws {SignatureError} If the signature is empty or invalid.
      */
     public decode(signature: string): any[] {
         // Read values as DBusSignedValue instances and convert them to plain JSON-like values
