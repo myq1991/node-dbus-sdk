@@ -1,7 +1,7 @@
 # DBus SDK
 
 [![npm version](https://badge.fury.io/js/dbus-sdk.svg)](https://badge.fury.io/js/dbus-sdk)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/myq1991/nodedbus/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/myq1991/node-dbus-sdk/blob/main/LICENSE)
 
 ## Introduction
 
@@ -235,18 +235,18 @@ runClient().catch(console.error);
 
 `dbus-sdk` is designed for both consuming existing DBus services and creating new ones. Developers can connect to a DBus bus, interact with remote services by invoking methods or listening to signals, and define local services to expose functionality to other processes. Its modular design and type safety make it suitable for complex IPC scenarios in Node.js applications.
 
-For detailed API documentation, refer to the [TypeScript type definitions](https://github.com/myq1991/nodedbus/tree/main/doc/API.md) or explore the source code on [GitHub](https://github.com/myq1991/nodedbus).
+For detailed API documentation, refer to the [TypeScript type definitions](https://github.com/myq1991/node-dbus-sdk/tree/main/doc/API.md) or explore the source code on [GitHub](https://github.com/myq1991/node-dbus-sdk).
 
 ## Contributing
 
-We welcome contributions to `dbus-sdk`! If you have suggestions, bug reports, or want to submit a pull request, please visit our [GitHub repository](https://github.com/myq1991/nodedbus). You can open an [issue](https://github.com/myq1991/nodedbus/issues) for bugs or feature requests, or fork the repository to contribute code.
+We welcome contributions to `dbus-sdk`! If you have suggestions, bug reports, or want to submit a pull request, please visit our [GitHub repository](https://github.com/myq1991/node-dbus-sdk). You can open an [issue](https://github.com/myq1991/node-dbus-sdk/issues) for bugs or feature requests, or fork the repository to contribute code.
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/myq1991/nodedbus/blob/main/LICENSE). Feel free to use, modify, and distribute it as per the license terms.
+This project is licensed under the [MIT License](https://github.com/myq1991/node-dbus-sdk/blob/main/LICENSE). Feel free to use, modify, and distribute it as per the license terms.
 
 ## Conclusion
 
 `dbus-sdk` provides a powerful and flexible solution for inter-process communication in TypeScript and Node.js environments. By abstracting low-level DBus protocol details and offering a structured, object-oriented API, it enables developers to build robust DBus clients and services with ease, supporting both standard operations and custom implementations.
 
-If you find this library useful, consider starring the project on [GitHub](https://github.com/myq1991/nodedbus) or sharing it with others. Happy coding!
+If you find this library useful, consider starring the project on [GitHub](https://github.com/myq1991/node-dbus-sdk) or sharing it with others. Happy coding!

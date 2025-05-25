@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/myq1991/nodedbus.git"
+    "url": "git+https://github.com/myq1991/node-dbus-sdk.git"
   },
   "keywords": [
     "dbus",
@@ -29,9 +29,9 @@
   "author": "alex.ma",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/myq1991/nodedbus/issues"
+    "url": "https://github.com/myq1991/node-dbus-sdk/issues"
   },
-  "homepage": "https://github.com/myq1991/nodedbus#readme",
+  "homepage": "https://github.com/myq1991/node-dbus-sdk#readme",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
