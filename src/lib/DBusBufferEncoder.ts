@@ -311,6 +311,7 @@ export class DBusBufferEncoder {
 
         if (arrayItemSignature) switch (arrayItemSignature) {
             case '{':
+                // case '('://TODO 此处还有问题
                 this.align(8)
         }
 

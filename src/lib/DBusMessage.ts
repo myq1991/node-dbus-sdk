@@ -220,8 +220,8 @@ export class DBusMessage {
         const protocolVersion: number = headers[3] // Protocol version
         const serial: number = headers[5] // Serial number for message tracking
         // Concatenate remaining header bytes with fields data for full field parsing
-        const fulfillFieldsBuffer: Buffer = Buffer.concat([header.subarray(12), fieldsAndBody.subarray(0, fieldsLength)])
-        const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fulfillFieldsBuffer)
+        const headerWithFieldsBuffer: Buffer = Buffer.concat([header, fieldsAndBody.subarray(0, fieldsLength)])
+        const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, headerWithFieldsBuffer, 12)
         const [fields] = fieldsDecoder.decode('a(yv)') // Decode array of (type ID, value) pairs for header fields
         const messageHeader: Partial<DBusMessageHeader> = {
             type: type,
