@@ -229,13 +229,8 @@ export class LocalObject {
         if (addSuccess) {
             const addedInterfaceRecord: Record<string, Record<string, any>> = {}
             // Fetch managed properties asynchronously and notify the object manager
-            localInterface.getManagedProperties().then((record: Record<string, DBusSignedValue>): void => {
-                addedInterfaceRecord[localInterface.name] = record
-                this.service?.objectManager?.interfacesAdded(this, addedInterfaceRecord)
-            }).catch((): void => {
-                // If fetching properties fails, notify without properties
-                this.service?.objectManager?.interfacesAdded(this, {})
-            })
+            addedInterfaceRecord[localInterface.name] = localInterface.getManagedProperties()
+            this.service?.objectManager?.interfacesAdded(this, addedInterfaceRecord)
         }
         return addSuccess
     }
@@ -332,10 +327,10 @@ export class LocalObject {
      *
      * @returns A Promise resolving to a record mapping interface names to their property records (property name to DBusSignedValue).
      */
-    public async getManagedInterfaces(): Promise<Record<string, Record<string, DBusSignedValue>>> {
+    public getManagedInterfaces(): Record<string, Record<string, DBusSignedValue>> {
         const record: Record<string, Record<string, DBusSignedValue>> = {}
         for (const interfaceName of this.interfaceNames()) {
-            record[interfaceName] = await this.#interfaceMap.get(interfaceName)!.getManagedProperties()
+            record[interfaceName] = this.#interfaceMap.get(interfaceName)!.getManagedProperties()
         }
         return record
     }

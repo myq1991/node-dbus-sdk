@@ -74,13 +74,13 @@ export class ObjectManagerInterface extends LocalInterface {
      * @returns A Promise resolving to a record mapping object paths to their interfaces
      *          and properties as a nested structure (Record<string, Record<string, Record<string, any>>>).
      */
-    protected async getManagedObjects(): Promise<Record<string, Record<string, Record<string, any>>>> {
+    protected getManagedObjects(): Record<string, Record<string, Record<string, any>>> {
         const managedObjects: Record<string, Record<string, Record<string, any>>> = {}
         const objects: Record<string, LocalObject> | undefined = this.object?.service?.listObjects()
         if (!objects) return managedObjects
         for (const objectPath in objects) {
             const object: LocalObject = objects[objectPath]
-            managedObjects[objectPath] = await object.getManagedInterfaces()
+            managedObjects[objectPath] = object.getManagedInterfaces()
         }
         return managedObjects
     }

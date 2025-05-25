@@ -39,12 +39,12 @@ export interface DefinePropertyOpts {
      * This function can return the value synchronously or as a Promise.
      * If not provided, the property is considered write-only or may have a default behavior.
      */
-    getter?: () => Promise<any> | any
+    getter?: () => any
 
     /**
      * An optional setter function for updating the property value.
      * This function takes the new value as an argument and can return void synchronously or as a Promise.
      * If not provided, the property is considered read-only or may have a default behavior.
      */
-    setter?: (value: any) => Promise<void> | void
+    setter?: (value: any) => void
 }

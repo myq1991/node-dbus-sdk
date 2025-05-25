@@ -270,10 +270,7 @@ export class LocalService {
         localObject.setService(this) // Link the object to this service
         this.#objectMap.set(localObject.name, localObject)
         addSuccess = true
-        if (addSuccess) localObject
-            .getManagedInterfaces()
-            .then((managedInterfaces: Record<string, Record<string, DBusSignedValue>>): void => this.objectManager?.interfacesAdded(localObject, managedInterfaces))
-            .catch((): void => this.objectManager?.interfacesAdded(localObject, {})) // Notify object manager of addition
+        if (addSuccess) this.objectManager?.interfacesAdded(localObject, localObject.getManagedInterfaces())
         return addSuccess
     }
 

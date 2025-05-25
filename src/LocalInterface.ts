@@ -68,8 +68,8 @@ export class LocalInterface {
      */
     #definedProperties: Record<string, {
         signature: string
-        getter?: () => Promise<any> | any
-        setter?: (value: any) => Promise<void> | void
+        getter?: () => any
+        setter?: (value: any) => void
     }> = {}
 
     /**
@@ -394,21 +394,21 @@ export class LocalInterface {
         if (opts.setter) access = DBusPropertyAccess.WRITE
         if (opts.getter && opts.setter) access = DBusPropertyAccess.READWRITE
         opts.name = this.validateDBusPropertyName(opts.name)
-        const getter: (() => Promise<any> | any) | undefined = opts.getter
-        let setter: ((value: any) => Promise<void> | void) | undefined = undefined
+        const getter: (() => any) | undefined = opts.getter
+        let setter: ((value: any) => void) | undefined = undefined
         if (opts.emitPropertiesChanged && opts.setter) {
             if ((typeof opts.emitPropertiesChanged === 'boolean' && opts.emitPropertiesChanged) || opts.emitPropertiesChanged.emitValue) {
                 // Emit property changed signal with the new value
-                setter = async (value: any): Promise<void> => {
-                    await opts.setter!(value)
+                setter = (value: any): void => {
+                    opts.setter!(value)
                     const changedProperties: Record<string, any> = {}
                     changedProperties[opts.name] = value
                     this.object?.propertiesInterface.emitPropertiesChanged(this.#name, changedProperties, [])
                 }
             } else {
                 // Emit property changed signal without the new value (invalidated only)
-                setter = async (value: any): Promise<void> => {
-                    await opts.setter!(value)
+                setter = (value: any): void => {
+                    opts.setter!(value)
                     this.object?.propertiesInterface.emitPropertiesChanged(this.#name, {}, [opts.name])
                 }
             }
@@ -522,7 +522,7 @@ export class LocalInterface {
      * @returns A Promise that resolves when the property is set.
      * @throws {DBusError} If the property is not found, the value signature does not match, or the property is read-only.
      */
-    public async setProperty(name: string, value: any): Promise<void> {
+    public setProperty(name: string, value: any): void {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         try {
             // Encode and decode the value to ensure it matches the property's signature
@@ -544,10 +544,10 @@ export class LocalInterface {
      * @returns A Promise resolving to the property value.
      * @throws {DBusError} If the property is not found or is write-only.
      */
-    public async getProperty(name: string): Promise<any> {
+    public getProperty(name: string): any {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         if (this.#definedProperties[name].getter) {
-            const value: any = await this.#definedProperties[name].getter()
+            const value: any = this.#definedProperties[name].getter()
             return value === undefined ? value : new DBusSignedValue(this.#definedProperties[name].signature, this.#definedProperties[name].getter())
         }
         throw CreateDBusError('org.freedesktop.DBus.Error.PropertyWriteOnly', `Property ${name} is write only`)
@@ -561,8 +561,8 @@ export class LocalInterface {
      * @returns A Promise resolving to a DBusSignedValue instance representing the property value.
      * @throws {DBusError} If the property is not found or is write-only.
      */
-    public async getPropertySignedValue(name: string): Promise<DBusSignedValue> {
-        const propertyValue: any = await this.getProperty(name)
+    public getPropertySignedValue(name: string): DBusSignedValue {
+        const propertyValue: any = this.getProperty(name)
         return DBusSignedValue.parse(this.#definedProperties[name].signature, propertyValue)[0]
     }
 
@@ -572,10 +572,10 @@ export class LocalInterface {
      *
      * @returns A Promise resolving to a record mapping property names to their DBusSignedValue instances.
      */
-    public async getManagedProperties(): Promise<Record<string, DBusSignedValue>> {
+    public getManagedProperties(): Record<string, DBusSignedValue> {
         const record: Record<string, DBusSignedValue> = {}
         for (const propertyName of this.propertyNames()) {
-            record[propertyName] = await this.getPropertySignedValue(propertyName)
+            record[propertyName] = this.getPropertySignedValue(propertyName)
         }
         return record
     }
