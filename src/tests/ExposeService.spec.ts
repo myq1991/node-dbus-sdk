@@ -90,10 +90,10 @@ export async function runExposeService(): Promise<void> {
                 obj.removeInterface(iface)
                 setTimeout(() => {
                     serv.removeObject(obj)
-                }, 20000)
-            }, 20000)
-        }, 20000)
-    }, 20000)
+                }, 3000)
+            }, 3000)
+        }, 3000)
+    }, 3000)
 
     //
     // setInterval(() => {

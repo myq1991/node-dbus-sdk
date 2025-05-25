@@ -9,16 +9,37 @@ import {PropertiesInterface} from './lib/common/PropertiesInterface'
 import {PeerInterface} from './lib/common/PeerInterface'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 
+/**
+ * A class representing a local DBus object.
+ * This class manages a collection of interfaces associated with a specific object path
+ * within a local DBus service. It provides methods to add, remove, and query interfaces,
+ * as well as to access standard DBus interfaces like Properties and Introspectable.
+ * It serves as a container for interfaces under a unique object path.
+ */
 export class LocalObject {
 
+    /**
+     * The name of this object, representing its DBus object path.
+     * This uniquely identifies the object within a service (e.g., '/org/example/Object').
+     */
     readonly #name: string
 
+    /**
+     * A map of interface names to their corresponding LocalInterface instances.
+     * Stores all interfaces associated with this object for quick lookup and management.
+     */
     #interfaceMap: Map<string, LocalInterface> = new Map()
 
+    /**
+     * The LocalService instance associated with this object, if any.
+     * Links the object to a specific service within a DBus connection for context.
+     */
     public service: LocalService | undefined
 
     /**
      * Getter for the DBus instance associated with this object's service.
+     * Provides access to the DBus connection for operations like signal emission.
+     *
      * @returns The DBus instance if the service is defined, otherwise undefined.
      */
     public get dbus(): DBus | undefined {
@@ -28,7 +49,9 @@ export class LocalObject {
 
     /**
      * Getter for the name (object path) of this local object.
-     * @returns The object path as a string.
+     * Returns the validated object path set during construction.
+     *
+     * @returns The object path as a string (e.g., '/org/example/Object').
      */
     public get name(): string {
         return this.#name
@@ -36,6 +59,9 @@ export class LocalObject {
 
     /**
      * Getter for the Properties interface associated with this object.
+     * Provides access to the standard 'org.freedesktop.DBus.Properties' interface
+     * for handling property-related operations across all interfaces on this object.
+     *
      * @returns The PropertiesInterface instance for handling property-related operations.
      */
     public get propertiesInterface(): PropertiesInterface {
@@ -44,6 +70,9 @@ export class LocalObject {
 
     /**
      * Getter for the Introspectable interface associated with this object.
+     * Provides access to the standard 'org.freedesktop.DBus.Introspectable' interface
+     * for handling introspection operations to describe the object's structure.
+     *
      * @returns The IntrospectableInterface instance for handling introspection operations.
      */
     public get introspectableInterface(): IntrospectableInterface {
@@ -52,6 +81,9 @@ export class LocalObject {
 
     /**
      * Getter for the Peer interface associated with this object.
+     * Provides access to the standard 'org.freedesktop.DBus.Peer' interface
+     * for handling peer-related operations like ping and machine ID retrieval.
+     *
      * @returns The PeerInterface instance for handling peer-related operations.
      */
     public get peerInterface(): PeerInterface {
@@ -60,11 +92,15 @@ export class LocalObject {
 
     /**
      * Constructor for LocalObject.
-     * Initializes the object with a validated object path and adds standard DBus interfaces.
-     * @param objectPath - The DBus object path to be validated and set.
+     * Initializes the object with a validated object path and adds standard DBus interfaces
+     * (Properties, Introspectable, and Peer) for compliance with DBus conventions.
+     *
+     * @param objectPath - The DBus object path to be validated and set (e.g., '/org/example/Object').
+     * @throws {LocalObjectInvalidNameError} If the provided object path does not meet DBus naming criteria.
      */
     constructor(objectPath: string) {
         this.#name = this.validateDBusObjectPath(objectPath)
+        // Add standard DBus interfaces required for most objects
         this.addInterface(new PropertiesInterface())
         this.addInterface(new IntrospectableInterface())
         this.addInterface(new PeerInterface())
@@ -72,9 +108,13 @@ export class LocalObject {
 
     /**
      * Validates a DBus object path based on DBus naming rules.
+     * Ensures the path is a non-empty string, within length limits, starts with a slash,
+     * does not end with a slash (except for root path '/'), avoids consecutive slashes,
+     * and uses only allowed characters (letters, digits, underscores) in each element.
+     *
      * @param objectPath - The path to validate.
      * @returns The validated object path if it passes all checks.
-     * @throws LocalObjectInvalidNameError if the path does not meet DBus naming criteria.
+     * @throws {LocalObjectInvalidNameError} If the path does not meet DBus naming criteria.
      */
     protected validateDBusObjectPath(objectPath: string | any): string {
         // Step 1: Check if the input is a string and not empty
@@ -139,6 +179,8 @@ export class LocalObject {
 
     /**
      * Sets the LocalService associated with this object.
+     * Links the object to a specific service within a DBus connection for context during operations.
+     *
      * @param service - The LocalService to associate with this object, or undefined to clear the association.
      * @returns The instance of this LocalObject for method chaining.
      */
@@ -149,6 +191,8 @@ export class LocalObject {
 
     /**
      * Getter for the introspection data of this object.
+     * Provides metadata about all interfaces associated with this object for DBus introspection.
+     *
      * @returns An IntrospectNode object containing the introspection data for all interfaces associated with this object.
      */
     public get introspectNode(): IntrospectNode {
@@ -163,9 +207,12 @@ export class LocalObject {
 
     /**
      * Adds a LocalInterface to this object.
-     * @param localInterface - The LocalInterface instance to add.
-     * @returns A boolean indicating whether the interface was successfully added.
-     * @throws LocalInterfaceExistsError if an interface with the same name already exists and is not the same instance.
+     * Associates the interface with this object, linking it to the object's context,
+     * and notifies the service's object manager of the addition if applicable.
+     *
+     * @param localInterface - The LocalInterface instance to add to this object.
+     * @returns A boolean indicating whether the interface was successfully added (true if added, false if already present).
+     * @throws {LocalInterfaceExistsError} If an interface with the same name already exists and is not the same instance.
      */
     public addInterface(localInterface: LocalInterface): boolean {
         let addSuccess: boolean = false
@@ -173,18 +220,20 @@ export class LocalObject {
             if (this.#interfaceMap.get(localInterface.name) !== localInterface) {
                 throw new LocalInterfaceExistsError(`Local interface ${localInterface.name} exists`)
             } else {
-                return addSuccess
+                return addSuccess // Interface already exists and is the same instance, no action needed
             }
         }
-        localInterface.setObject(this)
+        localInterface.setObject(this) // Link the interface to this object
         this.#interfaceMap.set(localInterface.name, localInterface)
         addSuccess = true
         if (addSuccess) {
             const addedInterfaceRecord: Record<string, Record<string, any>> = {}
+            // Fetch managed properties asynchronously and notify the object manager
             localInterface.getManagedProperties().then((record: Record<string, DBusSignedValue>): void => {
                 addedInterfaceRecord[localInterface.name] = record
                 this.service?.objectManager?.interfacesAdded(this, addedInterfaceRecord)
             }).catch((): void => {
+                // If fetching properties fails, notify without properties
                 this.service?.objectManager?.interfacesAdded(this, {})
             })
         }
@@ -193,23 +242,29 @@ export class LocalObject {
 
     /**
      * Removes a LocalInterface from this object by name.
+     * Unlinks the interface from the object and notifies the service's object manager of the removal.
+     *
      * @param interfaceName - The name of the interface to remove.
-     * @returns A boolean indicating whether the interface was successfully removed.
+     * @returns A boolean indicating whether the interface was successfully removed (true if removed, false if not found).
      */
     public removeInterface(interfaceName: string): boolean
 
     /**
      * Removes a LocalInterface from this object by instance.
+     * Unlinks the interface from the object and notifies the service's object manager of the removal.
+     *
      * @param localInterface - The LocalInterface instance to remove.
-     * @returns A boolean indicating whether the interface was successfully removed.
+     * @returns A boolean indicating whether the interface was successfully removed (true if removed, false if not found).
      */
     public removeInterface(localInterface: LocalInterface): boolean
 
     /**
      * Removes a LocalInterface from this object by name or instance.
-     * This method handles both string (interface name) and LocalInterface instance as input.
+     * This method handles both string (interface name) and LocalInterface instance as input,
+     * unlinking the interface and notifying the object manager of the removal.
+     *
      * @param inp - The name of the interface or the LocalInterface instance to remove.
-     * @returns A boolean indicating whether the interface was successfully removed.
+     * @returns A boolean indicating whether the interface was successfully removed (true if removed, false if not found).
      */
     public removeInterface(inp: LocalInterface | string): boolean {
         let removeSuccess: boolean
@@ -232,12 +287,15 @@ export class LocalObject {
                 removeSuccess = this.#interfaceMap.delete(result[0])
             }
         }
+        // If removal was successful, notify the object manager of the removed interface
         if (removedInterface && removeSuccess) this.service?.objectManager?.interfacesRemoved(this, [removedInterface.name])
         return removeSuccess
     }
 
     /**
      * Lists all interfaces associated with this object.
+     * Provides a convenient way to inspect all interfaces currently linked to the object.
+     *
      * @returns A record mapping interface names to their LocalInterface instances.
      */
     public listInterfaces(): Record<string, LocalInterface> {
@@ -246,19 +304,34 @@ export class LocalObject {
         return interfaces
     }
 
+    /**
+     * Lists the names of all interfaces associated with this object.
+     * Provides a quick way to retrieve just the names of the interfaces for enumeration.
+     *
+     * @returns An array of interface names as strings.
+     */
     public interfaceNames(): string[] {
         return [...this.#interfaceMap.keys()]
     }
 
     /**
      * Finds a LocalInterface by its name.
-     * @param name - The name of the interface to find.
+     * Allows retrieval of a specific interface with type casting for specialized interface types.
+     *
+     * @param name - The name of the interface to find (e.g., 'org.example.MyInterface').
      * @returns The LocalInterface instance of the specified type if found, otherwise undefined.
+     * @template T - The type of LocalInterface to cast the result to (defaults to LocalInterface).
      */
     public findInterfaceByName<T extends LocalInterface = LocalInterface>(name: string): T | undefined {
         return this.#interfaceMap.get(name) as T
     }
 
+    /**
+     * Gets all managed interfaces and their properties as a record.
+     * Retrieves the current properties of all interfaces on this object as DBusSignedValue instances.
+     *
+     * @returns A Promise resolving to a record mapping interface names to their property records (property name to DBusSignedValue).
+     */
     public async getManagedInterfaces(): Promise<Record<string, Record<string, DBusSignedValue>>> {
         const record: Record<string, Record<string, DBusSignedValue>> = {}
         for (const interfaceName of this.interfaceNames()) {

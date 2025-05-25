@@ -147,6 +147,13 @@ export {IntrospectableInterface} from './lib/common/IntrospectableInterface'
 export {PeerInterface} from './lib/common/PeerInterface'
 
 /**
+ * Exports the ObjectManagerInterface class for the standard DBus object manager interface.
+ * Implements 'org.freedesktop.DBus.ObjectManager' for managing object hierarchies and notifying
+ * clients of added or removed interfaces and objects.
+ */
+export {ObjectManagerInterface} from './lib/common/ObjectManagerInterface'
+
+/**
  * Exports the PropertiesInterface class for the standard DBus properties interface.
  * Implements 'org.freedesktop.DBus.Properties' for getting, setting, and monitoring properties.
  */
