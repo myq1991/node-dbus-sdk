@@ -228,7 +228,7 @@ export class LocalObject {
         addSuccess = true
         if (addSuccess) {
             const addedInterfaceRecord: Record<string, Record<string, any>> = {}
-            // Fetch managed properties asynchronously and notify the object manager
+            // Fetch managed properties and notify the object manager
             addedInterfaceRecord[localInterface.name] = localInterface.getManagedProperties()
             this.service?.objectManager?.interfacesAdded(this, addedInterfaceRecord)
         }
@@ -325,7 +325,7 @@ export class LocalObject {
      * Gets all managed interfaces and their properties as a record.
      * Retrieves the current properties of all interfaces on this object as DBusSignedValue instances.
      *
-     * @returns A Promise resolving to a record mapping interface names to their property records (property name to DBusSignedValue).
+     * @returns A record mapping interface names to their property records (property name to DBusSignedValue).
      */
     public getManagedInterfaces(): Record<string, Record<string, DBusSignedValue>> {
         const record: Record<string, Record<string, DBusSignedValue>> = {}

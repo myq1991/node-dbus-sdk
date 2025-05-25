@@ -519,7 +519,7 @@ export class LocalInterface {
      *
      * @param name - The name of the property to set.
      * @param value - The value to set for the property.
-     * @returns A Promise that resolves when the property is set.
+     * @returns void
      * @throws {DBusError} If the property is not found, the value signature does not match, or the property is read-only.
      */
     public setProperty(name: string, value: any): void {
@@ -541,7 +541,7 @@ export class LocalInterface {
      * Retrieves the current value by calling the getter function if available.
      *
      * @param name - The name of the property to get.
-     * @returns A Promise resolving to the property value.
+     * @returns The property value.
      * @throws {DBusError} If the property is not found or is write-only.
      */
     public getProperty(name: string): any {
@@ -558,7 +558,7 @@ export class LocalInterface {
      * Wraps the property value in a DBusSignedValue with the correct signature for DBus operations.
      *
      * @param name - The name of the property to get.
-     * @returns A Promise resolving to a DBusSignedValue instance representing the property value.
+     * @returns A DBusSignedValue instance representing the property value.
      * @throws {DBusError} If the property is not found or is write-only.
      */
     public getPropertySignedValue(name: string): DBusSignedValue {
@@ -570,7 +570,7 @@ export class LocalInterface {
      * Gets all managed properties as a record of DBusSignedValue objects.
      * Retrieves the current values of all properties on this interface.
      *
-     * @returns A Promise resolving to a record mapping property names to their DBusSignedValue instances.
+     * @returns A record mapping property names to their DBusSignedValue instances.
      */
     public getManagedProperties(): Record<string, DBusSignedValue> {
         const record: Record<string, DBusSignedValue> = {}

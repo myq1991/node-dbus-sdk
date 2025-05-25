@@ -86,7 +86,8 @@ export class LocalService {
      * Handler for incoming DBus method call messages.
      * Processes method calls by routing them to the appropriate object and interface,
      * executing the method, and sending a reply (success or error) back to the caller.
-     * Falls back to introspection handling if the target is not found but introspection is requested.
+     * Falls back to introspection handling if the target interface and method are for introspection
+     * but the specific object or interface is not found.
      *
      * @param message - The DBusMessage containing the method call details (path, interface, method, etc.).
      * @returns A Promise that resolves when the method call is processed and a reply is sent.
@@ -210,6 +211,7 @@ export class LocalService {
     /**
      * Formats an error to ensure it has a valid DBus error name.
      * Appends the service name as a prefix if the error name does not match DBus naming conventions.
+     * If the error name still doesn't match after prefixing, defaults to a generic error name with the service prefix.
      *
      * @param error - The error to format.
      * @returns The formatted error with a valid DBus error name (e.g., 'org.example.Service.Error').
@@ -224,8 +226,9 @@ export class LocalService {
 
     /**
      * Connects to a DBus bus and starts the service.
-     * Establishes a connection to the bus, registers the method call handler,
-     * and requests ownership of the service name on the bus.
+     * Establishes a connection to the bus using the provided options, registers the method call handler
+     * to process incoming requests, and requests ownership of the service name on the bus to make it
+     * available for clients to interact with.
      *
      * @param opts - Connection options for the DBus bus (e.g., socket path, TCP details).
      * @returns A Promise that resolves when the service is successfully running and connected to the bus.
@@ -238,8 +241,8 @@ export class LocalService {
 
     /**
      * Stops the service and disconnects from the DBus bus.
-     * Releases ownership of the service name, removes the method call handler,
-     * and closes the connection to the bus.
+     * Releases ownership of the service name to allow other services to claim it, removes the method
+     * call handler to stop processing requests, and closes the connection to the bus to clean up resources.
      *
      * @returns A Promise that resolves when the service is stopped and disconnected from the bus.
      */
@@ -251,8 +254,8 @@ export class LocalService {
 
     /**
      * Adds a LocalObject to this service.
-     * Associates the object with this service, linking it to the service's context,
-     * and notifies the object manager of the addition if applicable.
+     * Associates the object with this service, linking it to the service's context for further operations,
+     * and notifies the object manager of the addition if an ObjectManager interface is available on the root object.
      *
      * @param localObject - The LocalObject instance to add to this service.
      * @returns A boolean indicating whether the object was successfully added (true if added, false if already present).
@@ -276,7 +279,8 @@ export class LocalService {
 
     /**
      * Removes a LocalObject from this service by instance.
-     * Unlinks the object from the service and notifies the object manager of the removal.
+     * Unlinks the object from the service to prevent further operations and notifies the object manager
+     * of the removal if an ObjectManager interface is available on the root object.
      *
      * @param localObject - The LocalObject instance to remove.
      * @returns A boolean indicating whether the object was successfully removed (true if removed, false if not found).
@@ -285,7 +289,8 @@ export class LocalService {
 
     /**
      * Removes a LocalObject from this service by object path.
-     * Unlinks the object from the service and notifies the object manager of the removal.
+     * Unlinks the object from the service to prevent further operations and notifies the object manager
+     * of the removal if an ObjectManager interface is available on the root object.
      *
      * @param localObjectPath - The path of the object to remove.
      * @returns A boolean indicating whether the object was successfully removed (true if removed, false if not found).
@@ -295,7 +300,8 @@ export class LocalService {
     /**
      * Removes a LocalObject from this service by instance or object path.
      * This method handles both string (object path) and LocalObject instance as input,
-     * unlinking the object and notifying the object manager of the removal.
+     * unlinking the object from the service and notifying the object manager of the removal
+     * if an ObjectManager interface is available on the root object.
      *
      * @param inp - The object path or the LocalObject instance to remove.
      * @returns A boolean indicating whether the object was successfully removed (true if removed, false if not found).
@@ -329,7 +335,8 @@ export class LocalService {
 
     /**
      * Lists all objects associated with this service.
-     * Provides a convenient way to inspect all objects currently linked to the service.
+     * Provides a convenient way to inspect all objects currently linked to the service by returning
+     * a record mapping object paths to their respective LocalObject instances.
      *
      * @returns A record mapping object paths to their LocalObject instances.
      */
@@ -341,7 +348,7 @@ export class LocalService {
 
     /**
      * Finds a LocalObject by its path.
-     * Allows retrieval of a specific object with type casting for specialized object types.
+     * Allows retrieval of a specific object by its object path with type casting for specialized object types.
      *
      * @param objectPath - The path of the object to find (e.g., '/org/example/Object').
      * @returns The LocalObject instance of the specified type if found, otherwise undefined.
@@ -353,7 +360,7 @@ export class LocalService {
 
     /**
      * Lists all object paths associated with this service.
-     * Provides a quick way to retrieve just the paths of the objects for enumeration.
+     * Provides a quick way to retrieve just the paths of the objects for enumeration purposes.
      *
      * @returns An array of object paths as strings.
      */

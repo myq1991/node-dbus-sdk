@@ -70,8 +70,9 @@ export class ObjectManagerInterface extends LocalInterface {
      * Retrieves all managed objects, their interfaces, and properties.
      * Iterates through all objects in the associated service and collects their
      * managed interfaces and properties into a nested structure.
+     * If no service or objects are available, returns an empty record.
      *
-     * @returns A Promise resolving to a record mapping object paths to their interfaces
+     * @returns A record mapping object paths to their interfaces
      *          and properties as a nested structure (Record<string, Record<string, Record<string, any>>>).
      */
     protected getManagedObjects(): Record<string, Record<string, Record<string, any>>> {
@@ -88,6 +89,7 @@ export class ObjectManagerInterface extends LocalInterface {
     /**
      * Emits the 'InterfacesAdded' signal to notify clients of new interfaces.
      * Triggered when one or more interfaces are added to a specific object.
+     * The signal includes the object path and a record of the added interfaces along with their properties.
      *
      * @param localObject - The LocalObject instance to which interfaces were added.
      * @param interfacesAndProperties - A record mapping interface names to their properties and values.
@@ -99,6 +101,7 @@ export class ObjectManagerInterface extends LocalInterface {
     /**
      * Emits the 'InterfacesRemoved' signal to notify clients of removed interfaces.
      * Triggered when one or more interfaces are removed from a specific object.
+     * The signal includes the object path and an array of the names of the removed interfaces.
      *
      * @param localObject - The LocalObject instance from which interfaces were removed.
      * @param interfaces - An array of interface names that were removed from the object.
