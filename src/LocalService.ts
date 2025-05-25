@@ -212,7 +212,7 @@ export class LocalService {
         localObject.setService(this)
         this.#objectMap.set(localObject.name, localObject)
         addSuccess = true
-        localObject
+        if (addSuccess) localObject
             .getManagedInterfaces()
             .then((managedInterfaces: Record<string, Record<string, DBusSignedValue>>): void => this.objectManager?.interfacesAdded(localObject, managedInterfaces))
             .catch((): void => this.objectManager?.interfacesAdded(localObject, {}))
@@ -261,7 +261,7 @@ export class LocalService {
             }
         }
         const removedInterfaceNames: string[] | undefined = removedObject?.interfaceNames()
-        if (removedObject) this.objectManager?.interfacesRemoved(removedObject, removedInterfaceNames ? removedInterfaceNames : [])
+        if (removedObject && removeSuccess) this.objectManager?.interfacesRemoved(removedObject, removedInterfaceNames ? removedInterfaceNames : [])
         return removeSuccess
     }
 

@@ -77,7 +77,7 @@ export async function runExposeService(): Promise<void> {
         eventEmitter: ee
     })
 
-    obj.addInterface(iface)
+    // obj.addInterface(iface)
 
     // await serv.run({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     await serv.run({busAddress: 'tcp:host=192.168.1.236,port=44444'})
@@ -85,7 +85,13 @@ export async function runExposeService(): Promise<void> {
     setTimeout(() => {
         serv.addObject(obj)
         setTimeout(() => {
-            serv.removeObject(obj)
+            obj.addInterface(iface)
+            setTimeout(() => {
+                obj.removeInterface(iface)
+                setTimeout(() => {
+                    serv.removeObject(obj)
+                }, 20000)
+            }, 20000)
         }, 20000)
     }, 20000)
 

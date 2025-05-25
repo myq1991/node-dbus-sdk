@@ -179,6 +179,15 @@ export class LocalObject {
         localInterface.setObject(this)
         this.#interfaceMap.set(localInterface.name, localInterface)
         addSuccess = true
+        if (addSuccess) {
+            const addedInterfaceRecord: Record<string, Record<string, any>> = {}
+            localInterface.getManagedProperties().then((record: Record<string, DBusSignedValue>): void => {
+                addedInterfaceRecord[localInterface.name] = record
+                this.service?.objectManager?.interfacesAdded(this, addedInterfaceRecord)
+            }).catch((): void => {
+                this.service?.objectManager?.interfacesAdded(this, {})
+            })
+        }
         return addSuccess
     }
 
@@ -204,10 +213,12 @@ export class LocalObject {
      */
     public removeInterface(inp: LocalInterface | string): boolean {
         let removeSuccess: boolean
+        let removedInterface: LocalInterface | undefined
         if (typeof inp === 'string') {
             // Case 1: Input is a string representing the interface name.
             // Attempts to find and unset the associated object before deleting the interface.
             this.#interfaceMap.get(inp)?.setObject(undefined)
+            removedInterface = this.#interfaceMap.get(inp)
             removeSuccess = this.#interfaceMap.delete(inp)
         } else {
             // Case 2: Input is a LocalInterface instance.
@@ -217,9 +228,11 @@ export class LocalObject {
                 removeSuccess = false
             } else {
                 result[1].setObject(undefined)
+                removedInterface = result[1]
                 removeSuccess = this.#interfaceMap.delete(result[0])
             }
         }
+        if (removedInterface && removeSuccess) this.service?.objectManager?.interfacesRemoved(this, [removedInterface.name])
         return removeSuccess
     }
 
