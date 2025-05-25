@@ -27,7 +27,7 @@ export async function runExposeService(): Promise<void> {
         })
         .defineProperty({
             name: 'test2',
-            type: 'v',
+            type: 's',
             emitPropertiesChanged: {emitValue: true},
             getter: () => {
                 return test2Prop
@@ -38,7 +38,7 @@ export async function runExposeService(): Promise<void> {
         })
         .defineProperty({
             name: 'test3',
-            type: 'v',
+            type: 'x',
             emitPropertiesChanged: {emitValue: false},
             getter: () => {
                 return test3Prop

@@ -584,19 +584,15 @@ export class LocalInterface {
 
     /**
      * Gets the value of a defined property on this interface.
-     * Retrieves the current value by invoking the getter function if available, returning it either as a raw value
-     * (if undefined) or wrapped in a DBusSignedValue with the property's signature for DBus compatibility.
+     * Retrieves the current value by invoking the getter function if available, returning it as a raw value.
      *
      * @param name - The name of the property to get.
-     * @returns The property value, either as a raw value or wrapped in a DBusSignedValue if a getter is defined and returns a value.
+     * @returns The property value as returned by the getter function.
      * @throws {DBusError} If the property is not found or is write-only (no getter defined).
      */
     public getProperty(name: string): any {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
-        if (this.#definedProperties[name].getter) {
-            const value: any = this.#definedProperties[name].getter()
-            return value === undefined ? value : new DBusSignedValue(this.#definedProperties[name].signature, this.#definedProperties[name].getter())
-        }
+        if (this.#definedProperties[name].getter) return this.#definedProperties[name].getter()
         throw CreateDBusError('org.freedesktop.DBus.Error.PropertyWriteOnly', `Property ${name} is write only`)
     }
 
