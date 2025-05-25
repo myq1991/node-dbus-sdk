@@ -92,6 +92,9 @@ export class DBusSignedValue {
                     // Convert to Buffer for byte array
                     return Buffer.from(arrayValues as number[])
                 }
+                if (!arrayValues.length && value.$arrayItemSignature === '{') {
+                    return {}
+                }
                 return arrayValues
             case '{': // Dictionary (key-value pair)
                 const [key, val] = value.$value as DBusSignedValue[]

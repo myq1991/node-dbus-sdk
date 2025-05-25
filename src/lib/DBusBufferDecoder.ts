@@ -438,7 +438,7 @@ export class DBusBufferDecoder {
         }
         // Update the main offset to the end of the array data
         this.offset = arrayEndOffset
-        return new DBusSignedValue('a', elements)
+        return new DBusSignedValue({type: 'a', child: [elementType]}, elements)
     }
 
     /**
