@@ -5,41 +5,48 @@ import EventEmitter from 'node:events'
 import {DBusSignedValue} from '../lib/DBusSignedValue'
 
 export async function runExposeService(): Promise<void> {
-    let testProp: string[] = ['you']
+    let test1Prop: string[] = ['you']
+    let test2Prop: string = 'abc'
+    let test3Prop: number = 123
     const ee = new EventEmitter()
     const serv = new LocalService('org.test.service13')
     // const obj = new LocalObject('/test/obj')
     const obj = new LocalObject('/test/obj')
     const iface = new LocalInterface('test.iface')
-    iface.defineProperty({
-        name: 'fuck',
-        type: 'av',
-        emitPropertiesChanged: {emitValue: true},
-        getter: () => {
-            return testProp
-        },
-        setter: (value: string[]) => {
-            testProp = value
-        }
-    })
-    // iface.defineMethod({
-    //     name: 'fuckYou',
-    //     inputArgs: [
-    //         {
-    //             name: 'name',
-    //             type: 's'
-    //         }
-    //     ],
-    //     outputArgs: [
-    //         {
-    //             name: 'result',
-    //             type: 's'
-    //         }
-    //     ],
-    //     method: (name: string): string => {
-    //         return `fuck ${name}!!!`
-    //     }
-    // })
+    iface
+        .defineProperty({
+            name: 'test1',
+            type: 'av',
+            emitPropertiesChanged: {emitValue: true},
+            getter: () => {
+                return test1Prop
+            },
+            setter: (value: string[]) => {
+                test1Prop = value
+            }
+        })
+        .defineProperty({
+            name: 'test2',
+            type: 'v',
+            emitPropertiesChanged: {emitValue: true},
+            getter: () => {
+                return test2Prop
+            },
+            setter: (value: string) => {
+                test2Prop = value
+            }
+        })
+        .defineProperty({
+            name: 'test3',
+            type: 'v',
+            emitPropertiesChanged: {emitValue: false},
+            getter: () => {
+                return test3Prop
+            },
+            setter: (value: number) => {
+                test3Prop = value
+            }
+        })
     iface.defineMethod({
         name: 'test',
         inputArgs: [{type: 'u'}],
@@ -47,25 +54,11 @@ export async function runExposeService(): Promise<void> {
         // outputArgs: [{type: 'av'}],
         outputArgs: [{type: 'v'}],
         method: (name: number = 1234) => {
-            // throw new Error('fuck!')
-            console.log('name:', name)
-            // return name
-            // return ['ssss',true,123,3,[1,new DBusSignedValue('s','a'),3]]
-            // return ['ssss',true,123,3,[1,2],[3,4]]
-            // return ['ssss',true,123,3,[1,2],[3,4]]
-            // return [['aaa','bbb'],['ccc',true]]
-            // return {name:'123'}
-            // return {}
             return {
                 name: name,
                 haha: true,
                 sleep: 'oh!'
             }
-            // return {
-            //     name: name,
-            //     act: 'fuck'
-            // }
-            // return [['name',name], ['act','fuck']]
         }
     })
     iface.defineSignal({
@@ -77,23 +70,34 @@ export async function runExposeService(): Promise<void> {
         eventEmitter: ee
     })
 
-    // obj.addInterface(iface)
+    obj.addInterface(iface)
+    serv.addObject(obj)
 
     // await serv.run({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     await serv.run({busAddress: 'tcp:host=192.168.1.236,port=44444'})
 
-    setTimeout(() => {
-        serv.addObject(obj)
+    setInterval(() => {
+        iface.setProperty('test1', [`${Date.now()}`])
+        iface.setProperty('test2', `test2-${Date.now()}`)
+        iface.setProperty('test3', BigInt(Date.now()))
         setTimeout(() => {
-            obj.addInterface(iface)
-            setTimeout(() => {
-                obj.removeInterface(iface)
-                setTimeout(() => {
-                    serv.removeObject(obj)
-                }, 3000)
-            }, 3000)
-        }, 3000)
+            iface.setProperty('test2', `test2-${Date.now()}`)
+            iface.setProperty('test3', BigInt(Date.now()))
+        }, 1)
     }, 3000)
+
+    // setTimeout(() => {
+    //     serv.addObject(obj)
+    //     setTimeout(() => {
+    //         obj.addInterface(iface)
+    //         setTimeout(() => {
+    //             obj.removeInterface(iface)
+    //             setTimeout(() => {
+    //                 serv.removeObject(obj)
+    //             }, 3000)
+    //         }, 3000)
+    //     }, 3000)
+    // }, 3000)
 
     //
     // setInterval(() => {

@@ -25,12 +25,13 @@ import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
 import {Signature} from './lib/Signature'
 import {DBusBufferEncoder} from './lib/DBusBufferEncoder'
 import {DBusBufferDecoder} from './lib/DBusBufferDecoder'
+import {PropertiesInterface} from './lib/common/PropertiesInterface'
 
 /**
  * A class representing a local DBus interface.
- * This class allows the definition of methods, properties, and signals for a local DBus service.
- * It handles validation of names, introspection data, and interaction with the DBus for method calls,
- * property access, and signal emission. It serves as a building block for implementing custom DBus interfaces.
+ * This class enables the definition of methods, properties, and signals for a local DBus service,
+ * facilitating the creation of custom interfaces. It manages name validation, introspection data,
+ * and interactions with DBus for handling method calls, property access, and signal emission.
  */
 export class LocalInterface {
 
@@ -42,13 +43,13 @@ export class LocalInterface {
 
     /**
      * An array of IntrospectMethod objects for introspection.
-     * Stores metadata about defined methods for generating introspection XML.
+     * Stores metadata about defined methods for generating introspection XML as per DBus specification.
      */
     #introspectMethods: IntrospectMethod[] = []
 
     /**
      * A record of defined methods on this interface.
-     * Maps method names to their input/output signatures and implementation functions.
+     * Maps method names to their input/output signatures and implementation functions for execution.
      */
     #definedMethods: Record<string, {
         inputSignature?: string
@@ -58,13 +59,13 @@ export class LocalInterface {
 
     /**
      * An array of IntrospectProperty objects for introspection.
-     * Stores metadata about defined properties for generating introspection XML.
+     * Stores metadata about defined properties for generating introspection XML as per DBus specification.
      */
     #introspectProperties: IntrospectProperty[] = []
 
     /**
      * A record of defined properties on this interface.
-     * Maps property names to their signatures, getter, and setter functions.
+     * Maps property names to their signatures, getter, and setter functions for access and modification.
      */
     #definedProperties: Record<string, {
         signature: string
@@ -74,13 +75,13 @@ export class LocalInterface {
 
     /**
      * An array of IntrospectSignal objects for introspection.
-     * Stores metadata about defined signals for generating introspection XML.
+     * Stores metadata about defined signals for generating introspection XML as per DBus specification.
      */
     #introspectSignals: IntrospectSignal[] = []
 
     /**
      * A record of defined signals on this interface.
-     * Maps signal names to their listener functions and associated EventEmitter instances.
+     * Maps signal names to their listener functions and associated EventEmitter instances for emission.
      */
     #definedSignals: Record<string, {
         listener: (...args: any[]) => void,
@@ -88,16 +89,50 @@ export class LocalInterface {
     }> = {}
 
     /**
+     * An array of records for properties whose changes should emit values.
+     * Stores temporary records of changed properties with their new values to be included in the 'PropertiesChanged' signal.
+     */
+    #propertiesEmitValueChanges: Record<string, DBusSignedValue>[] = []
+
+    /**
+     * An array of property names whose changes should not emit values.
+     * Stores temporary names of properties that are invalidated (changed without including new values) in the 'PropertiesChanged' signal.
+     */
+    #propertiesNotEmitValueChanges: string[] = []
+
+    /**
+     * Handles property change notifications by emitting the 'PropertiesChanged' signal.
+     * Combines accumulated property changes (with and without values) into a single signal emission
+     * if there are changes to report and a PropertiesInterface is available on the associated object.
+     * Resets the accumulated change records after emission.
+     *
+     * @private
+     */
+    #propertyChangeHandler(): void {
+        if (!this.#propertiesEmitValueChanges.length && !this.#propertiesNotEmitValueChanges.length) return
+        const propertiesInterface: PropertiesInterface | undefined = this.object?.propertiesInterface
+        if (!propertiesInterface) return
+        const changedProperties: Record<string, DBusSignedValue> = this.#propertiesEmitValueChanges.reduce((previousValue: Record<string, DBusSignedValue>, currentValue: Record<string, DBusSignedValue>): Record<string, DBusSignedValue> => ({
+            ...previousValue,
+            ...currentValue
+        }), {})
+        const changedPropertyNames: string[] = [...new Set(this.#propertiesNotEmitValueChanges)]
+        this.#propertiesEmitValueChanges = []
+        this.#propertiesNotEmitValueChanges = []
+        propertiesInterface.emitPropertiesChanged(this.#name, changedProperties, changedPropertyNames)
+    }
+
+    /**
      * The LocalObject instance associated with this interface, if any.
-     * Links the interface to a specific object within a DBus service for context.
+     * Links the interface to a specific object within a DBus service for contextual operations.
      */
     public object: LocalObject | undefined
 
     /**
      * Getter for the DBus instance associated with this interface's object.
-     * Provides access to the DBus connection for emitting signals or other operations.
+     * Provides access to the DBus connection for operations such as emitting signals or sending messages.
      *
-     * @returns The DBus instance if the object is defined, otherwise undefined.
+     * @returns The DBus instance if the associated object is defined and connected, otherwise undefined.
      */
     public get dbus(): DBus | undefined {
         if (!this.object) return
@@ -116,7 +151,8 @@ export class LocalInterface {
 
     /**
      * Constructor for LocalInterface.
-     * Initializes the interface with a validated name, ensuring it adheres to DBus naming rules.
+     * Initializes the interface with a validated name, ensuring it adheres to DBus naming rules
+     * as specified in the DBus protocol documentation.
      *
      * @param interfaceName - The name of the interface to be validated and set (e.g., 'org.example.MyInterface').
      * @throws {LocalInterfaceInvalidNameError} If the provided name does not meet DBus naming criteria.
@@ -127,7 +163,7 @@ export class LocalInterface {
 
     /**
      * Validates a DBus interface name based on DBus naming rules.
-     * Ensures the name is a non-empty string, within length limits, contains at least two elements
+     * Ensures the name is a non-empty string, within length limits (255 bytes), contains at least two elements
      * separated by dots, does not start or end with a dot, avoids consecutive dots, and uses
      * only allowed characters (letters, digits, underscores) in each element.
      *
@@ -192,8 +228,8 @@ export class LocalInterface {
 
     /**
      * Validates a DBus method name based on DBus naming rules.
-     * Ensures the name is a non-empty string, within length limits, does not start with a digit,
-     * and uses only allowed characters (letters, digits, underscores).
+     * Ensures the name is a non-empty string, within length limits (255 bytes), does not start with a digit,
+     * and uses only allowed characters (letters, digits, underscores) as per DBus conventions.
      *
      * @param methodName - The name to validate.
      * @returns The validated method name if it passes all checks.
@@ -229,8 +265,8 @@ export class LocalInterface {
 
     /**
      * Validates a DBus property name based on DBus naming rules.
-     * Ensures the name is a non-empty string, within length limits, does not start with a digit,
-     * and uses only allowed characters (letters, digits, underscores).
+     * Ensures the name is a non-empty string, within length limits (255 bytes), does not start with a digit,
+     * and uses only allowed characters (letters, digits, underscores) as per DBus conventions.
      *
      * @param propertyName - The name to validate.
      * @returns The validated property name if it passes all checks.
@@ -266,8 +302,8 @@ export class LocalInterface {
 
     /**
      * Validates a DBus signal name based on DBus naming rules.
-     * Ensures the name is a non-empty string, within length limits, does not start with a digit,
-     * and uses only allowed characters (letters, digits, underscores).
+     * Ensures the name is a non-empty string, within length limits (255 bytes), does not start with a digit,
+     * and uses only allowed characters (letters, digits, underscores) as per DBus conventions.
      *
      * @param signalName - The name to validate.
      * @returns The validated signal name if it passes all checks.
@@ -303,7 +339,8 @@ export class LocalInterface {
 
     /**
      * Sets the LocalObject associated with this interface.
-     * Links the interface to a specific object within a DBus service for context during operations.
+     * Links the interface to a specific object within a DBus service, providing context for operations
+     * such as signal emission or property access on a specific object path.
      *
      * @param localObject - The LocalObject to associate with this interface, or undefined to clear the association.
      * @returns The instance of this LocalInterface for method chaining.
@@ -315,7 +352,8 @@ export class LocalInterface {
 
     /**
      * Getter for the introspection data of this interface.
-     * Provides metadata about the interface's methods, properties, and signals for DBus introspection.
+     * Provides metadata about the interface's methods, properties, and signals in a format suitable
+     * for DBus introspection, allowing clients to discover the capabilities of this interface.
      *
      * @returns An IntrospectInterface object containing the name, methods, properties, and signals defined for this interface.
      */
@@ -330,12 +368,12 @@ export class LocalInterface {
 
     /**
      * Defines a new method for this interface.
-     * Adds a method with specified input and output arguments and an implementation function.
-     * Validates the method name and updates introspection data.
+     * Configures a method with specified input and output arguments and an implementation function,
+     * validates the method name against DBus naming rules, and updates introspection data for discovery.
      *
      * @param opts - Options for defining the method, including name, input/output arguments, and the method implementation.
      * @returns The instance of this LocalInterface for method chaining.
-     * @throws {LocalInterfaceMethodDefinedError} If the method is already defined.
+     * @throws {LocalInterfaceMethodDefinedError} If a method with the same name is already defined.
      * @throws {LocalInterfaceInvalidMethodNameError} If the method name does not meet DBus naming criteria.
      */
     public defineMethod(opts: DefineMethodOpts): this {
@@ -365,7 +403,7 @@ export class LocalInterface {
 
     /**
      * Removes a defined method from this interface.
-     * Deletes the method and its introspection data from the interface.
+     * Deletes the method from the internal record and removes its associated introspection data.
      *
      * @param name - The name of the method to remove.
      * @returns The instance of this LocalInterface for method chaining.
@@ -378,12 +416,13 @@ export class LocalInterface {
 
     /**
      * Defines a new property for this interface.
-     * Adds a property with a specified type, access mode (read, write, read-write), and optional
-     * getter/setter functions. Supports emitting property change signals if configured.
+     * Configures a property with a specified type, determines access mode (read, write, read-write) based on provided
+     * getter/setter functions, and supports emitting property change signals if configured via options.
+     * Updates introspection data for discovery and sets up asynchronous change notifications via setImmediate.
      *
      * @param opts - Options for defining the property, including name, type, access mode, getter/setter functions, and change emission settings.
      * @returns The instance of this LocalInterface for method chaining.
-     * @throws {LocalInterfacePropertyDefinedError} If the property is already defined.
+     * @throws {LocalInterfacePropertyDefinedError} If a property with the same name is already defined.
      * @throws {LocalInterfaceInvalidPropertyNameError} If the property name does not meet DBus naming criteria.
      */
     public defineProperty(opts: DefinePropertyOpts): this {
@@ -402,14 +441,16 @@ export class LocalInterface {
                 setter = (value: any): void => {
                     opts.setter!(value)
                     const changedProperties: Record<string, any> = {}
-                    changedProperties[opts.name] = value
-                    this.object?.propertiesInterface.emitPropertiesChanged(this.#name, changedProperties, [])
+                    changedProperties[opts.name] = this.getPropertySignedValue(opts.name)
+                    this.#propertiesEmitValueChanges.push(changedProperties)
+                    setImmediate((): void => this.#propertyChangeHandler())
                 }
             } else {
                 // Emit property changed signal without the new value (invalidated only)
                 setter = (value: any): void => {
                     opts.setter!(value)
-                    this.object?.propertiesInterface.emitPropertiesChanged(this.#name, {}, [opts.name])
+                    this.#propertiesNotEmitValueChanges.push(opts.name)
+                    setImmediate((): void => this.#propertyChangeHandler())
                 }
             }
         }
@@ -428,7 +469,7 @@ export class LocalInterface {
 
     /**
      * Removes a defined property from this interface.
-     * Deletes the property and its introspection data from the interface.
+     * Deletes the property from the internal record and removes its associated introspection data.
      *
      * @param name - The name of the property to remove.
      * @returns The instance of this LocalInterface for method chaining.
@@ -441,12 +482,13 @@ export class LocalInterface {
 
     /**
      * Defines a new signal for this interface.
-     * Adds a signal with specified arguments and associates it with an EventEmitter for emission.
-     * When the signal is triggered, it is emitted over the DBus connection if available.
+     * Configures a signal with specified arguments and associates it with an EventEmitter for emission.
+     * When the signal is triggered, it is sent over the DBus connection if the interface is associated
+     * with an object and a DBus connection is available.
      *
      * @param opts - Options for defining the signal, including name, arguments, and associated event emitter.
      * @returns The instance of this LocalInterface for method chaining.
-     * @throws {LocalInterfaceSignalDefinedError} If the signal is already defined.
+     * @throws {LocalInterfaceSignalDefinedError} If a signal with the same name is already defined.
      * @throws {LocalInterfaceInvalidSignalNameError} If the signal name does not meet DBus naming criteria.
      */
     public defineSignal(opts: DefineSignalOpts): this {
@@ -477,7 +519,8 @@ export class LocalInterface {
 
     /**
      * Removes a defined signal from this interface.
-     * Deletes the signal, removes its listener from the event emitter, and updates introspection data.
+     * Deletes the signal from the internal record, removes its listener from the associated event emitter,
+     * and updates the introspection data by removing the signal's metadata.
      *
      * @param name - The name of the signal to remove.
      * @returns The instance of this LocalInterface for method chaining.
@@ -491,12 +534,13 @@ export class LocalInterface {
 
     /**
      * Calls a defined method on this interface.
-     * Executes the method implementation with provided arguments after validating the input signature.
+     * Executes the method implementation with the provided arguments after validating the input signature
+     * to ensure compatibility with the defined method signature.
      *
      * @param name - The name of the method to call.
      * @param payloadSignature - The signature of the input arguments provided (e.g., 'si' for string and integer).
      * @param args - The arguments to pass to the method.
-     * @returns A Promise resolving to an object with the method's output signature and result.
+     * @returns A Promise resolving to an object containing the method's output signature (if defined) and result.
      * @throws {DBusError} If the method is not found or if the input signature does not match the expected signature.
      */
     public async callMethod(name: string, payloadSignature: string | undefined, ...args: any[]): Promise<{
@@ -515,12 +559,14 @@ export class LocalInterface {
 
     /**
      * Sets the value of a defined property on this interface.
-     * Validates the value against the property's signature before calling the setter function.
+     * Validates the value against the property's signature by encoding and decoding it to ensure type compatibility
+     * before invoking the setter function to update the property.
      *
      * @param name - The name of the property to set.
      * @param value - The value to set for the property.
      * @returns void
-     * @throws {DBusError} If the property is not found, the value signature does not match, or the property is read-only.
+     * @throws {DBusError} If the property is not found, the value signature does not match the expected type,
+     *                     or the property is read-only (no setter defined).
      */
     public setProperty(name: string, value: any): void {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
@@ -538,11 +584,12 @@ export class LocalInterface {
 
     /**
      * Gets the value of a defined property on this interface.
-     * Retrieves the current value by calling the getter function if available.
+     * Retrieves the current value by invoking the getter function if available, returning it either as a raw value
+     * (if undefined) or wrapped in a DBusSignedValue with the property's signature for DBus compatibility.
      *
      * @param name - The name of the property to get.
-     * @returns The property value.
-     * @throws {DBusError} If the property is not found or is write-only.
+     * @returns The property value, either as a raw value or wrapped in a DBusSignedValue if a getter is defined and returns a value.
+     * @throws {DBusError} If the property is not found or is write-only (no getter defined).
      */
     public getProperty(name: string): any {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
@@ -555,11 +602,12 @@ export class LocalInterface {
 
     /**
      * Gets the value of a defined property as a DBusSignedValue on this interface.
-     * Wraps the property value in a DBusSignedValue with the correct signature for DBus operations.
+     * Retrieves the property value using getProperty and parses it into a DBusSignedValue with the correct signature,
+     * ensuring it is suitable for DBus operations like method replies or signal data.
      *
      * @param name - The name of the property to get.
-     * @returns A DBusSignedValue instance representing the property value.
-     * @throws {DBusError} If the property is not found or is write-only.
+     * @returns A DBusSignedValue instance representing the property value with its associated signature.
+     * @throws {DBusError} If the property is not found or is write-only (no getter defined).
      */
     public getPropertySignedValue(name: string): DBusSignedValue {
         const propertyValue: any = this.getProperty(name)
@@ -568,9 +616,10 @@ export class LocalInterface {
 
     /**
      * Gets all managed properties as a record of DBusSignedValue objects.
-     * Retrieves the current values of all properties on this interface.
+     * Iterates through all defined property names on this interface and retrieves their current values
+     * as DBusSignedValue instances, providing a comprehensive view of the interface's properties.
      *
-     * @returns A record mapping property names to their DBusSignedValue instances.
+     * @returns A record mapping property names to their corresponding DBusSignedValue instances.
      */
     public getManagedProperties(): Record<string, DBusSignedValue> {
         const record: Record<string, DBusSignedValue> = {}
@@ -582,7 +631,7 @@ export class LocalInterface {
 
     /**
      * Lists the names of all defined methods on this interface.
-     * Provides a convenient way to inspect available methods.
+     * Provides a convenient way to inspect the available methods for introspection or debugging purposes.
      *
      * @returns An array of method names as strings.
      */
@@ -592,7 +641,7 @@ export class LocalInterface {
 
     /**
      * Lists the names of all defined properties on this interface.
-     * Provides a convenient way to inspect available properties.
+     * Provides a convenient way to inspect the available properties for introspection or debugging purposes.
      *
      * @returns An array of property names as strings.
      */
@@ -602,7 +651,7 @@ export class LocalInterface {
 
     /**
      * Lists the names of all defined signals on this interface.
-     * Provides a convenient way to inspect available signals.
+     * Provides a convenient way to inspect the available signals for introspection or debugging purposes.
      *
      * @returns An array of signal names as strings.
      */

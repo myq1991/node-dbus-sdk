@@ -26,10 +26,15 @@ setImmediate(async (): Promise<void> => {
     //
     // const serv = await dbus.getService('org.glib.test')
     const serv = await dbus.getService('org.test.service13')
+    const obj = await serv.getObject('/test/obj')
     const rootObj = await serv.getObject('/')
     const objMgr = await rootObj.getInterface('org.freedesktop.DBus.ObjectManager')
     objMgr.signal.on('InterfacesAdded', console.log)
     objMgr.signal.on('InterfacesRemoved', console.log)
+    const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
+    propIface.signal.on('PropertiesChanged', console.log)
+
+
     // const obj = await serv.getObject('/test/obj')
     // const iface = await obj.getInterface('test.iface')
     // const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
