@@ -99,12 +99,13 @@ The `LocalService` class enables the creation and management of a custom DBus se
 
 ### Key Properties
 - **`name: string`**: The well-known name of the local service (e.g., `org.test.service`).
+- **`objectManager: ObjectManagerInterface | undefined`**: Access to the `org.freedesktop.DBus.ObjectManager` interface on the root object, if available, for managing object hierarchies.
 
 ### Key Methods
 - **`async run(opts: ConnectOpts): Promise<void>`**: Connects to a DBus bus using the provided options and starts the service, listening for incoming method calls.
 - **`async stop(): Promise<void>`**: Stops the service by releasing the name and disconnecting from the DBus bus.
-- **`addObject(localObject: LocalObject): boolean`**: Adds a `LocalObject` to the service, associating it with the service's context.
-- **`removeObject(inp: LocalObject | string): boolean`**: Removes a `LocalObject` by instance or object path.
+- **`addObject(localObject: LocalObject): boolean`**: Adds a `LocalObject` to the service, associating it with the service's context and notifying the object manager if available.
+- **`removeObject(inp: LocalObject | string): boolean`**: Removes a `LocalObject` by instance or object path, notifying the object manager if available.
 - **`listObjects(): Record<string, LocalObject>`**: Returns a record of all objects associated with this service.
 - **`findObjectByPath<T extends LocalObject>(objectPath: string): T | undefined`**: Finds a `LocalObject` by its path.
 - **`listObjectPaths(): string[]`**: Returns an array of object paths for all objects in this service.
@@ -121,16 +122,18 @@ The `LocalObject` class represents a custom DBus object within a local service, 
 - **`peerInterface: PeerInterface`**: Access to the standard peer interface for peer-related operations.
 
 ### Key Methods
-- **`addInterface(localInterface: LocalInterface): boolean`**: Adds a `LocalInterface` to this object, associating it with the object's context.
-- **`removeInterface(inp: LocalInterface | string): boolean`**: Removes a `LocalInterface` by instance or name.
+- **`addInterface(localInterface: LocalInterface): boolean`**: Adds a `LocalInterface` to this object, associating it with the object's context and notifying the service's object manager if applicable.
+- **`removeInterface(inp: LocalInterface | string): boolean`**: Removes a `LocalInterface` by instance or name, notifying the service's object manager if applicable.
 - **`listInterfaces(): Record<string, LocalInterface>`**: Returns a record of all interfaces associated with this object.
+- **`interfaceNames(): string[]`**: Returns an array of interface names associated with this object.
 - **`findInterfaceByName<T extends LocalInterface>(name: string): T | undefined`**: Finds a `LocalInterface` by its name.
+- **`getManagedInterfaces(): Record<string, Record<string, DBusSignedValue>>`**: Returns a record of all interfaces and their managed properties as `DBusSignedValue` instances.
 - **`introspectNode: IntrospectNode`**: Getter for introspection data of this object, including all associated interfaces.
 
 ## Class: LocalInterface
 
 ### Purpose
-The `LocalInterface` class allows developers to define a custom DBus interface with methods, properties, and signals that can be exposed through a local service. It handles incoming method calls and property operations, and emits signals as configured.
+The `LocalInterface` class allows developers to define a custom DBus interface with methods, properties, and signals that can be exposed through a local service. It handles incoming method calls, property operations, and emits signals as configured.
 
 ### Key Properties
 - **`name: string`**: The name of the local interface (e.g., `org.test.iface`).
@@ -139,12 +142,12 @@ The `LocalInterface` class allows developers to define a custom DBus interface w
 ### Key Methods
 - **`defineMethod(opts: DefineMethodOpts): this`**: Defines a custom method with input/output signatures and an implementation.
 - **`removeMethod(name: string): this`**: Removes a defined method by name.
-- **`defineProperty(opts: DefinePropertyOpts): this`**: Defines a custom property with type, access mode (read/write), and getter/setter functions.
+- **`defineProperty(opts: DefinePropertyOpts): this`**: Defines a custom property with type, access mode (read/write), getter/setter functions, and optional property change signal emission.
 - **`removeProperty(name: string): this`**: Removes a defined property by name.
 - **`defineSignal(opts: DefineSignalOpts): this`**: Defines a custom signal with arguments and an associated `EventEmitter` for triggering.
 - **`removeSignal(name: string): this`**: Removes a defined signal by name.
 - **`async callMethod(name: string, payloadSignature: string | undefined, ...args: any[]): Promise<{signature?: string, result: any}>`**: Calls a defined method with validated arguments and returns the result.
-- **`async setProperty(name: string, value: any): Promise<void>`**: Sets a property value if the property is writable.
+- **`async setProperty(name: string, value: any): Promise<void>`**: Sets a property value if the property is writable, triggering change signals if configured.
 - **`async getProperty(name: string): Promise<any>`**: Gets a property value if the property is readable.
 - **`methodNames(): string[]`**: Lists names of defined methods.
 - **`propertyNames(): string[]`**: Lists names of defined properties.
@@ -167,6 +170,7 @@ The classes in `dbus-sdk` are designed to work together in a hierarchical and mo
 3. **Defining Interfaces**: Create `LocalInterface` instances with custom methods, properties, and signals using `defineMethod`, `defineProperty`, and `defineSignal`. Add these interfaces to `LocalObject` instances.
 4. **Running the Service**: Call `LocalService.run()` to connect to the DBus bus and publish the service. The library automatically handles incoming method calls, routing them to the appropriate `LocalInterface` methods or properties.
 5. **Emitting Signals**: Use `EventEmitter` instances associated with signals in `LocalInterface` to trigger signal emissions, which are broadcast to subscribed clients via the `DBus` instance.
+6. **Managing Object Hierarchies**: Utilize the `objectManager` property on `LocalService` to access the `ObjectManagerInterface` (if available on the root object), which notifies clients of added or removed objects and interfaces.
 
 ### Type Safety and Data Handling
 - The library handles type conversion between DBus's strict type system and TypeScript/JavaScript using `DBusSignedValue`, ensuring signature validation and proper serialization/deserialization.
