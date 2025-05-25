@@ -8,7 +8,12 @@ import {DBusSignedValue} from '../lib/DBusSignedValue'
 // runDBusBufferTestSet()
 
 // const enc = new DBusBufferEncoder()
-// console.log(enc.encode('a{sv}', {}, true))
+// const buf=enc.encode('oa{sa{sv}}', ['/test/obj',{}], true)
+// console.log('buf',JSON.stringify(Array.from(buf)))
+// const dec=new DBusBufferDecoder(enc.endianness,buf)
+// console.log(dec.decode('oa{sa{sv}}'))
+//
+
 
 setImmediate(async (): Promise<void> => {
 
@@ -24,6 +29,7 @@ setImmediate(async (): Promise<void> => {
     const rootObj = await serv.getObject('/')
     const objMgr = await rootObj.getInterface('org.freedesktop.DBus.ObjectManager')
     objMgr.signal.on('InterfacesAdded', console.log)
+    objMgr.signal.on('InterfacesRemoved', console.log)
     // const obj = await serv.getObject('/test/obj')
     // const iface = await obj.getInterface('test.iface')
     // const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')

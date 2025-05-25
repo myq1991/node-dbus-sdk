@@ -84,6 +84,9 @@ export async function runExposeService(): Promise<void> {
 
     setTimeout(() => {
         serv.addObject(obj)
+        setTimeout(() => {
+            serv.removeObject(obj)
+        }, 20000)
     }, 20000)
 
     //

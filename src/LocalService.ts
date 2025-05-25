@@ -241,10 +241,12 @@ export class LocalService {
      */
     public removeObject(inp: LocalObject | string): boolean {
         let removeSuccess: boolean
+        let removedObject: LocalObject | undefined
         if (typeof inp === 'string') {
             // Case 1: Input is a string representing the object path.
             // Attempts to find and unset the associated service before deleting the object.
             this.#objectMap.get(inp)?.setService(undefined)
+            removedObject = this.#objectMap.get(inp)
             removeSuccess = this.#objectMap.delete(inp)
         } else {
             // Case 2: Input is a LocalObject instance.
@@ -254,10 +256,12 @@ export class LocalService {
                 removeSuccess = false
             } else {
                 result[1].setService(undefined)
+                removedObject = result[1]
                 removeSuccess = this.#objectMap.delete(result[0])
             }
         }
-        //TODO 向ObjectManager发事件
+        const removedInterfaceNames: string[] | undefined = removedObject?.interfaceNames()
+        if (removedObject) this.objectManager?.interfacesRemoved(removedObject, removedInterfaceNames ? removedInterfaceNames : [])
         return removeSuccess
     }
 

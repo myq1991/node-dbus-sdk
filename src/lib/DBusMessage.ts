@@ -225,7 +225,9 @@ export class DBusMessage {
         }
         if (!bodyLength || !messageHeader.signature) return new DBusMessage(messageHeader)
         // Calculate aligned offset before body to account for padding
-        const bodyOffset: number = fieldsLength + (8 - (header.length + fieldsLength) % 8)
+        let paddingLength: number = 8 - (header.length + fieldsLength) % 8
+        paddingLength = paddingLength === 8 ? 0 : paddingLength
+        const bodyOffset: number = fieldsLength + paddingLength
         const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fieldsAndBody.subarray(bodyOffset))
         const body: any[] = bodyDecoder.decode(messageHeader.signature)
         return new DBusMessage(messageHeader, ...body)

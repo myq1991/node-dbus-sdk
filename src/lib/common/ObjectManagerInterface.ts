@@ -18,10 +18,10 @@ export class ObjectManagerInterface extends LocalInterface {
             .defineSignal({
                 name: 'InterfacesAdded',
                 args: [
-                    // {
-                    //     name: 'object_path',
-                    //     type: 'o'
-                    // },
+                    {
+                        name: 'object_path',
+                        type: 'o'
+                    },
                     {
                         name: 'interfaces_and_properties',
                         type: 'a{sa{sv}}'
@@ -57,9 +57,7 @@ export class ObjectManagerInterface extends LocalInterface {
     }
 
     public interfacesAdded(localObject: LocalObject, interfacesAndProperties: Record<string, Record<string, any>>): void {
-        // this.#eventEmitter.emit('InterfacesAdded', localObject.name, interfacesAndProperties)
-        this.#eventEmitter.emit('InterfacesAdded', localObject.name, {})//TODO 发出去的信号解析有问题
-        // this.#eventEmitter.emit('InterfacesAdded',  interfacesAndProperties)
+        this.#eventEmitter.emit('InterfacesAdded', localObject.name, interfacesAndProperties)
     }
 
     public interfacesRemoved(localObject: LocalObject, interfaces: string[]): void {
