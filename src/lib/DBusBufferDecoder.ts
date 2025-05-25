@@ -33,17 +33,17 @@ export class DBusBufferDecoder {
     /**
      * Creates a new DBusBufferDecoder instance.
      * Initializes the decoder with the specified endianness and buffer,
-     * optionally aligning the initial offset to a boundary.
+     * optionally setting the initial offset for reading.
      *
      * @param endianness - The endianness to use for reading multi-byte values (default: Little Endian).
      * @param buffer - The binary buffer containing the DBus data to decode.
-     * @param alignment - Optional initial alignment boundary to align the offset to (e.g., 4 or 8 bytes).
+     * @param offset - The initial offset to start reading from (default: 0).
      */
-    constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, buffer: Buffer, alignment?: number) {
+    constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, buffer: Buffer, offset: number = 0) {
         this.endianness = endianness
         this.buffer = buffer
-        // Optionally align the initial offset to the specified boundary if provided
-        if (alignment) this.align(alignment)
+        // Set the initial offset for reading from the buffer
+        this.offset = offset
     }
 
     /**
@@ -464,6 +464,7 @@ export class DBusBufferDecoder {
         this.offset += 4 // Increment offset by 4 bytes for length field
         switch (elementType.type) {
             case '{':
+            case '(':
                 this.align(8) // Special case: dictionary entries require 8-byte alignment
         }
         // Calculate the end offset of the array data
