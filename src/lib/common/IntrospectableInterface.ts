@@ -152,8 +152,12 @@ export class IntrospectableInterface extends LocalInterface {
             return subNode ? subNode : ''
         }).filter((subNode: string): boolean => !!subNode)
             .map(nodeName => ({$: {name: nodeName}})) // XML attribute for sub-node name
-        if (nodes.length) xmlObject.node = nodes // Include sub-nodes if any
-
+        const exists: string[] = []
+        if (nodes.length) xmlObject.node = nodes.filter((node: { $: { name: string } }): boolean => {
+            if (exists.includes(node.$.name)) return false
+            exists.push(node.$.name)
+            return true
+        }) // Include sub-nodes if any
         return builder.buildObject(xmlObject) // Build and return the final XML string
     }
 }

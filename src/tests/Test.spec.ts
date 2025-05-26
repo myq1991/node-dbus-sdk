@@ -9,8 +9,13 @@ import {DBusArray} from '../lib/datatypes/DBusArray'
 import {DBusDictEntry} from '../lib/datatypes/DBusDictEntry'
 import {DBusString} from '../lib/datatypes/DBusString'
 import {runExposeService} from './ExposeService.spec'
+import {SetupLocalServiceSpec} from './examples/SetupLocalService.spec'
 
 // runDBusBufferTestSet()
+
+setImmediate(async (): Promise<void> => {
+    await SetupLocalServiceSpec('org.dbus.node.test', 'tcp:host=192.168.1.246,port=44446')
+})
 
 setImmediate(async () => {
     console.time('test')
@@ -18,10 +23,18 @@ setImmediate(async () => {
     // const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/G1/PIGO/LLN0', 'org.iec61850.LN')
     // const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/S1/CTRL/LLN0', 'org.iec61850.LN')
     const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/G1/PIGO/GGIO101', 'org.iec61850.LN')
-    const data = await iface.property.AnOut01.get()
-    // data.q = 1
+    let data = await iface.property.AnOut01.get()
     console.log(data)
+    data.q = 1
+    data.t = BigInt(Date.now())
+    data.subEna = 1
+    data.subQ = 1
+    data.db = 2
+    data.zeroDb = 3
+    data.smpRate = 4
+    data.dU = '魔法怎么失灵啦'
     await iface.property.AnOut01.set(data)
+    data = await iface.property.AnOut01.get()
     console.log(data)
     console.timeEnd('test')
 })
