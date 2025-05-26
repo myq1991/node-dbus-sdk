@@ -3,6 +3,7 @@ import {CommonConnectOpts} from './CommonConnectOpts'
 /**
  * Interface defining options for connecting to a DBus service over TCP.
  * Used to specify the host, port, and timeout settings for a TCP connection.
+ * Extends CommonConnectOpts to include shared connection settings alongside TCP-specific options.
  */
 export interface TCPConnectOpts extends CommonConnectOpts {
     /**
@@ -13,7 +14,7 @@ export interface TCPConnectOpts extends CommonConnectOpts {
 
     /**
      * The port number on which the DBus server is listening.
-     * This specifies the target port for the TCP connection (e.g.,  dbus default port).
+     * This specifies the target port for the TCP connection (e.g., DBus default port).
      */
     port: number
 

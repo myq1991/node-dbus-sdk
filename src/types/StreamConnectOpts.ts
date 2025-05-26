@@ -4,6 +4,7 @@ import {CommonConnectOpts} from './CommonConnectOpts'
 /**
  * Interface defining options for connecting to a DBus service using a stream.
  * Used to specify a duplex stream for communication with the DBus.
+ * Extends CommonConnectOpts to include shared connection settings alongside stream-specific options.
  */
 export interface StreamConnectOpts extends CommonConnectOpts {
     /**

@@ -3,6 +3,7 @@ import {CommonConnectOpts} from './CommonConnectOpts'
 /**
  * Interface defining options for connecting to a DBus socket.
  * Used to specify the socket path and connection timeout settings.
+ * Extends CommonConnectOpts to include shared connection settings alongside socket-specific options.
  */
 export interface SocketConnectOpts extends CommonConnectOpts {
     /**
