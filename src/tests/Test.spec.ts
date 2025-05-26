@@ -14,96 +14,100 @@ import {runExposeService} from './ExposeService.spec'
 
 setImmediate(async () => {
     console.time('test')
-    const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.246,port=44446', advancedResponse: true})
+    const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.246,port=44446', advancedResponse: false})
     // const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/G1/PIGO/LLN0', 'org.iec61850.LN')
-    const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/S1/CTRL/LLN0', 'org.iec61850.LN')
-    const dataSets = await iface.property.DataSets.get()
-    console.log(dataSets)
+    // const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/S1/CTRL/LLN0', 'org.iec61850.LN')
+    const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/G1/PIGO/GGIO101', 'org.iec61850.LN')
+    const data = await iface.property.AnOut01.get()
+    // data.q = 1
+    console.log(data)
+    await iface.property.AnOut01.set(data)
+    console.log(data)
     console.timeEnd('test')
 })
 
 
-setImmediate(async (): Promise<void> => {
-
-    await runExposeService()
-    //
-    // const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444', advancedResponse: true})
-    const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
-    // // const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.0.96,port=44444'})
-    console.log('success')
-    // await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
-    //
-    // const serv = await dbus.getService('org.glib.test')
-    const serv = await dbus.getService('org.test.service13')
-    const obj = await serv.getObject('/test/obj')
-    const rootObj = await serv.getObject('/')
-    const objMgr = await rootObj.getInterface('org.freedesktop.DBus.ObjectManager')
-    objMgr.signal.on('InterfacesAdded', console.log)
-    objMgr.signal.on('InterfacesRemoved', console.log)
-    const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
-    propIface.signal.on('PropertiesChanged', console.log)
-
-
-    // const obj = await serv.getObject('/test/obj')
-    // const iface = await obj.getInterface('test.iface')
-    // const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
-    // // iface.signal.on('fuckSignal', console.log)
-    // // console.log(await iface.method.test(123))
-    // propIface.signal.on('PropertiesChanged', console.log)
-    // // await iface.property.fuck.set(12345678)
-    // await iface.property.fuck.set([12345678])
-    // console.log(await iface.property.fuck.get())
-    // console.log('set value success')
-    //
-    // setInterval(async () => {
-    //     try {
-    //         console.log(await iface.property.fuck.get())
-    //     } catch (e: any) {
-    //         console.log(e.message)
-    //     }
-    // }, 3000)
-
-    // // const serv = await dbus.getService('org.sigxcpu.Feedback')
-    // // const obj = await serv.getObject('/org/sigxcpu/Feedback')
-    // // console.log(await obj.introspect())
-    //
-    // const serv = await dbus.getService('org.test.service')
-    // // console.log(await serv.listObjects())
-    // // const obj = await serv.getObject('/')
-    // const obj = await serv.getObject('/test/obj')
-    // const iface=await obj.getInterface('test.iface')
-    // console.log(await iface.method.fuckYou('hello!'))
-
-    // dbus.createSignalEmitter({
-    //     // uniqueName:'org.ptswitch.pad',
-    //     uniqueName: '*',//在DBus上真正发出信号的sender一般为服务的唯一id
-    //     objectPath: '/slot1/port1/stc',
-    //     interface: 'org.freedesktop.DBus.Properties'
-    // })
-    //     .on('PropertiesChanged', console.log)
-    //     .on('*', console.log)
-    // console.log(await dbus.listServices())
-    // const serv = await dbus.getService('org.ptswitch.pad')
-    // const obj = await serv.getObject('/slot1/port1/stc')
-    // const obj = await serv.getObject('/slot1/port1')
-
-    //
-    // // const serv = await dbus.getService('org.sigxcpu.Feedback')
-    // // const obj = await serv.getObject('/org/sigxcpu/Feedback')
-    // // console.log(await serv.listObjects())
-    //
-    // const iface = await obj.getInterface('pad.stc')
-    // const iface1 = await obj.getInterface('org.freedesktop.DBus.Properties')
-    //
-    // // iface.signal.on('*',console.log)
-    // iface1.signal.on('PropertiesChanged', console.log)
-    //
-    //
-    // // console.log(iface.listProperties())
-    // // console.log(await iface.property.serialNo.get())
-    // console.log(await iface.method.portSetRate(100))
-    // // console.log(iface.noReplyMethod.portSetRate(100))
-    // // iface.method.xxxx
-    // // console.log((await obj.listInterfaces()))
-    // // console.log(await obj.listInterfaces())
-})
+// setImmediate(async (): Promise<void> => {
+//
+//     await runExposeService()
+//     //
+//     // const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444', advancedResponse: true})
+//     const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
+//     // // const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.0.96,port=44444'})
+//     console.log('success')
+//     // await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+//     //
+//     // const serv = await dbus.getService('org.glib.test')
+//     const serv = await dbus.getService('org.test.service13')
+//     const obj = await serv.getObject('/test/obj')
+//     const rootObj = await serv.getObject('/')
+//     const objMgr = await rootObj.getInterface('org.freedesktop.DBus.ObjectManager')
+//     objMgr.signal.on('InterfacesAdded', console.log)
+//     objMgr.signal.on('InterfacesRemoved', console.log)
+//     const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
+//     propIface.signal.on('PropertiesChanged', console.log)
+//
+//
+//     // const obj = await serv.getObject('/test/obj')
+//     // const iface = await obj.getInterface('test.iface')
+//     // const propIface = await obj.getInterface('org.freedesktop.DBus.Properties')
+//     // // iface.signal.on('fuckSignal', console.log)
+//     // // console.log(await iface.method.test(123))
+//     // propIface.signal.on('PropertiesChanged', console.log)
+//     // // await iface.property.fuck.set(12345678)
+//     // await iface.property.fuck.set([12345678])
+//     // console.log(await iface.property.fuck.get())
+//     // console.log('set value success')
+//     //
+//     // setInterval(async () => {
+//     //     try {
+//     //         console.log(await iface.property.fuck.get())
+//     //     } catch (e: any) {
+//     //         console.log(e.message)
+//     //     }
+//     // }, 3000)
+//
+//     // // const serv = await dbus.getService('org.sigxcpu.Feedback')
+//     // // const obj = await serv.getObject('/org/sigxcpu/Feedback')
+//     // // console.log(await obj.introspect())
+//     //
+//     // const serv = await dbus.getService('org.test.service')
+//     // // console.log(await serv.listObjects())
+//     // // const obj = await serv.getObject('/')
+//     // const obj = await serv.getObject('/test/obj')
+//     // const iface=await obj.getInterface('test.iface')
+//     // console.log(await iface.method.fuckYou('hello!'))
+//
+//     // dbus.createSignalEmitter({
+//     //     // uniqueName:'org.ptswitch.pad',
+//     //     uniqueName: '*',//在DBus上真正发出信号的sender一般为服务的唯一id
+//     //     objectPath: '/slot1/port1/stc',
+//     //     interface: 'org.freedesktop.DBus.Properties'
+//     // })
+//     //     .on('PropertiesChanged', console.log)
+//     //     .on('*', console.log)
+//     // console.log(await dbus.listServices())
+//     // const serv = await dbus.getService('org.ptswitch.pad')
+//     // const obj = await serv.getObject('/slot1/port1/stc')
+//     // const obj = await serv.getObject('/slot1/port1')
+//
+//     //
+//     // // const serv = await dbus.getService('org.sigxcpu.Feedback')
+//     // // const obj = await serv.getObject('/org/sigxcpu/Feedback')
+//     // // console.log(await serv.listObjects())
+//     //
+//     // const iface = await obj.getInterface('pad.stc')
+//     // const iface1 = await obj.getInterface('org.freedesktop.DBus.Properties')
+//     //
+//     // // iface.signal.on('*',console.log)
+//     // iface1.signal.on('PropertiesChanged', console.log)
+//     //
+//     //
+//     // // console.log(iface.listProperties())
+//     // // console.log(await iface.property.serialNo.get())
+//     // console.log(await iface.method.portSetRate(100))
+//     // // console.log(iface.noReplyMethod.portSetRate(100))
+//     // // iface.method.xxxx
+//     // // console.log((await obj.listInterfaces()))
+//     // // console.log(await obj.listInterfaces())
+// })

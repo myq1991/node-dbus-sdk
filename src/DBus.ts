@@ -22,6 +22,7 @@ import {EmitSignalOpts} from './types/EmitSignalOpts'
 import {BusNameBasicInfo} from './types/BusNameBasicInfo'
 import {CreateDBusError} from './lib/CreateDBusError'
 import {DBusTypeClass} from './lib/DBusTypeClass'
+import {DBusVariant} from './lib/datatypes/DBusVariant'
 
 /**
  * Main class for interacting with a DBus connection.
@@ -358,7 +359,16 @@ export class DBus extends EventEmitter {
      * @returns A Promise that resolves when the property is successfully set.
      */
     public async setProperty(opts: SetPropertyValueOpts): Promise<void> {
-        const signedValue: DBusSignedValue = opts.signature ? new DBusSignedValue('v', new DBusSignedValue(opts.signature, opts.value)) : new DBusSignedValue('v', opts.value)
+        let signedValue: DBusSignedValue
+        if (opts.value instanceof DBusSignedValue) {
+            if (opts.value.$signature !== DBusVariant.type) {
+                signedValue = new DBusSignedValue('v', opts.value)
+            } else {
+                signedValue = opts.value
+            }
+        } else {
+            signedValue = opts.signature ? new DBusSignedValue('v', new DBusSignedValue(opts.signature, opts.value)) : new DBusSignedValue('v', opts.value)
+        }
         await this.invoke({
             service: opts.service,
             objectPath: opts.objectPath,
@@ -465,7 +475,7 @@ export class DBus extends EventEmitter {
                     case DBusMessageType.ERROR:
                         if (!message.header.replySerial) return
                         if (!this.#inflightCalls[message.header.replySerial]) return
-                        const error: Error = new Error(message.body[0] ? message.body[0] : '')
+                        const error: Error = new Error(message.body[0] ? message.body[0] instanceof DBusTypeClass ? message.body[0].value : message.body[0] : '')
                         error.name = message.header.errorName ? message.header.errorName : error.name
                         return this.#inflightCalls[message.header.replySerial][1](error)
                     case DBusMessageType.SIGNAL:
