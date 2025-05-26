@@ -11,6 +11,7 @@ import {IntrospectSignal} from './types/IntrospectSignal'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
 import {InterfaceNotFoundError} from './lib/Errors'
+import {DBusTypeClass} from './lib/DBusTypeClass'
 
 export class DBusObject {
 
@@ -77,7 +78,7 @@ export class DBusObject {
             interface: 'org.freedesktop.DBus.Introspectable',
             method: 'Introspect'
         })
-        const introspectObject: any = await parseXMLString(introspectXML)
+        const introspectObject: any = await parseXMLString(introspectXML instanceof DBusTypeClass ? introspectXML.value : introspectXML)
         const node: any = introspectObject.node
         const interfaces: any[] = node.interface ? node.interface : []
         return {

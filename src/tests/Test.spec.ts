@@ -14,7 +14,7 @@ import {runExposeService} from './ExposeService.spec'
 
 setImmediate(async () => {
     console.time('test')
-    const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.246,port=44446'})
+    const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.246,port=44446', advancedResponse: true})
     // const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/G1/PIGO/LLN0', 'org.iec61850.LN')
     const iface = await dbus.getInterface('org.iec61850.IED.XK1001', '/XK1001/S1/CTRL/LLN0', 'org.iec61850.LN')
     const dataSets = await iface.property.DataSets.get()
@@ -27,6 +27,7 @@ setImmediate(async (): Promise<void> => {
 
     await runExposeService()
     //
+    // const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444', advancedResponse: true})
     const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
     // // const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.0.96,port=44444'})
     console.log('success')

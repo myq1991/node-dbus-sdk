@@ -318,7 +318,7 @@ export class DBusConnection extends EventEmitter {
         opts = opts ? opts : {}
         const stream: Duplex = await this.createStream(opts)
         const [authMethod, uid, guid] = await this.handshake(stream, opts)
-        return new DBusConnection(stream, authMethod, uid, guid)
+        return new DBusConnection(stream, authMethod, uid, guid, !!opts.advancedResponse)
     }
 
     /**
@@ -392,8 +392,9 @@ export class DBusConnection extends EventEmitter {
      * @param authMethod - The authentication method that succeeded during handshake.
      * @param uid - The user ID used during authentication, as a string (later parsed to number).
      * @param guid - The GUID provided by the server after successful authentication.
+     * @param advancedResponse
      */
-    constructor(stream: Duplex, authMethod: string, uid: string, guid: string) {
+    constructor(stream: Duplex, authMethod: string, uid: string, guid: string, advancedResponse: boolean = false) {
         super()
         this.#stream = stream
         this.#authMethod = authMethod
@@ -422,7 +423,7 @@ export class DBusConnection extends EventEmitter {
                         fieldsAndBody = stream.read(fieldsAndBodyLength)
                         if (!fieldsAndBody) break
                         state = false
-                        this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength))
+                        this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse))
                     }
                 }
             })

@@ -1,8 +1,10 @@
+import {CommonConnectOpts} from './CommonConnectOpts'
+
 /**
  * Interface defining options for connecting to a DBus socket.
  * Used to specify the socket path and connection timeout settings.
  */
-export interface SocketConnectOpts {
+export interface SocketConnectOpts extends CommonConnectOpts {
     /**
      * The path or address of the socket to connect to.
      * This could be a file path for a Unix socket (e.g., '/var/run/dbus/system_bus_socket')

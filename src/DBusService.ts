@@ -2,6 +2,7 @@ import {DBusServiceOpts} from './types/DBusServiceOpts'
 import {DBusObject} from './DBusObject'
 import {DBus} from './DBus'
 import {parseStringPromise as parseXMLString} from 'xml2js'
+import {DBusTypeClass} from './lib/DBusTypeClass'
 
 export class DBusService {
 
@@ -48,7 +49,7 @@ export class DBusService {
                 method: 'Introspect'
             })
             if (!xmlResponse) return []
-            const parsedObject: any = await parseXMLString(xmlResponse)
+            const parsedObject: any = await parseXMLString(xmlResponse instanceof DBusTypeClass ? xmlResponse.value : xmlResponse)
             if (!parsedObject?.node?.interface) emptyObjectPaths.push(objectPath)
             if (!parsedObject?.node?.node) return []
             const nodeNames: string[] = (parsedObject.node.node as { $: { name: string } }[]).map((node: {

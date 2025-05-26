@@ -21,6 +21,7 @@ import {ReplyOpts} from './types/ReplyOpts'
 import {EmitSignalOpts} from './types/EmitSignalOpts'
 import {BusNameBasicInfo} from './types/BusNameBasicInfo'
 import {CreateDBusError} from './lib/CreateDBusError'
+import {DBusTypeClass} from './lib/DBusTypeClass'
 
 /**
  * Main class for interacting with a DBus connection.
@@ -196,7 +197,7 @@ export class DBus extends EventEmitter {
             interface: 'org.freedesktop.DBus',
             method: 'Hello'
         })
-        this.#uniqueName = uniqueName
+        this.#uniqueName = uniqueName instanceof DBusTypeClass ? uniqueName.value : uniqueName
     }
 
     /**
@@ -966,7 +967,7 @@ export class DBus extends EventEmitter {
                 signature: 's',
                 args: [name]
             })
-            return owner
+            return owner instanceof DBusTypeClass ? owner.value : owner
         } catch (e) {
             return undefined
         }
@@ -985,7 +986,7 @@ export class DBus extends EventEmitter {
             interface: 'org.freedesktop.DBus',
             method: 'ListActivatableNames'
         })
-        return activatableNames
+        return activatableNames instanceof DBusTypeClass ? activatableNames.value : activatableNames
     }
 
     /**
@@ -1001,7 +1002,7 @@ export class DBus extends EventEmitter {
             interface: 'org.freedesktop.DBus',
             method: 'ListNames'
         })
-        return names
+        return names instanceof DBusTypeClass ? names.value : names
     }
 
     /**
@@ -1020,7 +1021,7 @@ export class DBus extends EventEmitter {
             method: 'NameHasOwner',
             args: [name]
         })
-        return hasOwner
+        return hasOwner instanceof DBusTypeClass ? hasOwner.value : hasOwner
     }
 
     /**
@@ -1040,7 +1041,7 @@ export class DBus extends EventEmitter {
             method: 'RequestName',
             args: [name, flags]
         })
-        return res
+        return res instanceof DBusTypeClass ? res.value : res
     }
 
     /**
@@ -1059,7 +1060,7 @@ export class DBus extends EventEmitter {
             method: 'ReleaseName',
             args: [name]
         })
-        return res
+        return res instanceof DBusTypeClass ? res.value : res
     }
 
     /**
@@ -1094,7 +1095,7 @@ export class DBus extends EventEmitter {
             method: 'StartServiceByName',
             args: [name, flags]
         })
-        return res
+        return res instanceof DBusTypeClass ? res.value : res
     }
 
     /**
@@ -1114,7 +1115,7 @@ export class DBus extends EventEmitter {
                 signature: 's',
                 args: [name]
             })
-            return pid
+            return pid instanceof DBusTypeClass ? pid.value : pid
         } catch (e) {
             return undefined
         }

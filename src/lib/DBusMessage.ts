@@ -204,9 +204,10 @@ export class DBusMessage {
      * @param fieldsAndBody - A Buffer containing the header fields and body data.
      * @param fieldsLength - The length of the header fields section in bytes.
      * @param bodyLength - The length of the body section in bytes.
+     * @param typed
      * @returns A DBusMessage instance with parsed header and body content.
      */
-    public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number): DBusMessage {
+    public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number, typed: boolean = false): DBusMessage {
         // Determine the endianness from the first byte of the header
         const endianness: DBusMessageEndianness = header[0] === DBusMessageEndianness.LE ? DBusMessageEndianness.LE : DBusMessageEndianness.BE
         const headerDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, header)
@@ -241,7 +242,7 @@ export class DBusMessage {
         const bodyBuffer: Buffer = fieldsAndBody.subarray(bodyOffset)
         const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, bodyBuffer)
         // Decode the body based on the signature provided in the header
-        const body: any[] = bodyDecoder.decode(messageHeader.signature)
+        const body: any[] = bodyDecoder.decode(messageHeader.signature, typed)
         return new DBusMessage(messageHeader, ...body)
     }
 }

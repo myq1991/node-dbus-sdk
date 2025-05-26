@@ -1,8 +1,10 @@
+import {CommonConnectOpts} from './CommonConnectOpts'
+
 /**
  * Interface defining options for connecting to a DBus service over TCP.
  * Used to specify the host, port, and timeout settings for a TCP connection.
  */
-export interface TCPConnectOpts {
+export interface TCPConnectOpts extends CommonConnectOpts {
     /**
      * The hostname or IP address of the DBus server to connect to.
      * This specifies the target server for the TCP connection (e.g., 'localhost' or '192.168.1.100').
