@@ -670,11 +670,12 @@ export class DBusBufferDecoder {
      * This method unwraps DBusSignedValue instances into their raw values for easier use.
      *
      * @param signature - The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
+     * @param typed
      * @returns An array of plain JavaScript values extracted from the decoded DBusSignedValue instances.
      * @throws {SignatureError} If the signature is empty or invalid.
      */
-    public decode(signature: string): any[] {
+    public decode(signature: string, typed: boolean = false): any[] {
         // Read values as DBusSignedValue instances and convert them to plain JSON-like values
-        return DBusSignedValue.toJSON(this.toSignedValues(signature))
+        return typed ? this.toSignedValues(signature) : DBusSignedValue.toJSON(this.toSignedValues(signature))
     }
 }
