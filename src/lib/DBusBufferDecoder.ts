@@ -3,6 +3,8 @@ import {DBusSignedValue} from './DBusSignedValue'
 import {Signature} from './Signature'
 import {DataType} from '../types/DataType'
 import {AlignmentError, InvalidValueError, ReadBufferError, SignatureError} from './Errors'
+import {DBusTypeClass} from './DBusTypeClass'
+import {SignedValueToTypeClassInstance} from './SignedValueToTypeClassInstance'
 
 /**
  * A decoder for reading DBus data from a binary buffer, following the DBus wire format.
@@ -641,13 +643,13 @@ export class DBusBufferDecoder {
 
     /**
      * Reads multiple values from the buffer based on the provided signature string.
-     * The signature is parsed into DataType(s), and values are read accordingly.
+     * The signature is parsed into DataType(s), and values are read accordingly, then converted to DBusTypeClass instances.
      *
      * @param signature - The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
-     * @returns An array of DBusSignedValue instances representing the read values.
+     * @returns An array of DBusTypeClass instances representing the read values.
      * @throws {SignatureError} If the signature is empty or invalid.
      */
-    public toSignedValues(signature: string): DBusSignedValue[] {
+    public toSignedValues(signature: string): DBusTypeClass[] {
         // Parse the signature string into an array of DataType objects
         const dataTypes: DataType[] = Signature.parseSignature(signature)
 
@@ -657,25 +659,25 @@ export class DBusBufferDecoder {
         }
 
         // Read each value based on its corresponding DataType
-        const results: DBusSignedValue[] = []
+        const results: DBusTypeClass[] = []
         for (const dataType of dataTypes) {
-            const value = this.readSignedValue(dataType)
-            results.push(value)
+            const value: DBusSignedValue = this.readSignedValue(dataType)
+            results.push(SignedValueToTypeClassInstance(value))
         }
         return results
     }
 
     /**
-     * Decodes values from the buffer based on the provided signature and converts them to plain JavaScript values.
-     * This method unwraps DBusSignedValue instances into their raw values for easier use.
+     * Decodes values from the buffer based on the provided signature and optionally converts them to plain JavaScript values or typed DBusTypeClass instances.
+     * This method can unwrap DBusSignedValue instances into raw values for easier use or return typed instances for further processing.
      *
      * @param signature - The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
-     * @param typed
-     * @returns An array of plain JavaScript values extracted from the decoded DBusSignedValue instances.
+     * @param typed - If true, returns an array of DBusTypeClass instances; if false, returns plain JavaScript values (default: false).
+     * @returns An array of either plain JavaScript values or DBusTypeClass instances, based on the typed parameter.
      * @throws {SignatureError} If the signature is empty or invalid.
      */
     public decode(signature: string, typed: boolean = false): any[] {
-        // Read values as DBusSignedValue instances and convert them to plain JSON-like values
-        return typed ? this.toSignedValues(signature) : DBusSignedValue.toJSON(this.toSignedValues(signature))
+        // Read values as DBusSignedValue instances and convert them based on the typed parameter
+        return typed ? this.toSignedValues(signature) : DBusSignedValue.toJSON(this.toSignedValues(signature) as any)
     }
 }
