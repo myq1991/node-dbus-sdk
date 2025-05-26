@@ -392,7 +392,7 @@ export class DBusConnection extends EventEmitter {
      * @param authMethod - The authentication method that succeeded during handshake.
      * @param uid - The user ID used during authentication, as a string (later parsed to number).
      * @param guid - The GUID provided by the server after successful authentication.
-     * @param advancedResponse
+     * @param advancedResponse - Boolean flag to enable advanced response handling, where DBus return messages are organized using DBusTypeClass instances.
      */
     constructor(stream: Duplex, authMethod: string, uid: string, guid: string, advancedResponse: boolean = false) {
         super()
