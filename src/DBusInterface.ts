@@ -60,7 +60,7 @@ export class DBusInterface {
                     .filter((arg: IntrospectMethodArgument): boolean => arg.direction === 'in')
                     .map((arg: IntrospectMethodArgument): string => arg.type)
                 const signature: string | undefined = types.length ? types.join('') : undefined
-                const inputArguments: any[] = signature ? [new DBusSignedValue(signature, args)] : []
+                const inputArguments: any[] = signature ? args.length ? DBusSignedValue.parse(signature, args.length > 1 ? args : args[0]) : [] : []
                 const result: any[] = await this.dbus.invoke({
                     service: this.service.name,
                     objectPath: this.object.name,

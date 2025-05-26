@@ -24,7 +24,9 @@ export async function SetupLocalServiceSpec(serviceName: string, busAddress: str
             outputArgs: [{
                 type: 's'
             }],
-            method: async (input: string): Promise<string> => `Hello! ${input}`
+            method: async (input: string): Promise<string> => {
+                return `Hello! ${input}`
+            }
         })
         .defineMethod({
             name: 'GetTime',
@@ -86,5 +88,6 @@ export async function SetupLocalServiceSpec(serviceName: string, busAddress: str
     object1.addInterface(iface1)
     await new Promise<void>(resolve => setTimeout(resolve, 1000))
     object2.addInterface(iface2)
+    await new Promise<void>(resolve => setTimeout(resolve, 1000))
     console.info(`Local service ${serviceName} startup completely`)
 }
