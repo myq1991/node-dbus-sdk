@@ -1,7 +1,10 @@
-import {DBusSignedValue} from '../DBusSignedValue'
+import {DBusTypeClass} from '../DBusTypeClass'
 
-export class DBusObjectPath extends DBusSignedValue {
+export class DBusObjectPath extends DBusTypeClass {
+
+    public static type: string = 'o'
+
     constructor(value: string) {
-        super('o', value)
+        super(DBusObjectPath.type, value)
     }
 }

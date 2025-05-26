@@ -1,7 +1,10 @@
-import {DBusSignedValue} from '../DBusSignedValue'
+import {DBusTypeClass} from '../DBusTypeClass'
 
-export class DBusInt64 extends DBusSignedValue {
+export class DBusInt64 extends DBusTypeClass {
+
+    public static type: string = 'x'
+
     constructor(value: bigint) {
-        super('x', value)
+        super(DBusInt64.type, value)
     }
 }
