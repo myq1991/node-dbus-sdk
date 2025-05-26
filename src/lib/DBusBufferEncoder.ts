@@ -2,17 +2,35 @@ import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 import {ObjectPathError, SignatureError} from './Errors'
 import {DBusSignedValue} from './DBusSignedValue'
 
+/**
+ * A class for encoding data into a binary buffer following the DBus wire format.
+ * Supports various DBus data types with proper alignment and endianness handling.
+ * This class provides methods to encode basic types (e.g., integers, strings) and
+ * container types (e.g., arrays, structs) as per the DBus specification.
+ */
 export class DBusBufferEncoder {
 
+    /**
+     * The endianness used for encoding DBus messages.
+     * Defaults to little-endian (LE) as it is the most common in DBus implementations.
+     * Determines the byte order for multi-byte values in the message.
+     */
     public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.LE
 
+    /**
+     * The binary buffer where encoded DBus data is stored.
+     * This holds the raw bytes that are built during encoding operations.
+     */
     protected buffer: Buffer
 
     /**
-     * Constructor for DBusBufferEncoder
-     * @param endianness Byte order for encoding (little-endian or big-endian)
-     * @param initBuffer Initial buffer to start with, if any
-     * @param alignment Initial alignment requirement, if specified
+     * Constructor for DBusBufferEncoder.
+     * Initializes the encoder with the specified endianness and an optional initial buffer.
+     * Optionally aligns the buffer to a specified boundary if provided.
+     *
+     * @param endianness - The byte order for encoding (little-endian or big-endian, default: Little Endian).
+     * @param initBuffer - An initial buffer to start with, if any (default: empty buffer).
+     * @param alignment - An initial alignment requirement, if specified, to align the buffer start.
      */
     constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, initBuffer?: Buffer, alignment?: number) {
         this.endianness = endianness
@@ -21,8 +39,12 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Aligns the buffer to the specified byte boundary
-     * @param alignment The byte boundary to align to (e.g., 1, 2, 4, 8)
+     * Aligns the buffer to the specified byte boundary.
+     * Adds padding bytes (zeros) to ensure the buffer length meets the alignment requirement,
+     * which is necessary for certain DBus data types.
+     *
+     * @param alignment - The byte boundary to align to (e.g., 1, 2, 4, 8).
+     * @returns The instance itself for method chaining.
      * @protected
      */
     protected align(alignment: number): this {
@@ -36,9 +58,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a BYTE type value
-     * Buffer must be 1-byte aligned before calling this method
-     * @param value The byte value to encode (0-255)
+     * Encodes a BYTE type value into the buffer.
+     * BYTE is an 8-bit unsigned integer with no specific alignment requirement (1-byte alignment).
+     *
+     * @param value - The byte value to encode (0-255).
+     * @returns The instance itself for method chaining.
      */
     public writeByte(value: number): this {
         this.align(1)
@@ -49,9 +73,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a BOOLEAN type value
-     * Buffer must be 4-byte aligned before calling this method
-     * @param value The boolean value to encode
+     * Encodes a BOOLEAN type value into the buffer.
+     * BOOLEAN is stored as a 32-bit unsigned integer (0 for false, 1 for true) and requires 4-byte alignment.
+     *
+     * @param value - The boolean value to encode (true or false).
+     * @returns The instance itself for method chaining.
      */
     public writeBoolean(value: boolean): this {
         this.align(4)
@@ -67,9 +93,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes an INT16 type value
-     * Buffer must be 2-byte aligned before calling this method
-     * @param value The 16-bit signed integer value to encode
+     * Encodes an INT16 type value into the buffer.
+     * INT16 is a 16-bit signed integer and requires 2-byte alignment.
+     *
+     * @param value - The 16-bit signed integer value to encode.
+     * @returns The instance itself for method chaining.
      */
     public writeInt16(value: number): this {
         this.align(2)
@@ -84,9 +112,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a UINT16 type value
-     * Buffer must be 2-byte aligned before calling this method
-     * @param value The 16-bit unsigned integer value to encode
+     * Encodes a UINT16 type value into the buffer.
+     * UINT16 is a 16-bit unsigned integer and requires 2-byte alignment.
+     *
+     * @param value - The 16-bit unsigned integer value to encode.
+     * @returns The instance itself for method chaining.
      */
     public writeUInt16(value: number): this {
         this.align(2)
@@ -101,9 +131,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes an INT32 type value
-     * Buffer must be 4-byte aligned before calling this method
-     * @param value The 32-bit signed integer value to encode
+     * Encodes an INT32 type value into the buffer.
+     * INT32 is a 32-bit signed integer and requires 4-byte alignment.
+     *
+     * @param value - The 32-bit signed integer value to encode.
+     * @returns The instance itself for method chaining.
      */
     public writeInt32(value: number): this {
         this.align(4)
@@ -118,9 +150,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a UINT32 type value
-     * Buffer must be 4-byte aligned before calling this method
-     * @param value The 32-bit unsigned integer value to encode
+     * Encodes a UINT32 type value into the buffer.
+     * UINT32 is a 32-bit unsigned integer and requires 4-byte alignment.
+     *
+     * @param value - The 32-bit unsigned integer value to encode.
+     * @returns The instance itself for method chaining.
      */
     public writeUInt32(value: number): this {
         this.align(4)
@@ -135,9 +169,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes an INT64 type value
-     * Buffer must be 8-byte aligned before calling this method
-     * @param value The 64-bit signed integer value to encode
+     * Encodes an INT64 type value into the buffer.
+     * INT64 is a 64-bit signed integer and requires 8-byte alignment.
+     *
+     * @param value - The 64-bit signed integer value to encode, provided as a bigint.
+     * @returns The instance itself for method chaining.
      */
     public writeInt64(value: bigint): this {
         this.align(8)
@@ -152,9 +188,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a UINT64 type value
-     * Buffer must be 8-byte aligned before calling this method
-     * @param value The 64-bit unsigned integer value to encode
+     * Encodes a UINT64 type value into the buffer.
+     * UINT64 is a 64-bit unsigned integer and requires 8-byte alignment.
+     *
+     * @param value - The 64-bit unsigned integer value to encode, provided as a bigint.
+     * @returns The instance itself for method chaining.
      */
     public writeUInt64(value: bigint): this {
         this.align(8)
@@ -169,9 +207,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a DOUBLE type value
-     * Buffer must be 8-byte aligned before calling this method
-     * @param value The double-precision floating-point value to encode
+     * Encodes a DOUBLE type value into the buffer.
+     * DOUBLE is a 64-bit double-precision floating-point number and requires 8-byte alignment.
+     *
+     * @param value - The double-precision floating-point value to encode.
+     * @returns The instance itself for method chaining.
      */
     public writeDouble(value: number): this {
         this.align(8)
@@ -186,9 +226,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a UNIX_FD type value
-     * Buffer must be 4-byte aligned before calling this method
-     * @param fdIndex The file descriptor index to encode
+     * Encodes a UNIX_FD type value into the buffer.
+     * UNIX_FD is a 32-bit unsigned integer representing a file descriptor index and requires 4-byte alignment.
+     *
+     * @param fdIndex - The file descriptor index to encode.
+     * @returns The instance itself for method chaining.
      */
     public writeUnixFD(fdIndex: number): this {
         this.align(4)
@@ -203,9 +245,12 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a STRING type value
-     * Buffer must be 4-byte aligned before calling this method
-     * @param value The string value to encode
+     * Encodes a STRING type value into the buffer.
+     * STRING consists of a 32-bit length field followed by UTF-8 encoded characters and a null terminator.
+     * The length field requires 4-byte alignment.
+     *
+     * @param value - The string value to encode.
+     * @returns The instance itself for method chaining.
      */
     public writeString(value: string): this {
         this.align(4)
@@ -228,9 +273,13 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes an OBJECT_PATH type value
-     * Buffer must be 4-byte aligned before calling this method
-     * @param value The object path string to encode
+     * Encodes an OBJECT_PATH type value into the buffer.
+     * OBJECT_PATH is a string with specific formatting rules, stored like STRING with a 32-bit length field.
+     * The length field requires 4-byte alignment.
+     *
+     * @param value - The object path string to encode.
+     * @returns The instance itself for method chaining.
+     * @throws {ObjectPathError} If the object path does not conform to DBus specification formatting rules.
      */
     public writeObjectPath(value: string): this {
         // Validate object path format according to DBus specification
@@ -256,9 +305,12 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a SIGNATURE type value
-     * Buffer must be 1-byte aligned before calling this method
-     * @param value The signature string to encode
+     * Encodes a SIGNATURE type value into the buffer.
+     * SIGNATURE is a string of type codes with a 1-byte length field and no specific alignment requirement.
+     *
+     * @param value - The signature string to encode.
+     * @returns The instance itself for method chaining.
+     * @throws {SignatureError} If the signature length exceeds the maximum allowed (255 bytes).
      */
     public writeSignature(value: string): this {
         this.align(1)
@@ -279,10 +331,13 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes an ARRAY type value
-     * Buffer must be 4-byte aligned before calling this method
-     * @param signedValues Array elements, each associated with a signature
-     * @param arrayItemSignature Array elements type
+     * Encodes an ARRAY type value into the buffer.
+     * ARRAY starts with a 32-bit length field (total byte length of array data) and requires 4-byte alignment.
+     * Additional alignment may be needed for specific array element types (e.g., dictionary entries).
+     *
+     * @param signedValues - Array elements, each associated with a signature as DBusSignedValue instances.
+     * @param arrayItemSignature - Optional signature of array elements to determine additional alignment needs.
+     * @returns The instance itself for method chaining.
      */
     public writeArray(signedValues: DBusSignedValue[], arrayItemSignature?: string): this {
         this.align(4)
@@ -311,8 +366,8 @@ export class DBusBufferEncoder {
 
         if (arrayItemSignature) switch (arrayItemSignature) {
             case '{':
-                // case '('://TODO 此处还有问题
-                this.align(8)
+            case '(':
+                this.align(8) // Special alignment for dictionary entries or structs
         }
 
         // Append array content to the main buffer
@@ -321,9 +376,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a STRUCT type value
-     * Buffer must be 8-byte aligned before calling this method
-     * @param signedValues Struct fields, each associated with a signature
+     * Encodes a STRUCT type value into the buffer.
+     * STRUCT is a sequence of fields and requires 8-byte alignment at the start.
+     *
+     * @param signedValues - Struct fields, each associated with a signature as DBusSignedValue instances.
+     * @returns The instance itself for method chaining.
      */
     public writeStruct(signedValues: DBusSignedValue[]): this {
         this.align(8)
@@ -336,9 +393,12 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a DICT_ENTRY type value
-     * Buffer must be 8-byte aligned before calling this method
-     * @param signedValues Dictionary entry as a key-value pair, must contain exactly two elements (key and value), each associated with a signature
+     * Encodes a DICT_ENTRY type value into the buffer.
+     * DICT_ENTRY is a key-value pair used in dictionaries and requires 8-byte alignment at the start.
+     *
+     * @param signedValues - Dictionary entry as a key-value pair, must contain exactly two elements (key and value), each as a DBusSignedValue.
+     * @returns The instance itself for method chaining.
+     * @throws {SignatureError} If the dictionary entry does not contain exactly two elements.
      */
     public writeDictEntry(signedValues: DBusSignedValue[]): this {
         this.align(8)
@@ -355,9 +415,11 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a VARIANT type value
-     * Buffer must be 1-byte aligned before calling this method
-     * @param signedValue Variant value, associated with a signature
+     * Encodes a VARIANT type value into the buffer.
+     * VARIANT is a dynamic type container with a signature field followed by data, requiring no specific alignment (1-byte alignment).
+     *
+     * @param signedValue - Variant value, associated with a signature as a DBusSignedValue.
+     * @returns The instance itself for method chaining.
      */
     public writeVariant(signedValue: DBusSignedValue): this {
         this.align(1)
@@ -373,16 +435,13 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Builds the complete signature string for a given signed value
-     * Recursively handles nested structures like arrays, structs, dictionaries, and variants
-     * @param signedValue The signed value to build a signature for
-     * @returns The complete signature string
-     */
-    /**
-     * Builds the complete signature string for a given signed value
-     * Recursively handles nested structures like arrays, structs, dictionaries, and variants
-     * @param signedValue The signed value to build a signature for
-     * @returns The complete signature string
+     * Builds the complete signature string for a given signed value.
+     * Recursively handles nested structures like arrays, structs, dictionaries, and variants.
+     *
+     * @param signedValue - The signed value to build a signature for.
+     * @returns The complete signature string representing the type structure of the value.
+     * @throws {SignatureError} If the signature cannot be built due to invalid or unsupported types.
+     * @private
      */
     private buildSignature(signedValue: DBusSignedValue): string {
         // Basic types return their signature directly
@@ -466,8 +525,12 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Encodes a value based on its DBus type signature
-     * @param signedValue The value to encode, associated with a DBus signature
+     * Encodes a value based on its DBus type signature.
+     * Routes the encoding to the appropriate method based on the signature of the provided DBusSignedValue.
+     *
+     * @param signedValue - The value to encode, associated with a DBus signature as a DBusSignedValue.
+     * @returns The instance itself for method chaining.
+     * @throws {SignatureError} If the type signature is unsupported.
      */
     public writeSignedValue(signedValue: DBusSignedValue): this {
         // Route encoding based on the signature type
@@ -514,19 +577,23 @@ export class DBusBufferEncoder {
     }
 
     /**
-     * Retrieves the current encoded buffer
-     * @returns The current buffer with encoded data
+     * Retrieves the current encoded buffer.
+     * Returns the buffer containing all data encoded so far.
+     *
+     * @returns The current buffer with encoded data.
      */
     public getBuffer(): Buffer {
         return this.buffer
     }
 
     /**
-     * Encodes a value or set of values based on a DBus signature
-     * @param signature The DBus signature defining the type(s) of the value(s)
-     * @param value The value(s) to encode, can be raw or already wrapped as DBusSignedValue(s)
-     * @param debug
-     * @returns The encoded buffer
+     * Encodes a value or set of values based on a DBus signature.
+     * Parses the input value(s) into DBusSignedValue instances based on the signature and encodes them into the buffer.
+     *
+     * @param signature - The DBus signature defining the type(s) of the value(s) to encode.
+     * @param value - The value(s) to encode, can be raw data or already wrapped as DBusSignedValue(s).
+     * @param debug - If true, logs the parsed DBusSignedValue instances for debugging purposes (default: false).
+     * @returns The encoded buffer containing the data.
      */
     public encode(signature: string, value: any | DBusSignedValue | DBusSignedValue[], debug: boolean = false): Buffer {
         // Parse the input value(s) into signed values based on the signature
