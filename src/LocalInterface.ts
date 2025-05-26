@@ -574,7 +574,7 @@ export class LocalInterface {
             // Encode and decode the value to ensure it matches the property's signature
             const encoder: DBusBufferEncoder = new DBusBufferEncoder()
             const decoder: DBusBufferDecoder = new DBusBufferDecoder(encoder.endianness, encoder.encode(this.#definedProperties[name].signature, value))
-            ;[value] = decoder.decode(this.#definedProperties[name].signature)
+            ;[value] = decoder.decode(this.#definedProperties[name].signature, false)
         } catch (e) {
             throw CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The property signature '${this.#definedProperties[name].signature}' does not match its value.`)
         }
