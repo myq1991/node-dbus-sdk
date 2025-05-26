@@ -93,8 +93,6 @@ export class DBusMessage {
                 ])
             }
         })
-        const fieldsEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
-        const fieldsBuff: Buffer = fieldsEncoder.encode('a(yv)', fields)
         // Build basic header with only 12 bytes (without headerFieldsLength)
         const headerBasic: number[] = [
             DBusMessageEndianness.LE, // Endianness indicator
@@ -104,15 +102,13 @@ export class DBusMessage {
             bodyLength, // Length of the body in bytes
             this.header.serial // Serial number for message tracking
         ]
-        const headerEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
-        const headerBuffer: Buffer = headerEncoder.encode('yyyyuu', headerBasic)
-        // Calculate total header length (headerBuffer + fieldsBuff) and align to 8-byte boundary
-        const totalHeaderLen: number = headerBuffer.length + fieldsBuff.length
+        const headerAndFieldsEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
+        const headerAndFieldsBuffer: Buffer = headerAndFieldsEncoder.encode('yyyyuua(yv)', [...headerBasic, fields])
+        const totalHeaderLen: number = headerAndFieldsBuffer.length
         const headerLenAligned: number = Math.ceil(totalHeaderLen / 8) * 8
         const paddingLen: number = headerLenAligned - totalHeaderLen
         const paddingBuff: Buffer = Buffer.alloc(paddingLen, 0) // Add padding bytes to align to 8-byte boundary
-        // Combine header, fields, padding, and body into a single buffer
-        return Buffer.concat([headerBuffer, fieldsBuff, paddingBuff, bodyBuff])
+        return Buffer.concat([headerAndFieldsBuffer, paddingBuff, bodyBuff])
     }
 
     /**
@@ -242,7 +238,8 @@ export class DBusMessage {
         let paddingLength: number = 8 - (header.length + fieldsLength) % 8
         paddingLength = paddingLength === 8 ? 0 : paddingLength
         const bodyOffset: number = fieldsLength + paddingLength
-        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, fieldsAndBody.subarray(bodyOffset))
+        const bodyBuffer: Buffer = fieldsAndBody.subarray(bodyOffset)
+        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, bodyBuffer)
         // Decode the body based on the signature provided in the header
         const body: any[] = bodyDecoder.decode(messageHeader.signature)
         return new DBusMessage(messageHeader, ...body)
