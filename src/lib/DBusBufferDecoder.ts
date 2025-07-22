@@ -21,6 +21,12 @@ export class DBusBufferDecoder {
     public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.LE
 
     /**
+     * Auto convert BigInt type to Number type
+     * @protected
+     */
+    protected readonly convertBigIntToNumber: boolean = false
+
+    /**
      * The binary buffer containing the DBus data to be decoded.
      * This holds the raw bytes that the decoder reads from during operation.
      */
@@ -40,9 +46,11 @@ export class DBusBufferDecoder {
      * @param endianness - The endianness to use for reading multi-byte values (default: Little Endian).
      * @param buffer - The binary buffer containing the DBus data to decode.
      * @param offset - The initial offset to start reading from (default: 0).
+     * @param convertBigIntToNumber - Convert bigint value to number (default: false)
      */
-    constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, buffer: Buffer, offset: number = 0) {
+    constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, buffer: Buffer, offset: number = 0, convertBigIntToNumber: boolean = false) {
         this.endianness = endianness
+        this.convertBigIntToNumber = convertBigIntToNumber
         this.buffer = buffer
         // Set the initial offset for reading from the buffer
         this.offset = offset
@@ -240,7 +248,8 @@ export class DBusBufferDecoder {
             value = this.buffer.readBigInt64BE(this.offset) // Read as big-endian
         }
         this.offset += 8 // Increment offset by 8 bytes
-        return new DBusSignedValue('x', value)
+        // return new DBusSignedValue('x', value)
+        return new DBusSignedValue('x', this.convertBigIntToNumber ? parseInt(value.toString()) : value)
     }
 
     /**
@@ -264,7 +273,8 @@ export class DBusBufferDecoder {
             value = this.buffer.readBigUInt64BE(this.offset) // Read as big-endian
         }
         this.offset += 8 // Increment offset by 8 bytes
-        return new DBusSignedValue('t', value)
+        // return new DBusSignedValue('t', value)
+        return new DBusSignedValue('t', this.convertBigIntToNumber ? parseInt(value.toString()) : value)
     }
 
     /**
@@ -474,7 +484,7 @@ export class DBusBufferDecoder {
         // Extract a sub-buffer for the array data to isolate reading
         const arrayBuffer = this.buffer.subarray(this.offset, arrayEndOffset)
         // Create a new decoder instance for the array sub-buffer to manage local offset
-        const arrayDecoder = new DBusBufferDecoder(this.endianness, arrayBuffer)
+        const arrayDecoder = new DBusBufferDecoder(this.endianness, arrayBuffer, 0, this.convertBigIntToNumber)
         const elements: DBusSignedValue[] = []
         // Read elements until the sub-buffer is fully consumed
         while (arrayDecoder.offset < arrayBuffer.length) {

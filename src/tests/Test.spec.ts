@@ -9,8 +9,8 @@ import {InvokeDBusServiceSpec} from './examples/InvokeDBusService.spec'
  */
 setImmediate(async (): Promise<void> => {
     // Set up a local DBus service with the specified name and TCP bus address
-    await SetupLocalServiceSpec('org.dbus.node.test', 'tcp:host=192.168.1.246,port=44446')
+    await SetupLocalServiceSpec('org.dbus.node.test', 'tcp:host=192.168.1.127,port=44444')
 
     // Invoke the DBus service as a client to test interactions with the local service
-    await InvokeDBusServiceSpec('org.dbus.node.test', 'tcp:host=192.168.1.246,port=44446')
+    await InvokeDBusServiceSpec('org.dbus.node.test', 'tcp:host=192.168.1.127,port=44444')
 })

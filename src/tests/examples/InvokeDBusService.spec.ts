@@ -15,7 +15,11 @@ import {DBusInterface} from '../../DBusInterface'
  */
 export async function InvokeDBusServiceSpec(serviceName: string, busAddress: string): Promise<void> {
     // Connect to the DBus at the specified bus address, disabling advanced response handling
-    const dbus: DBus = await DBus.connect({busAddress: busAddress, advancedResponse: false})
+    const dbus: DBus = await DBus.connect({
+        busAddress: busAddress,
+        advancedResponse: false,
+        convertBigIntToNumber: true
+    })
 
     // Get the ObjectManager interface for the specified service at the root path
     const objectManagerInterface: DBusInterface = await dbus.getInterface(serviceName, '/', 'org.freedesktop.DBus.ObjectManager')

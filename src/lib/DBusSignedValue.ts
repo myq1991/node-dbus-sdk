@@ -86,7 +86,7 @@ export class DBusSignedValue {
      * @returns An array of plain JavaScript values representing the data without DBus signatures.
      */
     public static toJSON(values: DBusSignedValue[]): any[] {
-        return values.map(value => DBusSignedValue.convertToPlain(value))
+        return values.map((value: DBusSignedValue): any => DBusSignedValue.convertToPlain(value))
     }
 
     /**

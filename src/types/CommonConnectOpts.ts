@@ -9,4 +9,8 @@ export interface CommonConnectOpts {
      * Defaults to false, which returns plain JavaScript values.
      */
     advancedResponse?: boolean
+    /**
+     * Optional flag to enable auto convert bigint to javascript number for DBus messages.
+     */
+    convertBigIntToNumber?: boolean
 }

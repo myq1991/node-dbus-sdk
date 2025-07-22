@@ -205,12 +205,13 @@ export class DBusMessage {
      * @param fieldsLength - The length of the header fields section in bytes.
      * @param bodyLength - The length of the body section in bytes.
      * @param advancedResponse - Boolean flag to enable advanced response handling, where DBus return messages are organized using DBusTypeClass instances.
+     * @param convertBigIntToNumber - Boolean flag to enable auto convert bigint to javascript number.
      * @returns A DBusMessage instance with parsed header and body content.
      */
-    public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number, advancedResponse: boolean = false): DBusMessage {
+    public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number, advancedResponse: boolean = false, convertBigIntToNumber: boolean = false): DBusMessage {
         // Determine the endianness from the first byte of the header
         const endianness: DBusMessageEndianness = header[0] === DBusMessageEndianness.LE ? DBusMessageEndianness.LE : DBusMessageEndianness.BE
-        const headerDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, header)
+        const headerDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, header, 0, convertBigIntToNumber)
         const headers: number[] = headerDecoder.decode('yyyyuuu')
         const type: number = headers[1] // Message type (e.g., METHOD_CALL, SIGNAL)
         const flags: number = headers[2] // Message flags (e.g., REPLY_EXPECTED)
@@ -218,7 +219,7 @@ export class DBusMessage {
         const serial: number = headers[5] // Serial number for message tracking
         // Concatenate remaining header bytes with fields data for full field parsing
         const headerWithFieldsBuffer: Buffer = Buffer.concat([header, fieldsAndBody.subarray(0, fieldsLength)])
-        const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, headerWithFieldsBuffer, 12)
+        const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, headerWithFieldsBuffer, 12, convertBigIntToNumber)
         const [fields] = fieldsDecoder.decode('a(yv)') // Decode array of (type ID, value) pairs for header fields
         const messageHeader: Partial<DBusMessageHeader> = {
             type: type,
@@ -240,7 +241,7 @@ export class DBusMessage {
         paddingLength = paddingLength === 8 ? 0 : paddingLength
         const bodyOffset: number = fieldsLength + paddingLength
         const bodyBuffer: Buffer = fieldsAndBody.subarray(bodyOffset)
-        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, bodyBuffer)
+        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, bodyBuffer, 0, convertBigIntToNumber)
         // Decode the body based on the signature provided in the header
         const body: any[] = bodyDecoder.decode(messageHeader.signature, advancedResponse)
         return new DBusMessage(messageHeader, ...body)

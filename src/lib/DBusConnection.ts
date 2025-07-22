@@ -318,7 +318,7 @@ export class DBusConnection extends EventEmitter {
         opts = opts ? opts : {}
         const stream: Duplex = await this.createStream(opts)
         const [authMethod, uid, guid] = await this.handshake(stream, opts)
-        return new DBusConnection(stream, authMethod, uid, guid, !!opts.advancedResponse)
+        return new DBusConnection(stream, authMethod, uid, guid, !!opts.advancedResponse, !!opts.convertBigIntToNumber)
     }
 
     /**
@@ -393,8 +393,9 @@ export class DBusConnection extends EventEmitter {
      * @param uid - The user ID used during authentication, as a string (later parsed to number).
      * @param guid - The GUID provided by the server after successful authentication.
      * @param advancedResponse - Boolean flag to enable advanced response handling, where DBus return messages are organized using DBusTypeClass instances.
+     * @param convertBigIntToNumber - Boolean flag to enable auto convert bigint to javascript number.
      */
-    constructor(stream: Duplex, authMethod: string, uid: string, guid: string, advancedResponse: boolean = false) {
+    constructor(stream: Duplex, authMethod: string, uid: string, guid: string, advancedResponse: boolean = false, convertBigIntToNumber: boolean = false) {
         super()
         this.#stream = stream
         this.#authMethod = authMethod
@@ -423,7 +424,7 @@ export class DBusConnection extends EventEmitter {
                         fieldsAndBody = stream.read(fieldsAndBodyLength)
                         if (!fieldsAndBody) break
                         state = false
-                        this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse))
+                        this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber))
                     }
                 }
             })
