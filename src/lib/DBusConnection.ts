@@ -412,7 +412,7 @@ export class DBusConnection extends EventEmitter {
             .on('error', (error: Error): boolean => this.emit('error', error))
             .on('readable', (): void => {
                 // @ts-ignore
-                console.log('readable!!!!!',this.#stream.supportsUnixFd)
+                console.log('readable!!!!!')
                 console.log('stream.readableLength:', stream.readableLength)
                 const readableLength: number = stream.readableLength
                 while (true) {
@@ -430,17 +430,14 @@ export class DBusConnection extends EventEmitter {
                         state = false
                         console.log(Buffer.concat([header,fieldsAndBody]))
                         const decMsg = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber)
-                        if (decMsg.header.type === 2)
+                        // if (decMsg.header.type === 2)
                         console.log(decMsg, header.length + fieldsAndBody.length, readableLength)
                         this.emit('message', decMsg)
                         // this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber))
                     }
                 }
             })
-        if ('setNoDelay' in this.#stream && typeof this.#stream.setNoDelay === 'function') {
-            console.log('setNoDelay is a function!!!!!!!!!!!!!!!!!!')
-            this.#stream.setNoDelay()
-        }
+        if ('setNoDelay' in this.#stream && typeof this.#stream.setNoDelay === 'function') this.#stream.setNoDelay()
     }
 
     /**
