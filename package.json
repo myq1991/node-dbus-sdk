@@ -50,7 +50,6 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@tanislav000/usocket": "^1.0.6",
     "native-machine-id": "^0.1.3",
     "xml2js": "^0.6.2"
   }
