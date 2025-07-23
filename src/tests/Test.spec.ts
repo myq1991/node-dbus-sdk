@@ -28,21 +28,21 @@ setImmediate(async (): Promise<void> => {
     // dbus.addMatch('\'\'')
     // dbus.addMatch('type=\'method_return\'')
     // dbus.addMatch('type=method_return')
-    dbus.addMatch("type=method_return,sender=:1.8")
+    // dbus.addMatch("type=method_return,sender=:1.8")
     // dbus.addMatch('sender=:1.8')
-    // console.log('Connect to DBus OK!',dbus.uniqueName)
-    // const service = await dbus.getService('org.freedesktop.login1')
-    // console.log('Get DBus service OK!')
-    // const obj = await service.getObject('/org/freedesktop/login1')
-    // console.log('Get DBus object OK!')
-    // const inter = await obj.getInterface('org.freedesktop.login1.Manager')
-    // console.log('Get DBus interface OK!')
-    // const fd = (await inter.method.Inhibit(
-    //     'shutdown:sleep',
-    //     'ControlServer',
-    //     'Mode management actions',
-    //     'delay'
-    // )) as number
-    // console.log('Run Inhibit method done!')
-    // console.log('fd: ' + fd)
+    console.log('Connect to DBus OK!',dbus.uniqueName)
+    const service = await dbus.getService('org.freedesktop.login1')
+    console.log('Get DBus service OK!')
+    const obj = await service.getObject('/org/freedesktop/login1')
+    console.log('Get DBus object OK!')
+    const inter = await obj.getInterface('org.freedesktop.login1.Manager')
+    console.log('Get DBus interface OK!')
+    const fd = (await inter.method.Inhibit(
+        'shutdown:sleep',
+        'ControlServer',
+        'Mode management actions',
+        'delay'
+    )) as number
+    console.log('Run Inhibit method done!')
+    console.log('fd: ' + fd)
 })
