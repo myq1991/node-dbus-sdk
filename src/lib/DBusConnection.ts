@@ -411,7 +411,8 @@ export class DBusConnection extends EventEmitter {
         this.#stream.on('close', (): boolean => this.emit('close'))
             .on('error', (error: Error): boolean => this.emit('error', error))
             .on('readable', (): void => {
-                console.log('readable!!!!!')
+                // @ts-ignore
+                console.log('readable!!!!!',this.#stream.supportsUnixFd)
                 console.log('stream.readableLength:', stream.readableLength)
                 const readableLength: number = stream.readableLength
                 while (true) {
