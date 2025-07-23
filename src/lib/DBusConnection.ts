@@ -429,7 +429,7 @@ export class DBusConnection extends EventEmitter {
                         state = false
                         console.log(Buffer.concat([header,fieldsAndBody]))
                         const decMsg = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber)
-                        // if (decMsg.header.type === 2)
+                        if (decMsg.header.type === 2)
                         console.log(decMsg, header.length + fieldsAndBody.length, readableLength)
                         this.emit('message', decMsg)
                         // this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber))
