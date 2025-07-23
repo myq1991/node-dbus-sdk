@@ -412,16 +412,12 @@ export class DBusConnection extends EventEmitter {
             .on('error', (error: Error): boolean => this.emit('error', error))
             .on('readable', (): void => {
                 console.log('readable!!!!!')
+                console.log('stream.readableLength:', stream.readableLength)
+                const readableLength: number = stream.readableLength
                 while (true) {
                     if (!state) {
-                        console.log('stream.readableLength:',stream.readableLength)
                         header = stream.read(16) // DBus message header is 16 bytes
-                        if (!header) {
-                            console.log('NO HEADER BREAK!!!!!!!!',stream.read())
-                            break
-                        }else{
-                            console.log('header:',header)
-                        }
+                        if (!header) break
                         state = true
                         fieldsLength = header.readUInt32LE(12) // Length of header fields
                         fieldsLengthPadded = ((fieldsLength + 7) >> 3) << 3 // Padded to 8-byte boundary
@@ -433,7 +429,7 @@ export class DBusConnection extends EventEmitter {
                         state = false
                         const decMsg = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber)
                         // if (decMsg.header.type === 2)
-                            console.log(decMsg)
+                        console.log(decMsg, header.length + fieldsAndBody.length, readableLength)
                         this.emit('message', decMsg)
                         // this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber))
                     }
