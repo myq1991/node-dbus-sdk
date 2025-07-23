@@ -422,7 +422,10 @@ export class DBusConnection extends EventEmitter {
                         fieldsAndBodyLength = fieldsLengthPadded + bodyLength
                     } else {
                         fieldsAndBody = stream.read(fieldsAndBodyLength)
-                        if (!fieldsAndBody) break
+                        if (!fieldsAndBody) {
+                            console.log('OH!!!! BREAK!!!!!!!')
+                            break
+                        }
                         state = false
                         const decMsg = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber)
                         if (decMsg.header.type === 2) console.log(decMsg)
