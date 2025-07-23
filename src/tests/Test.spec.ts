@@ -25,7 +25,7 @@ setImmediate(async (): Promise<void> => {
     const dbus = await DBus.connect({busAddress: 'unix:path=/var/run/dbus/system_bus_socket'})
     // dbus.addMatch(`destination=:${dbus.uniqueName}`)
     // dbus.addMatch('destination=""')
-    dbus.addMatch('""')
+    dbus.addMatch('\'\'')
     console.log('Connect to DBus OK!',dbus.uniqueName)
     const service = await dbus.getService('org.freedesktop.login1')
     console.log('Get DBus service OK!')
