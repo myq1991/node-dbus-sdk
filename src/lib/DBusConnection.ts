@@ -416,7 +416,7 @@ export class DBusConnection extends EventEmitter {
                     if (!state) {
                         header = stream.read(16) // DBus message header is 16 bytes
                         if (!header) {
-                            console.log('NO HEADER BREAK!!!!!!!!',header)
+                            console.log('NO HEADER BREAK!!!!!!!!',stream.read())
                             break
                         }
                         state = true
