@@ -418,6 +418,8 @@ export class DBusConnection extends EventEmitter {
                         if (!header) {
                             console.log('NO HEADER BREAK!!!!!!!!',stream.read())
                             break
+                        }else{
+                            console.log('header:',header)
                         }
                         state = true
                         fieldsLength = header.readUInt32LE(12) // Length of header fields
