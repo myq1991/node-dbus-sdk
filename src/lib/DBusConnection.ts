@@ -250,15 +250,10 @@ export class DBusConnection extends EventEmitter {
      * @returns A Promise resolving to a Duplex stream for Unix socket communication with the DBus server.
      */
     protected static async createUnixStream(timeout: number, addr: string): Promise<Duplex> {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const unix = require('unix-dgram')
-        const client=unix.createSocket('unix_dgram')
-        client.connect('/var/run/dbus/system_bus_socket')
-        return client as any
-        // return this.createDuplexStream({
-        //     path: addr,
-        //     timeout: timeout
-        // })
+        return this.createDuplexStream({
+            path: addr,
+            timeout: timeout
+        })
     }
 
     /**
@@ -429,11 +424,7 @@ export class DBusConnection extends EventEmitter {
                         fieldsAndBody = stream.read(fieldsAndBodyLength)
                         if (!fieldsAndBody) break
                         state = false
-                        const decMsg = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber)
-                        // if (decMsg.header.type === 2)
-                        console.log(decMsg)
-                        this.emit('message', decMsg)
-                        // this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber))
+                        this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber))
                     }
                 }
             })
