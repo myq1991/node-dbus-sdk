@@ -23,6 +23,7 @@ setImmediate(async (): Promise<void> => {
     // Invoke the DBus service as a client to test interactions with the local service
     // await InvokeDBusServiceSpec('org.dbus.node.test', 'tcp:host=192.168.1.127,port=44444')
     const dbus = await DBus.connect({busAddress: 'unix:path=/var/run/dbus/system_bus_socket'})
+    dbus.addMatch(`destination=:${dbus.uniqueName}`)
     console.log('Connect to DBus OK!',dbus.uniqueName)
     const service = await dbus.getService('org.freedesktop.login1')
     console.log('Get DBus service OK!')
