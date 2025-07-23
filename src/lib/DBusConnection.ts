@@ -437,7 +437,10 @@ export class DBusConnection extends EventEmitter {
                     }
                 }
             })
-        if ('setNoDelay' in this.#stream && typeof this.#stream.setNoDelay === 'function') this.#stream.setNoDelay()
+        if ('setNoDelay' in this.#stream && typeof this.#stream.setNoDelay === 'function') {
+            console.log('setNoDelay is a function!!!!!!!!!!!!!!!!!!')
+            this.#stream.setNoDelay()
+        }
     }
 
     /**
