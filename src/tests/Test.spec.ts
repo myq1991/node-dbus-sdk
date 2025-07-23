@@ -23,14 +23,19 @@ setImmediate(async (): Promise<void> => {
     // Invoke the DBus service as a client to test interactions with the local service
     // await InvokeDBusServiceSpec('org.dbus.node.test', 'tcp:host=192.168.1.127,port=44444')
     const dbus = await DBus.connect({busAddress: 'unix:path=/var/run/dbus/system_bus_socket'})
+    console.log('Connect to DBus OK!')
     const service = await dbus.getService('org.freedesktop.login1')
+    console.log('Get DBus service OK!')
     const obj = await service.getObject('/org/freedesktop/login1')
+    console.log('Get DBus object OK!')
     const inter = await obj.getInterface('org.freedesktop.login1.Manager')
+    console.log('Get DBus interface OK!')
     const fd = (await inter.method.Inhibit(
         'shutdown:sleep',
         'ControlServer',
         'Mode management actions',
         'delay'
     )) as number
+    console.log('Run Inhibit method done!')
     console.log('fd: ' + fd)
 })
