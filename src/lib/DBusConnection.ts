@@ -251,9 +251,9 @@ export class DBusConnection extends EventEmitter {
      */
     protected static async createUnixStream(timeout: number, addr: string): Promise<Duplex> {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const usocket=require('@tanislav000/usocket')
-        const sock=new usocket.USocket({path:addr})
-        sock.supportsUnixFd=true
+        const usocket = require('@tanislav000/usocket')
+        const sock = new usocket.USocket({path: '\u0000' + addr})
+        sock.supportsUnixFd = true
         return sock
         // return this.createDuplexStream({
         //     path: addr,
