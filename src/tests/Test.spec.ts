@@ -27,7 +27,7 @@ setImmediate(async (): Promise<void> => {
     // dbus.addMatch('destination=""')
     // dbus.addMatch('\'\'')
     // dbus.addMatch('type=\'method_return\'')
-    dbus.addMatch('type=method_return,sender=:1.8')
+    dbus.addMatch('sender=:1.8')
     // console.log('Connect to DBus OK!',dbus.uniqueName)
     // const service = await dbus.getService('org.freedesktop.login1')
     // console.log('Get DBus service OK!')
