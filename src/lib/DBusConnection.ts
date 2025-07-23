@@ -250,10 +250,15 @@ export class DBusConnection extends EventEmitter {
      * @returns A Promise resolving to a Duplex stream for Unix socket communication with the DBus server.
      */
     protected static async createUnixStream(timeout: number, addr: string): Promise<Duplex> {
-        return this.createDuplexStream({
-            path: addr,
-            timeout: timeout
-        })
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const unix = require('unix-dgram')
+        const client=unix.createSocket('unix_dgram')
+        client.connect('/var/run/dbus/system_bus_socket')
+        return client as any
+        // return this.createDuplexStream({
+        //     path: addr,
+        //     timeout: timeout
+        // })
     }
 
     /**
@@ -411,10 +416,6 @@ export class DBusConnection extends EventEmitter {
         this.#stream.on('close', (): boolean => this.emit('close'))
             .on('error', (error: Error): boolean => this.emit('error', error))
             .on('readable', (): void => {
-                // @ts-ignore
-                console.log('readable!!!!!')
-                console.log('stream.readableLength:', stream.readableLength)
-                const readableLength: number = stream.readableLength
                 while (true) {
                     if (!state) {
                         header = stream.read(16) // DBus message header is 16 bytes
@@ -428,10 +429,9 @@ export class DBusConnection extends EventEmitter {
                         fieldsAndBody = stream.read(fieldsAndBodyLength)
                         if (!fieldsAndBody) break
                         state = false
-                        console.log(Buffer.concat([header,fieldsAndBody]))
                         const decMsg = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber)
                         // if (decMsg.header.type === 2)
-                        console.log(decMsg, header.length + fieldsAndBody.length, readableLength)
+                        console.log(decMsg)
                         this.emit('message', decMsg)
                         // this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber))
                     }
