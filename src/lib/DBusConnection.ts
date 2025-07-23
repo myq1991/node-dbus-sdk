@@ -411,6 +411,7 @@ export class DBusConnection extends EventEmitter {
         this.#stream.on('close', (): boolean => this.emit('close'))
             .on('error', (error: Error): boolean => this.emit('error', error))
             .on('readable', (): void => {
+                console.log('readable!!!!!')
                 while (true) {
                     if (!state) {
                         header = stream.read(16) // DBus message header is 16 bytes
