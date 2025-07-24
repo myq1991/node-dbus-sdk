@@ -8,7 +8,7 @@
     "clean": "shx rm -rf ./build",
     "build": "tsc",
     "rebuild": "npm run clean && npm run build",
-    "release": "release-it",
+    "release": "release-it --no-push",
     "test": "npm run rebuild && node ./build/tests/Test.spec.js"
   },
   "repository": {
