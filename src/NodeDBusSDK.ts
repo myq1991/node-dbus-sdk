@@ -413,6 +413,13 @@ export type {InvokeOpts} from './types/InvokeOpts'
 export type {NoReplyModeMethodCall} from './types/NoReplyModeMethodCall'
 
 /**
+ * Exports the NoReplyModeParameterObjectMethodCall type for method calls without reply expectation using parameter object pattern.
+ * Defines the structure for method calls that do not await or expect a response from the remote service,
+ * accepting a single parameter object for named arguments to enhance readability and avoid order errors.
+ */
+export type {NoReplyModeParameterObjectMethodCall} from './types/NoReplyModeParameterObjectMethodCall'
+
+/**
  * Exports the PropertyOperation type for property access operations.
  * Defines the structure for operations on DBus properties, such as getting or setting values.
  */
@@ -423,6 +430,13 @@ export type {PropertyOperation} from './types/PropertyOperation'
  * Defines the structure for method calls that await a response from the remote service with return data.
  */
 export type {ReplyModeMethodCall} from './types/ReplyModeMethodCall'
+
+/**
+ * Exports the ReplyModeParameterObjectMethodCall type for method calls expecting a reply using parameter object pattern.
+ * Defines the structure for method calls that await a response from the remote service with return data,
+ * accepting a single parameter object for named arguments to enhance readability and avoid order errors.
+ */
+export type {ReplyModeParameterObjectMethodCall} from './types/ReplyModeParameterObjectMethodCall'
 
 /**
  * Exports the ReplyOpts type for crafting replies to DBus method calls.

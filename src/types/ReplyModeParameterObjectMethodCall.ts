@@ -1,0 +1,1 @@
+export type ReplyModeParameterObjectMethodCall = (parameterObject?: Record<string, any>) => Promise<any>

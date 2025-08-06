@@ -11,9 +11,11 @@ import {ReplyModeMethodCall} from './types/ReplyModeMethodCall'
 import {NoReplyModeMethodCall} from './types/NoReplyModeMethodCall'
 import {PropertyOperation} from './types/PropertyOperation'
 import {DBusPropertyAccess} from './lib/enums/DBusPropertyAccess'
-import {AccessPropertyForbiddenError} from './lib/Errors'
+import {AccessPropertyForbiddenError, NotEnoughParamsError} from './lib/Errors'
 import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 import {DBusSignedValue} from './lib/DBusSignedValue'
+import {ReplyModeParameterObjectMethodCall} from './types/ReplyModeParameterObjectMethodCall'
+import {NoReplyModeParameterObjectMethodCall} from './types/NoReplyModeParameterObjectMethodCall'
 
 export class DBusInterface {
 
@@ -47,6 +49,32 @@ export class DBusInterface {
     }
 
     /**
+     * Converts a parameter object to an array of arguments based on introspection data.
+     * Extracts input parameters from the provided parameter object, mapping them to the expected order of arguments
+     * for a given method as defined in the introspection metadata. If a required parameter is missing, an error is thrown.
+     * @param methodInfo - The introspection metadata of the method, containing argument definitions.
+     * @param inputParameterObject - The parameter object containing named arguments to be mapped.
+     * @returns An array of arguments extracted from the parameter object, ordered according to the method's signature.
+     * @throws {NotEnoughParamsError} If a required parameter is missing from the input object.
+     */
+    protected objectifiedParameterToArguments(methodInfo: IntrospectMethod, inputParameterObject: Record<string, any>): any[] {
+        const inputParameters: IntrospectMethodArgument[] = methodInfo.arg
+            .filter((arg: IntrospectMethodArgument): boolean => arg.direction === 'in')
+            .map((arg: IntrospectMethodArgument, index: number): IntrospectMethodArgument => ({
+                ...arg,
+                name: arg.name ? arg.name : `param${index}`
+            }))
+        const args: any[] = []
+        for (const inputParameter of inputParameters) {
+            const name: string = inputParameter.name!
+            const arg: any = inputParameterObject[name]
+            if (arg === undefined) throw new NotEnoughParamsError(`Parameter "${name}" is required`)
+            args.push(arg)
+        }
+        return args
+    }
+
+    /**
      * Getter for methods with reply mode.
      * Dynamically creates an object containing methods that expect a reply from the DBus invocation.
      * Each method handles input arguments with type signatures and returns the result of the invocation.
@@ -77,6 +105,24 @@ export class DBusInterface {
     }
 
     /**
+     * Getter for methods with reply mode using parameter object pattern.
+     * Dynamically creates an object containing methods that expect a reply from the DBus invocation.
+     * Each method accepts a single parameter object containing named arguments, which are mapped to the expected input parameters
+     * based on the introspection data. This approach enhances readability and avoids errors due to parameter order.
+     * @returns A record of method names mapped to their callable implementations with reply mode, accepting a parameter object.
+     */
+    public get parameterObjectifyMethod(): Record<string, ReplyModeParameterObjectMethodCall> {
+        const methods: Record<string, ReplyModeMethodCall> = {}
+        this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
+            methods[methodInfo.name] = async (parameterObject?: Record<string, any>): Promise<any> => {
+                const args: any[] = this.objectifiedParameterToArguments(methodInfo, parameterObject ? parameterObject : {})
+                return await this.method[methodInfo.name](...args)
+            }
+        })
+        return methods
+    }
+
+    /**
      * Getter for methods with no-reply mode.
      * Dynamically creates an object containing methods that do not expect a reply from the DBus invocation.
      * These methods are used for fire-and-forget calls.
@@ -97,6 +143,25 @@ export class DBusInterface {
                     signature: types.length ? types.join('') : undefined,
                     args: args
                 }, true)
+            }
+        })
+        return noReplyMethods
+    }
+
+    /**
+     * Getter for methods with no-reply mode using parameter object pattern.
+     * Dynamically creates an object containing methods that do not expect a reply from the DBus invocation.
+     * Each method accepts a single parameter object containing named arguments, which are mapped to the expected input parameters
+     * based on the introspection data. This approach enhances readability and avoids errors due to parameter order.
+     * These methods are used for fire-and-forget calls.
+     * @returns A record of method names mapped to their callable implementations with no-reply mode, accepting a parameter object.
+     */
+    public get parameterObjectifyNoReplyMethod(): Record<string, NoReplyModeParameterObjectMethodCall> {
+        const noReplyMethods: Record<string, NoReplyModeParameterObjectMethodCall> = {}
+        this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
+            noReplyMethods[methodInfo.name] = (parameterObject?: Record<string, any>): void => {
+                const args: any[] = this.objectifiedParameterToArguments(methodInfo, parameterObject ? parameterObject : {})
+                return this.noReplyMethod[methodInfo.name](...args)
             }
         })
         return noReplyMethods
