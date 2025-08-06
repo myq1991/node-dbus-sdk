@@ -50,7 +50,8 @@ export async function InvokeDBusServiceSpec(serviceName: string, busAddress: str
     })
 
     // Call a method on the first interface and log the result
-    console.log('SayHello result:', await iface1.method.SayHello('you'))
+    // console.log('SayHello result:', await iface1.method.SayHello('you'))
+    console.log('SayHello result:', await iface1.parameterObjectifyMethod.SayHello({name:'you'}))
 
     // Access and log a property value from the first interface
     console.log('iface1.Timestamp:', await iface1.property.Timestamp.get())
