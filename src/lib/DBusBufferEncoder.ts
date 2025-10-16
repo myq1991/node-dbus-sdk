@@ -283,7 +283,11 @@ export class DBusBufferEncoder {
      */
     public writeObjectPath(value: string): this {
         // Validate object path format according to DBus specification
-        const objectPathRegex: RegExp = /^\/([a-zA-Z_][a-zA-Z0-9_]*)*(?:\/([a-zA-Z_][a-zA-Z0-9_]*))*$|^\/$/
+        /**
+         * Fix bug: Invalid DBus Object Path Validation - Incorrectly Rejects Digit-Starting Elements
+         * @see https://github.com/myq1991/node-dbus-sdk/issues/2
+         */
+        const objectPathRegex: RegExp = /^\/(?:[a-zA-Z0-9_]+(?:\/[a-zA-Z0-9_]+)*)?$/
         if (!objectPathRegex.test(value)) throw new ObjectPathError(`Invalid DBus object path: "${value}". Object path must start with '/' and consist of elements separated by '/', where each element starts with a letter or underscore and contains only letters, numbers, or underscores.`)
         this.align(4)
         const pathBuffer: Buffer = Buffer.from(value, 'utf8') // Convert path to UTF-8 encoded buffer
