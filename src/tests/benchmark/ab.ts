@@ -1,5 +1,5 @@
 import {execFileSync, execSync} from 'node:child_process'
-import {mkdtempSync, rmSync, symlinkSync} from 'node:fs'
+import {mkdtempSync, readFileSync, rmSync, symlinkSync} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {formatValue, Metric} from './Harness'
@@ -28,12 +28,17 @@ function metricsOf(report: BenchmarkReport): Map<string, Metric> {
     return new Map(report.outcomes.flatMap((outcome) => Object.entries(outcome.metrics).map(([name, metric]): [string, Metric] => [`${outcome.name} :: ${name}`, metric])))
 }
 
+function dependenciesOf(directory: string): string {
+    const manifest: Record<string, any> = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
+    return JSON.stringify({...manifest.dependencies, ...manifest.devDependencies})
+}
+
 function runBenchmarks(directory: string, label: string, filter: string | undefined): BenchmarkReport {
     const args: string[] = ['--expose-gc', path.join(directory, 'build/tests/benchmark/run.js'), '--label', label]
     if (filter) args.push('--filter', filter)
     execFileSync(process.execPath, args, {cwd: directory, stdio: 'ignore'})
     const file: string = path.join(directory, 'src/tests/benchmark/results', `${label}.json`)
-    const report: BenchmarkReport = JSON.parse(execSync(`cat "${file}"`).toString())
+    const report: BenchmarkReport = JSON.parse(readFileSync(file, 'utf8'))
     rmSync(file)
     return report
 }
@@ -46,7 +51,13 @@ function main(): void {
     const worktree: string = mkdtempSync(path.join(os.tmpdir(), 'dbus-sdk-ab-'))
     try {
         execSync(`git worktree add --detach "${worktree}" ${commit}`, {cwd: ROOT, stdio: 'ignore'})
-        symlinkSync(path.join(ROOT, 'node_modules'), path.join(worktree, 'node_modules'))
+        if (dependenciesOf(worktree) === dependenciesOf(ROOT)) {
+            symlinkSync(path.join(ROOT, 'node_modules'), path.join(worktree, 'node_modules'))
+        } else {
+            // The other commit needs different packages (e.g. ones removed since), so give it its own
+            console.log(`installing the dependencies of ${commit}`)
+            execSync('npm install --no-audit --no-fund', {cwd: worktree, stdio: 'ignore'})
+        }
         execSync('npx tsc -p .', {cwd: worktree, stdio: 'inherit'})
         const old: BenchmarkReport[] = []
         const current: BenchmarkReport[] = []
