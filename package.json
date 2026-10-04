@@ -15,7 +15,8 @@
     "test:perf": "npm run rebuild && node --test --test-concurrency=1 \"build/tests/perf/**/*.test.js\"",
     "test:example": "npm run rebuild && node ./build/tests/Test.spec.js",
     "bench": "npm run rebuild && node --expose-gc ./build/tests/benchmark/run.js",
-    "bench:compare": "node ./build/tests/benchmark/compare.js"
+    "bench:compare": "node ./build/tests/benchmark/compare.js",
+    "bench:ab": "npm run rebuild && node ./build/tests/benchmark/ab.js"
   },
   "repository": {
     "type": "git",
