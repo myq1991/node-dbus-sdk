@@ -1,3 +1,5 @@
+import {DBusMessageHeader} from '../types/DBusMessageHeader'
+
 export class TimeoutError extends Error implements NodeJS.ErrnoException {
     errno: number = 1000
     code: string = 'E_TIMEOUT'
@@ -139,3 +141,18 @@ export class LocalInterfaceInvalidSignalNameError extends Error implements NodeJ
 }
 
 
+export class MessageDecodeError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1028
+    code: string = 'E_MESSAGE_DECODE'
+
+    /**
+     * The message header, when it could be decoded and only the body could not. It identifies the message,
+     * e.g. which call a reply belongs to (replySerial).
+     */
+    header?: Partial<DBusMessageHeader>
+
+    constructor(message: string, header?: Partial<DBusMessageHeader>, options?: { cause?: unknown }) {
+        super(message, options)
+        this.header = header
+    }
+}

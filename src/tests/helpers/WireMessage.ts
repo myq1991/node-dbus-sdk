@@ -1,4 +1,5 @@
 import {DBusMessage} from '../../lib/DBusMessage'
+import {DBusMessageHeader} from '../../types/DBusMessageHeader'
 
 /**
  * Splits a raw DBus message buffer into the parts expected by DBusMessage.decode and decodes it.
@@ -43,4 +44,18 @@ export function splitWireMessages(data: Buffer): Buffer[] {
         offset += length
     }
     return messages
+}
+
+/**
+ * Encodes a well-framed message whose body no decoder may accept: a BOOLEAN with the value 2.
+ * It is encoded as UINT32 2 and the SIGNATURE header field is then changed from 'u' to 'b'.
+ *
+ * @param header - Header fields of the message; its signature is replaced.
+ * @returns The raw message.
+ */
+export function undecodableMessage(header: Partial<DBusMessageHeader>): Buffer {
+    const raw: Buffer = DBusMessage.encode({...header, signature: 'u'}, 2)
+    const signatureField: number = raw.indexOf(Buffer.from([0x08, 0x01, 0x67, 0x00, 0x01, 0x75, 0x00]))
+    raw[signatureField + 5] = 0x62
+    return raw
 }

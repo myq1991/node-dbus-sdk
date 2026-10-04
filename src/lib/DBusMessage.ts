@@ -1,7 +1,7 @@
 import {DBusMessageHeader} from '../types/DBusMessageHeader'
 import {DBusMessageType} from './enums/DBusMessageType'
 import {DBusMessageFlags} from './enums/DBusMessageFlags'
-import {SerialError} from './Errors'
+import {MessageDecodeError, SerialError} from './Errors'
 import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 import {DBusBufferEncoder} from './DBusBufferEncoder'
 import {DBusSignedValue} from './DBusSignedValue'
@@ -207,6 +207,7 @@ export class DBusMessage {
      * @param advancedResponse - Boolean flag to enable advanced response handling, where DBus return messages are organized using DBusTypeClass instances.
      * @param convertBigIntToNumber - Boolean flag to enable auto convert bigint to javascript number.
      * @returns A DBusMessage instance with parsed header and body content.
+     * @throws {MessageDecodeError} If the body cannot be decoded; the error carries the decoded header.
      */
     public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number, advancedResponse: boolean = false, convertBigIntToNumber: boolean = false): DBusMessage {
         // Determine the endianness from the first byte of the header
@@ -243,7 +244,13 @@ export class DBusMessage {
         const bodyBuffer: Buffer = fieldsAndBody.subarray(bodyOffset)
         const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, bodyBuffer, 0, convertBigIntToNumber)
         // Decode the body based on the signature provided in the header
-        const body: any[] = bodyDecoder.decode(messageHeader.signature, advancedResponse)
+        let body: any[]
+        try {
+            body = bodyDecoder.decode(messageHeader.signature, advancedResponse)
+        } catch (error: any) {
+            // Keep the decoded header, so the receiver can tell which message (e.g. which call's reply) was unreadable
+            throw new MessageDecodeError(`Cannot decode the body of a message with signature '${messageHeader.signature}': ${error?.message}`, messageHeader, {cause: error})
+        }
         return new DBusMessage(messageHeader, ...body)
     }
 }

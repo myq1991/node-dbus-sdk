@@ -11,6 +11,7 @@ import {DBusMessageFlags} from '../../lib/enums/DBusMessageFlags'
 import {MockBusStream} from '../helpers/MockBusStream'
 import {knownBug} from '../helpers/KnownBug'
 import {withTimeout} from '../helpers/Async'
+import {undecodableMessage} from '../helpers/WireMessage'
 
 v8.setFlagsFromString('--expose-gc')
 const gc: () => void = vm.runInNewContext('gc')
@@ -117,14 +118,31 @@ describe('DBus message dispatch', (): void => {
             await flush()
         })
 
-        it('rejects pending calls when the connection closes', knownBug('pending calls are never settled when the connection closes, so callers wait forever'), async (): Promise<void> => {
+        it('rejects pending calls when the connection closes', async (): Promise<void> => {
             const pending: Promise<any[]> = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Slow'})
             await stream.nextOutgoing()
             stream.destroy()
-            await assert.rejects(withTimeout(pending, 500, 'pending call'), (error: Error): boolean => !error.message.startsWith('Timed out'))
+            await assert.rejects(withTimeout(pending, 500, 'pending call'), {name: 'org.freedesktop.DBus.Error.Disconnected'})
         })
 
-        it('releases completed calls', knownBug('entries in #inflightCalls are never deleted, so every call leaks its promise'), async (): Promise<void> => {
+        it('rejects a call whose reply cannot be decoded', async (): Promise<void> => {
+            const pending: Promise<any[]> = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Broken'})
+            const call: DBusMessage = await stream.nextOutgoing()
+            stream.deliver(undecodableMessage({serial: serverSerial++, replySerial: call.header.serial, type: DBusMessageType.METHOD_RETURN, flags: DBusMessageFlags.NO_REPLY_EXPECTED, sender: ':1.1'}))
+            await assert.rejects(withTimeout(pending, 500, 'pending call'), {code: 'E_MESSAGE_DECODE'})
+        })
+
+        it('rejects a call that cannot be encoded', async (): Promise<void> => {
+            await assert.rejects(withTimeout(dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Typed', signature: 'o', args: ['not an object path']}) as Promise<any[]>, 500, 'call'), {code: 'E_OBJECT_PATH'})
+        })
+
+        it('rejects a call made after the connection closed', async (): Promise<void> => {
+            stream.destroy()
+            await flush()
+            await assert.rejects(dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Late'}), {name: 'org.freedesktop.DBus.Error.Disconnected'})
+        })
+
+        it('releases completed calls', async (): Promise<void> => {
             const control: WeakRef<object> = ((): WeakRef<object> => new WeakRef({}))()
             const completed: WeakRef<Promise<any[]>> = await (async (): Promise<WeakRef<Promise<any[]>>> => {
                 const pending: Promise<any[]> = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Ping'})
@@ -172,6 +190,17 @@ describe('DBus message dispatch', (): void => {
             stream.deliver(signal(':1.7', '/b', 'org.example.J', 'Two'))
             await flush()
             assert.deepEqual(received, ['One', 'Two'])
+        })
+    })
+
+    describe('undecodable incoming method calls', (): void => {
+        it('answers with InvalidArgs instead of leaving the caller waiting', async (): Promise<void> => {
+            stream.deliver(undecodableMessage({serial: 77, type: DBusMessageType.METHOD_CALL, flags: DBusMessageFlags.REPLY_EXPECTED, sender: ':1.3', path: '/obj', interfaceName: 'org.example.I', member: 'Do'}))
+            const reply: DBusMessage = await withTimeout(stream.nextOutgoing(), 500, 'reply')
+            assert.equal(reply.header.type, DBusMessageType.ERROR)
+            assert.equal(reply.header.errorName, 'org.freedesktop.DBus.Error.InvalidArgs')
+            assert.equal(reply.header.replySerial, 77)
+            assert.equal(reply.header.destination, ':1.3')
         })
     })
 

@@ -8,6 +8,7 @@ import {
     NotEnoughParamsError, TimeoutError,
     UnknownBusAddressError,
     UnknownBusTypeError,
+    MessageDecodeError,
     UserPermissionError
 } from './Errors'
 import {BinaryLike, createHash, randomBytes} from 'node:crypto'
@@ -424,7 +425,16 @@ export class DBusConnection extends EventEmitter {
                         fieldsAndBody = stream.read(fieldsAndBodyLength)
                         if (!fieldsAndBody) break
                         state = false
-                        this.emit('message', DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber))
+                        let message: DBusMessage
+                        try {
+                            message = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber)
+                        } catch (error: any) {
+                            // The message was framed by its declared lengths, so the following ones are unaffected:
+                            // report this one and keep reading instead of throwing out of the stream handler
+                            this.emit('error', error instanceof MessageDecodeError ? error : new MessageDecodeError(`Cannot decode a message: ${error?.message}`, undefined, {cause: error}))
+                            continue
+                        }
+                        this.emit('message', message)
                     }
                 }
             })

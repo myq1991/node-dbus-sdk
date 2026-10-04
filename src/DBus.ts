@@ -15,7 +15,8 @@ import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 import {ServiceBasicInfo} from './types/ServiceBasicInfo'
 import {RequestNameFlags} from './lib/enums/RequestNameFlags'
 import {RequestNameResultCode} from './lib/enums/RequestNameResultCode'
-import {ServiceNotFoundError} from './lib/Errors'
+import {MessageDecodeError, ServiceNotFoundError} from './lib/Errors'
+import {DBusMessageHeader} from './types/DBusMessageHeader'
 import EventEmitter from 'node:events'
 import {ReplyOpts} from './types/ReplyOpts'
 import {EmitSignalOpts} from './types/EmitSignalOpts'
@@ -23,6 +24,11 @@ import {BusNameBasicInfo} from './types/BusNameBasicInfo'
 import {CreateDBusError} from './lib/CreateDBusError'
 import {DBusTypeClass} from './lib/DBusTypeClass'
 import {DBusVariant} from './lib/datatypes/DBusVariant'
+
+/**
+ * The resolve and reject functions of a method call waiting for its reply.
+ */
+type InflightCall = [(response: any[]) => void, (error: Error) => void]
 
 /**
  * Main class for interacting with a DBus connection.
@@ -54,7 +60,43 @@ export class DBus extends EventEmitter {
      * A record of pending method calls awaiting responses.
      * Maps serial numbers to callback functions for resolving or rejecting the call.
      */
-    #inflightCalls: Record<number, [(response: any[]) => void, (error: Error) => void]> = {}
+    #inflightCalls: Record<number, InflightCall> = {}
+
+    /**
+     * Removes and returns the pending call a reply belongs to.
+     *
+     * @param replySerial - The reply's REPLY_SERIAL header field.
+     * @returns The pending call, or undefined if none is waiting for this serial.
+     */
+    #takeInflightCall(replySerial: number | undefined): InflightCall | undefined {
+        if (!replySerial) return undefined
+        const call: InflightCall | undefined = this.#inflightCalls[replySerial]
+        delete this.#inflightCalls[replySerial]
+        return call
+    }
+
+    /**
+     * Handles a message whose header was readable but whose body was not, so nobody waits forever:
+     * a pending call it replies to is rejected, and a method call expecting a reply is answered with InvalidArgs.
+     *
+     * @param error - The decoding error.
+     * @param header - The decoded header of the unreadable message.
+     */
+    #answerUndecodableMessage(error: MessageDecodeError, header: Partial<DBusMessageHeader>): void {
+        switch (header.type) {
+            case DBusMessageType.METHOD_RETURN:
+            case DBusMessageType.ERROR:
+                this.#takeInflightCall(header.replySerial)?.[1](error)
+                return
+            case DBusMessageType.METHOD_CALL:
+                if (!header.sender || !header.serial || ((header.flags || 0) & DBusMessageFlags.NO_REPLY_EXPECTED)) return
+                try {
+                    this.reply({destination: header.sender, replySerial: header.serial, signature: 's', data: CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', error.message)})
+                } catch {
+                    // The connection is gone, so there is nobody to answer
+                }
+        }
+    }
 
     /**
      * A set of WeakRef objects referencing DBusSignalEmitter instances.
@@ -327,7 +369,13 @@ export class DBus extends EventEmitter {
                     signature: opts.signature ? opts.signature : undefined
                 }, ...opts.args ? opts.args : [])
                 this.#inflightCalls[message.header.serial] = [resolve, reject]
-                this.write(message.toBuffer())
+                try {
+                    this.write(message.toBuffer())
+                } catch (error) {
+                    // Nothing was sent (encoding failed or the connection is closed), so no reply will ever come
+                    delete this.#inflightCalls[message.header.serial]
+                    reject(error)
+                }
             })
         }
     }
@@ -468,16 +516,17 @@ export class DBus extends EventEmitter {
         this.#connection
             .on('message', (message: DBusMessage): void => {
                 switch (message.header.type) {
-                    case DBusMessageType.METHOD_RETURN:
-                        if (!message.header.replySerial) return
-                        if (!this.#inflightCalls[message.header.replySerial]) return
-                        return this.#inflightCalls[message.header.replySerial][0](message.body)
-                    case DBusMessageType.ERROR:
-                        if (!message.header.replySerial) return
-                        if (!this.#inflightCalls[message.header.replySerial]) return
+                    case DBusMessageType.METHOD_RETURN: {
+                        const call: InflightCall | undefined = this.#takeInflightCall(message.header.replySerial)
+                        return call?.[0](message.body)
+                    }
+                    case DBusMessageType.ERROR: {
+                        const call: InflightCall | undefined = this.#takeInflightCall(message.header.replySerial)
+                        if (!call) return
                         const error: Error = new Error(message.body[0] ? message.body[0] instanceof DBusTypeClass ? message.body[0].value : message.body[0] : '')
                         error.name = message.header.errorName ? message.header.errorName : error.name
-                        return this.#inflightCalls[message.header.replySerial][1](error)
+                        return call[1](error)
+                    }
                     case DBusMessageType.SIGNAL:
                         const sender: string = message.header.sender
                         const objectPath: string = message.header.path
@@ -512,8 +561,17 @@ export class DBus extends EventEmitter {
                         return
                 }
             })
-            .on('close', (): boolean => this.emit('connectionClose'))
-            .on('error', (error: Error): boolean => this.emit('connectionError', error))
+            .on('close', (): void => {
+                // No reply can arrive any more, so settle the calls still waiting for one
+                const calls: InflightCall[] = Object.values(this.#inflightCalls)
+                this.#inflightCalls = {}
+                calls.forEach(([, reject]: InflightCall): void => reject(CreateDBusError('org.freedesktop.DBus.Error.Disconnected', 'The connection was closed before a reply was received')))
+                this.emit('connectionClose')
+            })
+            .on('error', (error: Error): void => {
+                if (error instanceof MessageDecodeError && error.header) this.#answerUndecodableMessage(error, error.header)
+                this.emit('connectionError', error)
+            })
     }
 
     /**

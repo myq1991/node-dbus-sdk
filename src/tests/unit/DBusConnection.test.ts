@@ -10,6 +10,8 @@ import {DBusSignedValue} from '../../lib/DBusSignedValue'
 import {MockBusStream} from '../helpers/MockBusStream'
 import {LibdbusMessages} from '../fixtures/LibdbusMessages'
 import {knownBug} from '../helpers/KnownBug'
+import {undecodableMessage} from '../helpers/WireMessage'
+import {MessageDecodeError} from '../../lib/Errors'
 import {DBusByte} from '../../lib/datatypes/DBusByte'
 import {DBusArray} from '../../lib/datatypes/DBusArray'
 import {DBusVariant} from '../../lib/datatypes/DBusVariant'
@@ -91,18 +93,16 @@ describe('DBusConnection framing', (): void => {
         assert.deepEqual(received[0].body, ['big'])
     })
 
-    it('reports a message it cannot decode and keeps processing later messages', knownBug('a decoding error is thrown from the socket handler as an uncaught exception, which terminates the process'), async (): Promise<void> => {
+    it('reports a message it cannot decode and keeps processing later messages', async (): Promise<void> => {
         const {stream, connection, received} = createConnection()
         const errors: Error[] = []
         connection.on('error', (error: Error): number => errors.push(error))
-        // A well-framed signal whose BOOLEAN body value is 2, which no decoder may accept: encode it as UINT32 2,
-        // then change the signature header field from 'u' to 'b'
-        const invalid: Buffer = DBusMessage.encode({serial: 9, type: DBusMessageType.SIGNAL, flags: DBusMessageFlags.NO_REPLY_EXPECTED, path: '/test', interfaceName: 'test.I', member: 'Invalid', signature: 'u'}, 2)
-        const signatureField: number = invalid.indexOf(Buffer.from([0x08, 0x01, 0x67, 0x00, 0x01, 0x75, 0x00]))
-        invalid[signatureField + 5] = 0x62
+        const invalid: Buffer = undecodableMessage({serial: 9, type: DBusMessageType.SIGNAL, flags: DBusMessageFlags.NO_REPLY_EXPECTED, path: '/test', interfaceName: 'test.I', member: 'Invalid'})
         stream.deliver(Buffer.concat([invalid, basic]))
         await flush()
         assert.equal(errors.length, 1)
+        assert.ok(errors[0] instanceof MessageDecodeError)
+        assert.equal((errors[0] as MessageDecodeError).header?.member, 'Invalid')
         assert.deepEqual(received.map((message: DBusMessage): string => message.header.member), ['Basic'])
     })
 
