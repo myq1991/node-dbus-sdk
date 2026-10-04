@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Runnable examples for dbus-sdk; see README.md in this directory"
+}

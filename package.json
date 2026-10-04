@@ -4,6 +4,18 @@
   "description": "A Node.js SDK for interacting with DBus, enabling seamless service calling and exposure with TypeScript support",
   "main": "build/NodeDBusSDK.js",
   "types": "build/NodeDBusSDK.d.ts",
+  "files": [
+    "build/**/*.js",
+    "build/**/*.d.ts",
+    "!build/tests/**",
+    "doc/",
+    "examples/*.ts",
+    "examples/README.md",
+    "MIGRATION.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "clean": "shx rm -rf ./build",
     "build": "tsc",
@@ -13,7 +25,7 @@
     "test:unit": "npm run rebuild && node --test --test-timeout=120000 \"build/tests/unit/**/*.test.js\"",
     "test:integration": "npm run rebuild && node --test --test-timeout=120000 \"build/tests/integration/**/*.test.js\"",
     "test:perf": "npm run rebuild && node --test --test-concurrency=1 \"build/tests/perf/**/*.test.js\"",
-    "test:example": "npm run rebuild && node ./build/tests/Test.spec.js",
+    "example": "node --import ./examples/use-local-build.mjs",
     "bench": "npm run rebuild && node --expose-gc ./build/tests/benchmark/run.js",
     "bench:compare": "node ./build/tests/benchmark/compare.js",
     "bench:ab": "npm run rebuild && node ./build/tests/benchmark/ab.js"
