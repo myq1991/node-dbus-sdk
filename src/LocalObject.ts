@@ -10,11 +10,13 @@ import {PeerInterface} from './lib/common/PeerInterface'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 
 /**
- * A class representing a local DBus object.
- * This class manages a collection of interfaces associated with a specific object path
- * within a local DBus service. It provides methods to add, remove, and query interfaces,
- * as well as to access standard DBus interfaces like Properties and Introspectable.
- * It serves as a container for interfaces under a unique object path.
+ * An object of a service you provide, at an object path, holding LocalInterfaces. Every object also has the standard
+ * interfaces org.freedesktop.DBus.Properties, .Introspectable and .Peer, answered by the library.
+ *
+ * @example
+ * const object = new LocalObject('/org/example/Greeter')
+ * object.addInterface(greeterInterface)
+ * service.addObject(object)
  */
 export class LocalObject {
 

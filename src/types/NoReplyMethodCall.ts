@@ -1,5 +1,5 @@
 /**
- * Type definition for a method call function that operates in no-reply mode.
- * Used to represent a DBus method call that does not expect or return a response from the server.
+ * A method of DBusInterface.noReplyMethod: takes the input arguments in order and sends the call with
+ * NO_REPLY_EXPECTED. It returns immediately; any result or error of the call is never seen.
  */
 export type NoReplyMethodCall = (...args: any[]) => void

@@ -24,6 +24,15 @@ function withAnnotations<T extends { annotation?: IntrospectAnnotation[] }>(entr
     return entry
 }
 
+/**
+ * A proxy for one object of a service on the bus. Get one from DBus.getObject or DBusService.getObject; its
+ * interfaces are found by introspection.
+ *
+ * @example
+ * const object = await dbus.getObject('org.freedesktop.DBus', '/org/freedesktop/DBus')
+ * console.log(await object.listInterfaceNames())
+ * const iface = await object.getInterface('org.freedesktop.DBus')
+ */
 export class DBusObject {
 
     protected readonly opts: DBusObjectOpts
@@ -32,6 +41,9 @@ export class DBusObject {
 
     protected readonly service: DBusService
 
+    /**
+     * The object path, e.g. '/org/freedesktop/DBus'.
+     */
     public readonly name: string
 
     #shareIntrospect: boolean = false
@@ -39,10 +51,9 @@ export class DBusObject {
     #shareIntrospectInterfaces: IntrospectInterface[] = []
 
     /**
-     * Constructor for DBusObject.
-     * Initializes the DBus object with the provided options and sets up references to the DBus connection
-     * and service.
-     * @param opts - Configuration options for the DBus object.
+     * Created by DBus.getObject and DBusService.getObject; not meant to be constructed directly.
+     *
+     * @param opts - The connection, the service and the object path.
      */
     constructor(opts: DBusObjectOpts) {
         this.opts = opts

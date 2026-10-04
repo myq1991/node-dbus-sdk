@@ -278,11 +278,15 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Emits a DBus signal with the specified options.
-     * Encodes the signal message using the provided options and writes it to the DBus socket.
-     * Signals are broadcast messages that do not expect a reply.
+     * Sends a signal from this connection: to everyone whose match rules select it, or to `destination` only.
+     * LocalInterface.defineSignal sends signals for you; this is the low-level form.
      *
-     * @param opts - Options for emitting the signal, including object path, interface, signal name, destination, signature, and data.
+     * @example
+     * bus.emitSignal({objectPath: '/org/example/Clock', interface: 'org.example.Clock1', signal: 'Tick', signature: 'us', data: [1, new Date().toISOString()]})
+     *
+     * @param opts - Object path, interface and signal name, the data's signature and values, and an optional
+     *               destination.
+     * @throws {InvalidValueError | SignatureError} When the data does not fit the signature.
      */
     public emitSignal(opts: EmitSignalOpts): void {
         this.write(DBusMessage.encode({
@@ -345,10 +349,26 @@ export class DBus extends EventEmitter {
      */
     public invoke(opts: InvokeOpts & { noReply?: false }): Promise<any[]>
     /**
-     * Calls a method, waiting for its reply unless `opts.noReply` is set.
+     * Calls a method without introspection. `args` are plain values (or DBusSignedValue / type class instances) typed
+     * by `signature`, which must describe all of them, e.g. 'su' for a string and a UINT32. For calls with types
+     * from introspection, use getInterface(...).method instead.
      *
-     * @param opts - Options for the method call, including service, object path, interface, method, signature, and arguments.
-     * @returns A Promise resolving to the reply's arguments, or nothing when no reply is expected.
+     * Resolves with the array of the reply's values, even for one or none (`const [value] = await bus.invoke(...)`).
+     * Rejects with the error the service replied with, whose `name` is the DBus error name, with a TimeoutError after
+     * `timeout` (or the connection's callTimeout), or with an error named 'org.freedesktop.DBus.Error.Disconnected'
+     * when the connection closes first. With `noReply: true`, nothing is waited for and nothing is returned.
+     *
+     * @example
+     * const [owner] = await bus.invoke({
+     *     service: 'org.freedesktop.DBus', objectPath: '/org/freedesktop/DBus', interface: 'org.freedesktop.DBus',
+     *     method: 'GetNameOwner', signature: 's', args: ['org.example.Greeter'], timeout: 5000
+     * })
+     *
+     * @param opts - Destination service, object path, interface, method, signature and args; optionally timeout
+     *               and noReply.
+     * @returns The reply's values, or nothing when no reply is expected.
+     * @throws {InvalidValueError | SignatureError} When the args do not fit the signature: the returned promise rejects,
+     *         or, with noReply, invoke throws.
      */
     public invoke(opts: InvokeOpts): Promise<any[]> | void
     public invoke(opts: InvokeOpts): Promise<any[]> | void {
@@ -406,11 +426,14 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Retrieves the value of a DBus property using the Properties interface.
-     * Calls the 'Get' method of 'org.freedesktop.DBus.Properties' to fetch a property value.
+     * Reads a property with org.freedesktop.DBus.Properties.Get, without introspection.
      *
-     * @param opts - Options for getting the property, including service, object path, interface name, and property name.
-     * @returns A Promise resolving to the value of the requested property.
+     * @example
+     * const features = await bus.getProperty({service: 'org.freedesktop.DBus', objectPath: '/org/freedesktop/DBus', interface: 'org.freedesktop.DBus', property: 'Features'})
+     *
+     * @param opts - Service, object path, interface and property name.
+     * @returns The property's value as a plain value.
+     * @throws {Error} The DBus error the service replied with, e.g. 'org.freedesktop.DBus.Error.UnknownProperty'.
      */
     public async getProperty(opts: GetPropertyValueOpts): Promise<any> {
         const [value] = await this.invoke({
@@ -425,11 +448,13 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Sets the value of a DBus property using the Properties interface.
-     * Calls the 'Set' method of 'org.freedesktop.DBus.Properties' to update a property value.
+     * Writes a property with org.freedesktop.DBus.Properties.Set, without introspection. Give the value's type with
+     * `signature`, or as a DBusSignedValue; otherwise it is inferred as for a variant (e.g. 5 is sent as 'i'), which
+     * services usually reject for a property of another type.
      *
-     * @param opts - Options for setting the property, including service, object path, interface name, property name, value, and optional signature.
-     * @returns A Promise that resolves when the property is successfully set.
+     * @param opts - Service, object path, interface, property name, value, and the value's signature.
+     * @returns Resolves when the service has accepted the value.
+     * @throws {Error} The DBus error the service replied with, e.g. 'org.freedesktop.DBus.Error.InvalidArgs'.
      */
     public async setProperty(opts: SetPropertyValueOpts): Promise<void> {
         let signedValue: DBusSignedValue
@@ -530,11 +555,21 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Creates a signal emitter for listening to DBus signals.
-     * Constructs a DBusSignalEmitter instance to handle signal events for specific criteria.
+     * Creates an emitter for the signals selected by sender, object path and interface, where '*' matches any.
+     * Listen with the signal's name as the event (or '*' for every signal, with the name first): the listener gets
+     * the signal's arguments. Listening adds a match rule on the bus; removing the last listener removes it.
      *
-     * @param opts - Options for creating the signal emitter, including service name, object path, and interface.
-     * @returns A DBusSignalEmitter instance for subscribing to and handling signals.
+     * Signals are matched by the sender's unique name: `uniqueName` is the sender (e.g. ':1.42', or '*'), and
+     * `service` the well-known name whose owner changes it follows. For one service's interface,
+     * getInterface(...).signal is simpler; the rule takes effect once the bus has processed it, which any later
+     * call on this connection waits for.
+     *
+     * @example
+     * const emitter = bus.createSignalEmitter({service: '*', uniqueName: '*', objectPath: '*', interface: 'org.example.Clock1'})
+     * emitter.on('Tick', (count, time) => console.log(count, time))
+     *
+     * @param opts - The sender's well-known and unique names, the object path and the interface, each possibly '*'.
+     * @returns The signal emitter.
      */
     public createSignalEmitter(opts: CreateSignalEmitterOpts): DBusSignalEmitter {
         const signalEmitter: DBusSignalEmitter = new DBusSignalEmitter(
@@ -1246,10 +1281,10 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Disconnects from the DBus daemon.
-     * Closes the underlying connection stream, ending communication with the daemon.
+     * Closes the connection. Calls still waiting for a reply are rejected with
+     * 'org.freedesktop.DBus.Error.Disconnected', and 'connectionClose' is emitted.
      *
-     * @returns A Promise that resolves when the connection is fully closed.
+     * @returns Resolves when the connection is closed.
      */
     public async disconnect(): Promise<void> {
         await new Promise<void>(resolve => this.#connection.end(resolve))
@@ -1323,12 +1358,12 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Retrieves a specific service by its bus name.
-     * Starts the service if it is activatable but not currently active, and throws an error if not found.
+     * A proxy for a service by its well-known name. A service that is not running but activatable is started.
      *
-     * @param service - The bus name of the service to retrieve (e.g., 'org.my.Service').
-     * @returns A Promise resolving to a DBusService instance for the specified service.
-     * @throws {ServiceNotFoundError} If the service is not found in active or activatable lists, or if it has no connection.
+     * @param service - The well-known name, e.g. 'org.freedesktop.NetworkManager'.
+     * @returns The service proxy.
+     * @throws {ServiceNotFoundError} When no connection owns the name and it is not activatable, or activation does
+     *         not give it an owner.
      */
     public async getService(service: string): Promise<DBusService> {
         const [activeNames, activatableNames] = await Promise.all([
@@ -1343,25 +1378,31 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Retrieves a specific DBus object by service and object path.
-     * Fetches the service first, then constructs or retrieves the object at the specified path.
+     * A proxy for an object of a service; see getService. The path itself is not checked.
      *
-     * @param service - The bus name of the service (e.g., 'org.my.Service').
-     * @param objectPath - The object path to retrieve (e.g., '/org/my/Object').
-     * @returns A Promise resolving to a DBusObject instance for the specified path under the service.
+     * @param service - The service's well-known name.
+     * @param objectPath - The object path, e.g. '/org/freedesktop/NetworkManager'.
+     * @returns The object proxy.
+     * @throws {ServiceNotFoundError} As getService.
      */
     public async getObject(service: string, objectPath: string): Promise<DBusObject> {
         return (await this.getService(service)).getObject(objectPath)
     }
 
     /**
-     * Retrieves a specific DBus interface by service, object path, and interface name.
-     * Fetches the object first, then retrieves or constructs the specified interface on that object.
+     * A proxy for an interface of an object, built by introspecting the object. This is the usual way to call
+     * methods, use properties and receive signals of a service.
      *
-     * @param service - The bus name of the service (e.g., 'org.my.Service').
-     * @param objectPath - The object path of the object (e.g., '/org/my/Object').
-     * @param iface - The interface name to retrieve (e.g., 'org.my.Interface').
-     * @returns A Promise resolving to a DBusInterface instance for the specified interface.
+     * @example
+     * const iface = await bus.getInterface('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus')
+     * const id = await iface.method.GetId()
+     *
+     * @param service - The service's well-known name.
+     * @param objectPath - The object path.
+     * @param iface - The interface name.
+     * @returns The interface proxy.
+     * @throws {ServiceNotFoundError} As getService.
+     * @throws {InterfaceNotFoundError} When the object's introspection data does not list the interface.
      */
     public async getInterface(service: string, objectPath: string, iface: string): Promise<DBusInterface> {
         return (await this.getObject(service, objectPath)).getInterface(iface)

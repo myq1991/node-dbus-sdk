@@ -31,10 +31,18 @@ import {DBusBufferDecoder} from './lib/DBusBufferDecoder'
 import {PropertiesInterface} from './lib/common/PropertiesInterface'
 
 /**
- * A class representing a local DBus interface.
- * This class enables the definition of methods, properties, and signals for a local DBus service,
- * facilitating the creation of custom interfaces. It manages name validation, introspection data,
- * and interactions with DBus for handling method calls, property access, and signal emission.
+ * An interface of a service you provide: its methods, properties and signals, defined with defineMethod,
+ * defineProperty and defineSignal. Add it to a LocalObject, and the object to a LocalService.
+ *
+ * @example
+ * const iface = new LocalInterface('org.example.Greeter1')
+ *     .defineMethod({name: 'Greet', inputArgs: [{type: 's'}], outputArgs: [{type: 's'}], method: (name: string): string => `Hello, ${name}!`})
+ *     .defineProperty({name: 'Greeting', type: 's', getter: (): string => 'Hello'})
+ * const object = new LocalObject('/org/example/Greeter')
+ * object.addInterface(iface)
+ * const service = new LocalService('org.example.Greeter')
+ * service.addObject(object)
+ * await service.run()
  */
 export class LocalInterface {
 
@@ -432,14 +440,29 @@ export class LocalInterface {
     }
 
     /**
-     * Defines a new method for this interface.
-     * Configures a method with specified input and output arguments and an implementation function,
-     * validates the method name against DBus naming rules, and updates introspection data for discovery.
+     * Defines a method. The handler receives the input arguments in order as plain values (see the README's type
+     * mapping), plus the call's context last if `withContext` is set. It may be async. What it returns is sent back
+     * typed by `outputArgs`: with one output argument, return its value (an array for 'as', an object for 'a{sv}');
+     * with several, return an array holding one value per output argument; with none, the return value is ignored.
+     * An error it throws is sent to the caller as a DBus error named after the error's `name` when that is a valid
+     * DBus error name (use createDBusError), and '<service name>.<name>' or '<service name>.Error' otherwise.
      *
-     * @param opts - Options for defining the method, including name, input/output arguments, and the method implementation.
-     * @returns The instance of this LocalInterface for method chaining.
+     * @example
+     * iface.defineMethod({
+     *     name: 'Divide',
+     *     inputArgs: [{name: 'dividend', type: 'd'}, {name: 'divisor', type: 'd'}],
+     *     outputArgs: [{name: 'quotient', type: 'd'}],
+     *     method: (dividend: number, divisor: number): number => {
+     *         if (divisor === 0) throw createDBusError('org.example.Error.DivisionByZero', 'Cannot divide by zero')
+     *         return dividend / divisor
+     *     }
+     * })
+     *
+     * @param opts - Name, input and output arguments with their types, the handler, and optional withContext and
+     *               annotations.
+     * @returns This interface, for chaining.
      * @throws {LocalInterfaceMethodDefinedError} If a method with the same name is already defined.
-     * @throws {LocalInterfaceInvalidMethodNameError} If the method name does not meet DBus naming criteria.
+     * @throws {LocalInterfaceInvalidMethodNameError} If the name is not a valid DBus member name.
      */
     public defineMethod(opts: DefineMethodOpts): this {
         if (this.#definedMethods[opts.name]) throw new LocalInterfaceMethodDefinedError(`Method ${opts.name} is already defined`)
@@ -478,15 +501,29 @@ export class LocalInterface {
     }
 
     /**
-     * Defines a new property for this interface.
-     * Configures a property with a specified type, determines access mode (read, write, read-write) based on provided
-     * getter/setter functions, and supports emitting property change signals if configured via options.
-     * Updates introspection data for discovery and sets up asynchronous change notifications via setImmediate.
+     * Defines a property. Its access follows the functions given: getter only → read, setter only → write, both →
+     * readwrite. The getter returns a plain value of the property's type; the setter receives one and may be async
+     * or throw, which the caller of Set sees as a DBus error.
      *
-     * @param opts - Options for defining the property, including name, type, access mode, getter/setter functions, and change emission settings.
-     * @returns The instance of this LocalInterface for method chaining.
+     * With emitPropertiesChanged, a change made through the setter (a DBus Set call, or setProperty from your own
+     * code) sends org.freedesktop.DBus.Properties.PropertiesChanged, with the new value or, with
+     * `{emitValue: false}`, as invalidated. A value changed some other way, e.g. a read-only property, is announced
+     * with `object.propertiesInterface.emitPropertiesChanged(iface.name, {Name: iface.getPropertySignedValue('Name')})`.
+     *
+     * @example
+     * let volume = 50
+     * iface.defineProperty({
+     *     name: 'Volume',
+     *     type: 'u',
+     *     emitPropertiesChanged: true,
+     *     getter: (): number => volume,
+     *     setter: (value: number): void => { volume = Math.min(value, 100) }
+     * })
+     *
+     * @param opts - Name, type signature, getter and/or setter, emitPropertiesChanged and annotations.
+     * @returns This interface, for chaining.
      * @throws {LocalInterfacePropertyDefinedError} If a property with the same name is already defined.
-     * @throws {LocalInterfaceInvalidPropertyNameError} If the property name does not meet DBus naming criteria.
+     * @throws {LocalInterfaceInvalidPropertyNameError} If the name is not a valid DBus member name.
      */
     public defineProperty(opts: DefinePropertyOpts): this {
         if (!opts.setter && !opts.getter) return this // Skip if neither getter nor setter is provided
@@ -541,15 +578,19 @@ export class LocalInterface {
     }
 
     /**
-     * Defines a new signal for this interface.
-     * Configures a signal with specified arguments and associates it with an EventEmitter for emission.
-     * When the signal is triggered, it is sent over the DBus connection if the interface is associated
-     * with an object and a DBus connection is available.
+     * Defines a signal, sent whenever the given EventEmitter emits an event of the signal's name: the event's
+     * arguments become the signal's arguments, typed by `args`. Signals are sent only while the interface is on an
+     * object of a running service.
      *
-     * @param opts - Options for defining the signal, including name, arguments, and associated event emitter.
-     * @returns The instance of this LocalInterface for method chaining.
+     * @example
+     * const events = new EventEmitter()
+     * iface.defineSignal({name: 'Greeted', args: [{name: 'name', type: 's'}, {name: 'count', type: 'u'}], eventEmitter: events})
+     * events.emit('Greeted', 'Alice', 1)   // sends the signal
+     *
+     * @param opts - Name, arguments with their types, the EventEmitter, and annotations.
+     * @returns This interface, for chaining.
      * @throws {LocalInterfaceSignalDefinedError} If a signal with the same name is already defined.
-     * @throws {LocalInterfaceInvalidSignalNameError} If the signal name does not meet DBus naming criteria.
+     * @throws {LocalInterfaceInvalidSignalNameError} If the name is not a valid DBus member name.
      */
     public defineSignal(opts: DefineSignalOpts): this {
         if (this.#definedSignals[opts.name]) throw new LocalInterfaceSignalDefinedError(`Signal ${opts.name} is already defined`)
@@ -603,7 +644,8 @@ export class LocalInterface {
      * @param context - The call being answered, passed to methods defined with `withContext`; LocalService provides
      *                  it, and it is undefined when the method is called directly.
      * @returns A Promise resolving to an object containing the method's output signature (if defined) and result.
-     * @throws {DBusError} If the method is not found or if the input signature does not match the expected signature.
+     * @throws {Error} Named 'org.freedesktop.DBus.Error.UnknownMethod' or '...InvalidArgs' when the method is not
+     *         defined or the signature does not match; otherwise whatever the method throws.
      */
     public async callMethod(name: string, payloadSignature: string | undefined, args: any[] = [], context?: MethodCallContext): Promise<{
         signature?: string
@@ -620,15 +662,15 @@ export class LocalInterface {
     }
 
     /**
-     * Sets the value of a defined property on this interface.
-     * Validates the value against the property's signature by encoding and decoding it to ensure type compatibility
-     * before invoking the setter function to update the property.
+     * Sets a property through its setter, as a DBus Set call does: the value is checked against the property's type,
+     * the setter is awaited, and PropertiesChanged is sent if the property was defined with emitPropertiesChanged.
+     * Service code can use it to change a writable property and announce the change.
      *
-     * @param name - The name of the property to set.
-     * @param value - The value to set for the property.
-     * @returns void
-     * @throws {DBusError} If the property is not found, the value signature does not match the expected type,
-     *                     or the property is read-only (no setter defined).
+     * @param name - The property name.
+     * @param value - The new value.
+     * @returns Resolves when the setter has finished.
+     * @throws {Error} Named 'org.freedesktop.DBus.Error.UnknownProperty', '...InvalidArgs' (the value does not fit the
+     *         type) or '...PropertyReadOnly' (no setter); otherwise whatever the setter throws.
      */
     public async setProperty(name: string, value: any): Promise<void> {
         if (!this.#definedProperties[name]) throw createDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
@@ -646,12 +688,11 @@ export class LocalInterface {
     }
 
     /**
-     * Gets the value of a defined property on this interface.
-     * Retrieves the current value by invoking the getter function if available, returning it as a raw value.
+     * The value of a property, from its getter.
      *
-     * @param name - The name of the property to get.
-     * @returns The property value as returned by the getter function.
-     * @throws {DBusError} If the property is not found or is write-only (no getter defined).
+     * @param name - The property name.
+     * @returns What the getter returns.
+     * @throws {Error} Named 'org.freedesktop.DBus.Error.UnknownProperty' or '...PropertyWriteOnly' (no getter).
      */
     public getProperty(name: string): any {
         if (!this.#definedProperties[name]) throw createDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
@@ -666,7 +707,7 @@ export class LocalInterface {
      *
      * @param name - The name of the property to get.
      * @returns A DBusSignedValue instance representing the property value with its associated signature.
-     * @throws {DBusError} If the property is not found or is write-only (no getter defined).
+     * @throws {Error} Named 'org.freedesktop.DBus.Error.UnknownProperty' or '...PropertyWriteOnly'.
      */
     public getPropertySignedValue(name: string): DBusSignedValue {
         const propertyValue: any = this.getProperty(name)

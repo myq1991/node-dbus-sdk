@@ -26,7 +26,8 @@ export interface IntrospectProperty {
     access: DBusPropertyAccess
 
     /**
-     * Annotations, if any.
+     * The property's annotations from the introspection data, e.g. [{name: 'org.freedesktop.DBus.Deprecated', value: 'true'}];
+     * absent when it has none.
      */
     annotation?: IntrospectAnnotation[]
 }

@@ -33,7 +33,8 @@ export interface IntrospectInterface {
     signal: IntrospectSignal[]
 
     /**
-     * Annotations, if any.
+     * The interface's annotations from the introspection data, e.g. [{name: 'org.freedesktop.DBus.Deprecated', value: 'true'}];
+     * absent when it has none.
      */
     annotation?: IntrospectAnnotation[]
 }

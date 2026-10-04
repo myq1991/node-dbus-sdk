@@ -12,6 +12,9 @@ import {DBusMessageHeader} from '../types/DBusMessageHeader'
  * or connecting to the bus took longer than the connect options' timeout.
  */
 export class TimeoutError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'TimeoutError'.
+     */
     name: string = 'TimeoutError'
 
     /**
@@ -29,6 +32,9 @@ export class TimeoutError extends Error implements NodeJS.ErrnoException {
  * DBus.connect was given no address and the DBUS_SESSION_BUS_ADDRESS environment variable is not set.
  */
 export class UnknownBusAddressError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'UnknownBusAddressError'.
+     */
     name: string = 'UnknownBusAddressError'
 
     /**
@@ -46,6 +52,9 @@ export class UnknownBusAddressError extends Error implements NodeJS.ErrnoExcepti
  * A bus address uses a transport other than unix: and tcp:.
  */
 export class UnknownBusTypeError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'UnknownBusTypeError'.
+     */
     name: string = 'UnknownBusTypeError'
 
     /**
@@ -64,6 +73,9 @@ export class UnknownBusTypeError extends Error implements NodeJS.ErrnoException 
  * or a unix: bus address has neither path= nor socket=.
  */
 export class NotEnoughParamsError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'NotEnoughParamsError'.
+     */
     name: string = 'NotEnoughParamsError'
 
     /**
@@ -81,6 +93,9 @@ export class NotEnoughParamsError extends Error implements NodeJS.ErrnoException
  * None of the addresses in a bus address list could be connected to.
  */
 export class CreateStreamFailedError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'CreateStreamFailedError'.
+     */
     name: string = 'CreateStreamFailedError'
 
     /**
@@ -99,6 +114,9 @@ export class CreateStreamFailedError extends Error implements NodeJS.ErrnoExcept
  * another user, or holds no matching cookie.
  */
 export class UserPermissionError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'UserPermissionError'.
+     */
     name: string = 'UserPermissionError'
 
     /**
@@ -116,6 +134,9 @@ export class UserPermissionError extends Error implements NodeJS.ErrnoException 
  * Authentication with the bus failed: the server rejected every mechanism tried, or an unsupported one was asked for.
  */
 export class AuthError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'AuthError'.
+     */
     name: string = 'AuthError'
 
     /**
@@ -134,6 +155,9 @@ export class AuthError extends Error implements NodeJS.ErrnoException {
  * e.g. two values for a one-type signature.
  */
 export class SignatureError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'SignatureError'.
+     */
     name: string = 'SignatureError'
 
     /**
@@ -151,6 +175,9 @@ export class SignatureError extends Error implements NodeJS.ErrnoException {
  * A message was written without a serial number.
  */
 export class SerialError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'SerialError'.
+     */
     name: string = 'SerialError'
 
     /**
@@ -168,6 +195,9 @@ export class SerialError extends Error implements NodeJS.ErrnoException {
  * A value for type 'o' is not a valid object path.
  */
 export class ObjectPathError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'ObjectPathError'.
+     */
     name: string = 'ObjectPathError'
 
     /**
@@ -185,6 +215,9 @@ export class ObjectPathError extends Error implements NodeJS.ErrnoException {
  * Received data ends inside the padding a value is aligned with; the message is truncated or malformed.
  */
 export class AlignmentError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'AlignmentError'.
+     */
     name: string = 'AlignmentError'
 
     /**
@@ -202,6 +235,9 @@ export class AlignmentError extends Error implements NodeJS.ErrnoException {
  * Received data ends before a value it announces; the message is truncated or malformed.
  */
 export class ReadBufferError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'ReadBufferError'.
+     */
     name: string = 'ReadBufferError'
 
     /**
@@ -221,6 +257,9 @@ export class ReadBufferError extends Error implements NodeJS.ErrnoException {
  * an array over 64 MiB).
  */
 export class InvalidValueError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'InvalidValueError'.
+     */
     name: string = 'InvalidValueError'
 
     /**
@@ -239,6 +278,9 @@ export class InvalidValueError extends Error implements NodeJS.ErrnoException {
  * nor activatable, or whose activation did not give it an owner.
  */
 export class ServiceNotFoundError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'ServiceNotFoundError'.
+     */
     name: string = 'ServiceNotFoundError'
 
     /**
@@ -256,6 +298,9 @@ export class ServiceNotFoundError extends Error implements NodeJS.ErrnoException
  * The remote object's introspection data does not list the requested interface.
  */
 export class InterfaceNotFoundError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'InterfaceNotFoundError'.
+     */
     name: string = 'InterfaceNotFoundError'
 
     /**
@@ -274,6 +319,9 @@ export class InterfaceNotFoundError extends Error implements NodeJS.ErrnoExcepti
  * e.g. set() on a read-only property.
  */
 export class AccessPropertyForbiddenError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'AccessPropertyForbiddenError'.
+     */
     name: string = 'AccessPropertyForbiddenError'
 
     /**
@@ -291,6 +339,9 @@ export class AccessPropertyForbiddenError extends Error implements NodeJS.ErrnoE
  * LocalService.addObject was given an object whose path the service already has. Every service has '/'.
  */
 export class LocalObjectPathExistsError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalObjectPathExistsError'.
+     */
     name: string = 'LocalObjectPathExistsError'
 
     /**
@@ -308,6 +359,9 @@ export class LocalObjectPathExistsError extends Error implements NodeJS.ErrnoExc
  * LocalObject.addInterface was given an interface whose name the object already has.
  */
 export class LocalInterfaceExistsError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfaceExistsError'.
+     */
     name: string = 'LocalInterfaceExistsError'
 
     /**
@@ -325,6 +379,9 @@ export class LocalInterfaceExistsError extends Error implements NodeJS.ErrnoExce
  * LocalInterface.defineMethod was given a name the interface already defines.
  */
 export class LocalInterfaceMethodDefinedError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfaceMethodDefinedError'.
+     */
     name: string = 'LocalInterfaceMethodDefinedError'
 
     /**
@@ -342,6 +399,9 @@ export class LocalInterfaceMethodDefinedError extends Error implements NodeJS.Er
  * LocalInterface.defineProperty was given a name the interface already defines.
  */
 export class LocalInterfacePropertyDefinedError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfacePropertyDefinedError'.
+     */
     name: string = 'LocalInterfacePropertyDefinedError'
 
     /**
@@ -359,6 +419,9 @@ export class LocalInterfacePropertyDefinedError extends Error implements NodeJS.
  * LocalInterface.defineSignal was given a name the interface already defines.
  */
 export class LocalInterfaceSignalDefinedError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfaceSignalDefinedError'.
+     */
     name: string = 'LocalInterfaceSignalDefinedError'
 
     /**
@@ -376,6 +439,9 @@ export class LocalInterfaceSignalDefinedError extends Error implements NodeJS.Er
  * A LocalService name is not a valid bus name, e.g. 'org.example.Service'.
  */
 export class LocalServiceInvalidNameError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalServiceInvalidNameError'.
+     */
     name: string = 'LocalServiceInvalidNameError'
 
     /**
@@ -393,6 +459,9 @@ export class LocalServiceInvalidNameError extends Error implements NodeJS.ErrnoE
  * A LocalObject path is not a valid object path, e.g. '/org/example/Object'.
  */
 export class LocalObjectInvalidNameError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalObjectInvalidNameError'.
+     */
     name: string = 'LocalObjectInvalidNameError'
 
     /**
@@ -410,6 +479,9 @@ export class LocalObjectInvalidNameError extends Error implements NodeJS.ErrnoEx
  * A LocalInterface name is not a valid interface name, e.g. 'org.example.Interface1'.
  */
 export class LocalInterfaceInvalidNameError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfaceInvalidNameError'.
+     */
     name: string = 'LocalInterfaceInvalidNameError'
 
     /**
@@ -427,6 +499,9 @@ export class LocalInterfaceInvalidNameError extends Error implements NodeJS.Errn
  * A method name is not a valid member name ([A-Za-z_][A-Za-z0-9_]*, at most 255 bytes).
  */
 export class LocalInterfaceInvalidMethodNameError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfaceInvalidMethodNameError'.
+     */
     name: string = 'LocalInterfaceInvalidMethodNameError'
 
     /**
@@ -444,6 +519,9 @@ export class LocalInterfaceInvalidMethodNameError extends Error implements NodeJ
  * A property name is not a valid member name ([A-Za-z_][A-Za-z0-9_]*, at most 255 bytes).
  */
 export class LocalInterfaceInvalidPropertyNameError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfaceInvalidPropertyNameError'.
+     */
     name: string = 'LocalInterfaceInvalidPropertyNameError'
 
     /**
@@ -461,6 +539,9 @@ export class LocalInterfaceInvalidPropertyNameError extends Error implements Nod
  * A signal name is not a valid member name ([A-Za-z_][A-Za-z0-9_]*, at most 255 bytes).
  */
 export class LocalInterfaceInvalidSignalNameError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfaceInvalidSignalNameError'.
+     */
     name: string = 'LocalInterfaceInvalidSignalNameError'
 
     /**
@@ -478,6 +559,9 @@ export class LocalInterfaceInvalidSignalNameError extends Error implements NodeJ
  * An annotation name does not have the form of an interface name, or its value is not a string.
  */
 export class LocalInterfaceInvalidAnnotationError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'LocalInterfaceInvalidAnnotationError'.
+     */
     name: string = 'LocalInterfaceInvalidAnnotationError'
 
     /**
@@ -497,6 +581,9 @@ export class LocalInterfaceInvalidAnnotationError extends Error implements NodeJ
  * org.freedesktop.DBus.Error.InvalidArgs reply.
  */
 export class MessageDecodeError extends Error implements NodeJS.ErrnoException {
+    /**
+     * The class name, 'MessageDecodeError'.
+     */
     name: string = 'MessageDecodeError'
 
     /**
@@ -515,6 +602,11 @@ export class MessageDecodeError extends Error implements NodeJS.ErrnoException {
      */
     header?: Partial<DBusMessageHeader>
 
+    /**
+     * @param message - What could not be decoded.
+     * @param header - The message header, if it was decoded.
+     * @param options - `cause`: the error the decoder threw.
+     */
     constructor(message: string, header?: Partial<DBusMessageHeader>, options?: { cause?: unknown }) {
         super(message, options)
         this.header = header

@@ -15,10 +15,18 @@ import {RequestNameFlags} from './lib/enums/RequestNameFlags'
 import {RequestNameResultCode} from './lib/enums/RequestNameResultCode'
 
 /**
- * A class representing a local DBus service.
- * This class manages a collection of objects and their associated interfaces within a DBus service.
- * It handles connecting to a DBus bus, processing incoming method calls, and managing the lifecycle
- * of the service. It serves as the top-level entity for a local DBus service implementation.
+ * A service you provide on the bus under a well-known name: holds LocalObjects, connects with run(), answers method
+ * calls by routing them to the right object, interface and method, and stops with stop().
+ *
+ * The root object '/' exists from the start and carries org.freedesktop.DBus.ObjectManager, which announces objects
+ * added and removed while the service runs. Do not add another object at '/'.
+ *
+ * @example
+ * const service = new LocalService('org.example.Greeter')
+ * service.addObject(greeterObject)
+ * const result = await service.run()   // the session bus; run({busAddress}) for another
+ * if (result !== RequestNameResultCode.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) console.error('name is taken')
+ * process.once('SIGTERM', () => service.stop({graceful: true, timeout: 5000}))
  */
 export class LocalService {
 
@@ -240,13 +248,16 @@ export class LocalService {
     }
 
     /**
-     * Connects to a DBus bus and starts the service.
-     * Establishes a connection to the bus using the provided options, registers the method call handler
-     * to process incoming requests, and requests ownership of the service name on the bus to make it
-     * available for clients to interact with, using configurable flags for name request behavior.
+     * Connects to the bus, starts answering method calls, and requests the service's name.
      *
-     * @param opts - Connection options for the DBus bus (e.g., socket path, TCP details) and optional flags for name request behavior.
-     * @returns A Promise that resolves to a RequestNameResultCode indicating the result of the service name request.
+     * A taken name does not make it fail: by default the service is queued and gets the name when the owner
+     * releases it (DBUS_REQUEST_NAME_REPLY_IN_QUEUE). Check the result, or pass
+     * `flags: RequestNameFlags.DBUS_NAME_FLAG_DO_NOT_QUEUE` to get DBUS_REQUEST_NAME_REPLY_EXISTS instead.
+     *
+     * @param opts - Where to connect, as for DBus.connect (the session bus by default), and `flags` for requesting
+     *               the name.
+     * @returns The result of requesting the name; DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER when the service owns it.
+     * @throws {UnknownBusAddressError | CreateStreamFailedError | TimeoutError | AuthError} When connecting fails.
      */
     public async run(opts: RunServiceOpts = {}): Promise<RequestNameResultCode> {
         const flags: RequestNameFlags = opts.flags !== undefined ? opts.flags : RequestNameFlags.DBUS_NAME_FLAG_DEFAULT
@@ -330,13 +341,11 @@ export class LocalService {
     }
 
     /**
-     * Adds a LocalObject to this service.
-     * Associates the object with this service, linking it to the service's context for further operations,
-     * and notifies the object manager of the addition if an ObjectManager interface is available on the root object.
+     * Adds an object. While the service runs, the object manager announces it with InterfacesAdded.
      *
-     * @param localObject - The LocalObject instance to add to this service.
-     * @returns A boolean indicating whether the object was successfully added (true if added, false if already present).
-     * @throws {LocalObjectPathExistsError} If an object with the same path already exists and is not the same instance.
+     * @param localObject - The object to add.
+     * @returns True when it was added, false when this object was already added.
+     * @throws {LocalObjectPathExistsError} If another object has the same path ('/' always exists).
      */
     public addObject(localObject: LocalObject): boolean {
         let addSuccess: boolean = false

@@ -467,9 +467,11 @@ export class DBusBufferDecoder {
      * Reads a SIGNATURE type value from the buffer.
      * SIGNATURE is a string of type codes with a 1-byte length field and no specific alignment requirement.
      *
+     * @param validate - Whether to check the signature against the specification's rules (default true).
      * @returns The signature as a string wrapped in a DBusSignedValue instance with signature 'g'.
      * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read the SIGNATURE length or content.
      * @throws {ReadBufferError} If the null terminator is not found or is invalid.
+     * @throws {SignatureError} If validate is set and the signature breaks the rules.
      */
     public readSignature(validate: boolean = true): DBusSignedValue {
         // No alignment needed for 1-byte length field

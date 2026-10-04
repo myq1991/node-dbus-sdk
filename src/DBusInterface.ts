@@ -17,6 +17,21 @@ import {DBusSignedValue} from './lib/DBusSignedValue'
 import {NamedMethodCall} from './types/NamedMethodCall'
 import {NamedNoReplyMethodCall} from './types/NamedNoReplyMethodCall'
 
+/**
+ * A proxy for one interface of a remote object, built from its introspection data. Get one from DBus.getInterface or
+ * DBusObject.getInterface. Methods, properties and signals are reached by name, and arguments take their types from
+ * the introspected signatures, so plain JavaScript values are enough.
+ *
+ * @example
+ * const iface = await dbus.getInterface('org.example.Greeter', '/org/example/Greeter', 'org.example.Greeter1')
+ * const message = await iface.method.Greet('Alice')            // one return value: the value itself
+ * const [count, since] = await iface.method.Stats()            // several: an array
+ * await iface.namedMethod.Greet({name: 'Bob'})                 // arguments by name
+ * iface.noReplyMethod.Ping()                                   // no reply expected
+ * const greeting = await iface.property.Greeting.get()
+ * await iface.property.Greeting.set('Howdy')
+ * iface.signal.on('Greeted', (name, count) => console.log(name, count))
+ */
 export class DBusInterface {
 
     #signalEmitter: DBusSignalEmitter
@@ -31,13 +46,15 @@ export class DBusInterface {
 
     protected readonly introspectInterface: IntrospectInterface
 
+    /**
+     * The interface name, e.g. 'org.freedesktop.DBus.Properties'.
+     */
     public readonly name: string
 
     /**
-     * Constructor for DBusInterface.
-     * Initializes the DBus interface with the provided options and sets up references to the DBus connection,
-     * service, object, and introspection data.
-     * @param opts - Configuration options for the DBus interface.
+     * Created by DBus.getInterface and DBusObject.getInterface; not meant to be constructed directly.
+     *
+     * @param opts - The connection, service, object, interface name and introspection data.
      */
     constructor(opts: DBusInterfaceOpts) {
         this.opts = opts
@@ -75,10 +92,17 @@ export class DBusInterface {
     }
 
     /**
-     * Getter for methods with reply mode.
-     * Dynamically creates an object containing methods that expect a reply from the DBus invocation.
-     * Each method handles input arguments with type signatures and returns the result of the invocation.
-     * @returns A record of method names mapped to their callable implementations with reply mode.
+     * The interface's methods by name, taking the input arguments in order as plain values (their types come from
+     * the introspected signature) and waiting for the reply.
+     *
+     * A call resolves with undefined when the method returns nothing, the value itself when it returns one, and an
+     * array when it returns several. It rejects with the error the service replied with, whose `name` is the DBus
+     * error name (e.g. 'org.freedesktop.DBus.Error.InvalidArgs'), or with a TimeoutError after the connection's
+     * callTimeout.
+     *
+     * @example
+     * const id = await iface.method.GetId()
+     * const [count, since] = await iface.method.Stats()
      */
     public get method(): Record<string, MethodCall> {
         const methods: Record<string, MethodCall> = {}
@@ -105,11 +129,12 @@ export class DBusInterface {
     }
 
     /**
-     * Getter for methods with reply mode using parameter object pattern.
-     * Dynamically creates an object containing methods that expect a reply from the DBus invocation.
-     * Each method accepts a single parameter object containing named arguments, which are mapped to the expected input parameters
-     * based on the introspection data. This approach enhances readability and avoids errors due to parameter order.
-     * @returns A record of method names mapped to their callable implementations with reply mode, accepting a parameter object.
+     * Like `method`, but each method takes its input arguments as one object keyed by the introspected argument
+     * names, so the order does not matter. Arguments without a name in the introspection data cannot be given.
+     *
+     * @example
+     * await iface.namedMethod.Divide({dividend: 1, divisor: 4})
+     * @throws {NotEnoughParamsError} (from the call) When an input argument is missing from the object.
      */
     public get namedMethod(): Record<string, NamedMethodCall> {
         const methods: Record<string, MethodCall> = {}
@@ -123,10 +148,8 @@ export class DBusInterface {
     }
 
     /**
-     * Getter for methods with no-reply mode.
-     * Dynamically creates an object containing methods that do not expect a reply from the DBus invocation.
-     * These methods are used for fire-and-forget calls.
-     * @returns A record of method names mapped to their callable implementations with no-reply mode.
+     * Like `method`, but each call is sent with NO_REPLY_EXPECTED and returns immediately; its result or error is
+     * never seen. For methods whose outcome does not matter, e.g. notifications.
      */
     public get noReplyMethod(): Record<string, NoReplyMethodCall> {
         const noReplyMethods: Record<string, NoReplyMethodCall> = {}
@@ -150,12 +173,7 @@ export class DBusInterface {
     }
 
     /**
-     * Getter for methods with no-reply mode using parameter object pattern.
-     * Dynamically creates an object containing methods that do not expect a reply from the DBus invocation.
-     * Each method accepts a single parameter object containing named arguments, which are mapped to the expected input parameters
-     * based on the introspection data. This approach enhances readability and avoids errors due to parameter order.
-     * These methods are used for fire-and-forget calls.
-     * @returns A record of method names mapped to their callable implementations with no-reply mode, accepting a parameter object.
+     * The no-reply form of `namedMethod`: arguments by name, nothing waited for.
      */
     public get namedNoReplyMethod(): Record<string, NamedNoReplyMethodCall> {
         const noReplyMethods: Record<string, NamedNoReplyMethodCall> = {}
@@ -169,10 +187,13 @@ export class DBusInterface {
     }
 
     /**
-     * Getter for properties of the DBus interface.
-     * Dynamically creates an object containing property operations (get/set) for each property defined in the introspection data.
-     * Access control is enforced based on property access mode (read/write/readwrite).
-     * @returns A record of property names mapped to their get/set operations.
+     * The interface's properties by name, each with `get()` and `set(value)`, which call
+     * org.freedesktop.DBus.Properties.Get and Set. The value's type comes from the introspected signature.
+     *
+     * @example
+     * const volume = await iface.property.Volume.get()
+     * await iface.property.Volume.set(50)
+     * @throws {AccessPropertyForbiddenError} (from get/set) When the introspected access mode does not allow it.
      */
     public get property(): Record<string, PropertyOperation> {
         const properties: Record<string, PropertyOperation> = {}
@@ -203,9 +224,13 @@ export class DBusInterface {
     }
 
     /**
-     * Getter for the DBus signal emitter.
-     * Lazily initializes and returns a signal emitter for emitting signals associated with this interface.
-     * @returns A DBusSignalEmitter instance for handling signal emissions.
+     * Receives this interface's signals from this object: listen with the signal name as the event, and the listener
+     * gets the signal's arguments. Listening adds a match rule on the bus; removing the last listener removes it.
+     * The emitter follows the service to its new owner when it restarts.
+     *
+     * @example
+     * iface.signal.on('PropertiesChanged', (iface, changed, invalidated) => console.log(changed))
+     * iface.signal.on('*', (signalName, ...args) => console.log(signalName, args))   // every signal
      */
     public get signal(): DBusSignalEmitter {
         if (!this.#signalEmitter) this.#signalEmitter = this.dbus.createSignalEmitter({
@@ -218,24 +243,21 @@ export class DBusInterface {
     }
 
     /**
-     * Lists all methods defined in the introspection data for this interface.
-     * @returns An array of IntrospectMethod objects representing the methods of this interface.
+     * The interface's methods as introspected: names, arguments with types and directions, annotations.
      */
     public listMethods(): IntrospectMethod[] {
         return this.introspectInterface.method
     }
 
     /**
-     * Lists all properties defined in the introspection data for this interface.
-     * @returns An array of IntrospectProperty objects representing the properties of this interface.
+     * The interface's properties as introspected: names, types, access modes, annotations.
      */
     public listProperties(): IntrospectProperty[] {
         return this.introspectInterface.property
     }
 
     /**
-     * Lists all signals defined in the introspection data for this interface.
-     * @returns An array of IntrospectSignal objects representing the signals of this interface.
+     * The interface's signals as introspected: names, arguments with types, annotations.
      */
     public listSignals(): IntrospectSignal[] {
         return this.introspectInterface.signal

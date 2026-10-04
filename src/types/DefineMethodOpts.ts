@@ -46,9 +46,11 @@ export interface DefineMethodOpts {
     outputArgs?: DefineMethodArgumentOpts[]
 
     /**
-     * The implementation of the method.
-     * This is a function that takes the input arguments and returns a result (or a Promise of a result).
-     * The return value can be a single value, an array of values, or a Promise resolving to either.
+     * The handler. It receives the input arguments in order as plain values (and the context last with
+     * withContext), may be async, and returns: the value of the single output argument; an array with one value per
+     * output argument when there are several; anything (ignored) when there are none. A thrown error becomes a DBus
+     * error reply named after its `name` if that is a valid DBus error name (see createDBusError), otherwise
+     * '<service name>.<name>', or '<service name>.Error'.
      */
     method: (...args: any[]) => Promise<any | any[]> | any | any[]
 

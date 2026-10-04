@@ -4,6 +4,15 @@ import {DBus} from './DBus'
 import {parseStringPromise as parseXMLString} from 'xml2js'
 import {DBusTypeClass} from './lib/DBusTypeClass'
 
+/**
+ * A proxy for a service on the bus, by its well-known name (e.g. 'org.freedesktop.NetworkManager').
+ * Get one from DBus.getService; it follows the name to its current owner when the service restarts.
+ *
+ * @example
+ * const service = await dbus.getService('org.freedesktop.DBus')
+ * console.log(await service.listObjectPaths())   // ['/', '/org/freedesktop/DBus']
+ * const object = await service.getObject('/org/freedesktop/DBus')
+ */
 export class DBusService {
 
     #uniqueName: string
@@ -12,12 +21,23 @@ export class DBusService {
 
     protected readonly dbus: DBus
 
+    /**
+     * The service's name as requested, e.g. 'org.freedesktop.NetworkManager'.
+     */
     public readonly name: string
 
+    /**
+     * The unique name of the connection that currently owns the name, e.g. ':1.42'; updated when the owner changes.
+     */
     public get uniqueName(): string {
         return this.#uniqueName
     }
 
+    /**
+     * Created by DBus.getService; not meant to be constructed directly.
+     *
+     * @param opts - The connection, the service name and its current owner.
+     */
     constructor(opts: DBusServiceOpts) {
         this.opts = opts
         this.dbus = opts.dbus
@@ -26,16 +46,20 @@ export class DBusService {
     }
 
     /**
-     * Update unique name
-     * @param uniqueName
-     * @protected
+     * Records the new owner of the name; called by DBus when the name changes owner.
+     *
+     * @param uniqueName - The new owner's unique name, or '' when the name has no owner.
      */
     protected updateUniqueName(uniqueName: string): void {
         this.#uniqueName = uniqueName
     }
 
     /**
-     * List all object paths
+     * Lists the paths of the service's objects by introspecting its tree from '/'. Paths that are only intermediate
+     * nodes without interfaces (e.g. '/org' above '/org/example/Object') are left out; subtrees that fail to
+     * introspect are skipped.
+     *
+     * @returns The object paths, e.g. ['/', '/org/example/Object'].
      */
     public async listObjectPaths(): Promise<string[]> {
         if (!this.name) return []
@@ -66,12 +90,14 @@ export class DBusService {
             return objectPaths
         }
         const allObjectPaths: string[] = [...new Set(await getSubNodes())]
-        if (!allObjectPaths.includes('/')) allObjectPaths.push('/')//将根路径加入列表
+        if (!allObjectPaths.includes('/')) allObjectPaths.push('/') // the root is always listed unless it is empty
         return allObjectPaths.concat(emptyObjectPaths).filter(v => !allObjectPaths.includes(v) || !emptyObjectPaths.includes(v))
     }
 
     /**
-     * Get all objects from dbus service
+     * Proxies for all objects listed by listObjectPaths.
+     *
+     * @returns One DBusObject per object path.
      */
     public async getObjects(): Promise<DBusObject[]> {
         const objectPaths: string[] = await this.listObjectPaths()
@@ -79,8 +105,11 @@ export class DBusService {
     }
 
     /**
-     * Get object from dbus service
-     * @param objectPath
+     * A proxy for the object at a path. Nothing is checked or sent until the object is used: a path without an
+     * object gives an object without interfaces.
+     *
+     * @param objectPath - The object path, e.g. '/org/freedesktop/DBus'.
+     * @returns The object proxy.
      */
     public async getObject(objectPath: string): Promise<DBusObject> {
         return new DBusObject({

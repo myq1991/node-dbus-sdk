@@ -19,7 +19,8 @@ export interface IntrospectSignal {
     arg: IntrospectSignalArgument[]
 
     /**
-     * Annotations, if any.
+     * The signal's annotations from the introspection data, e.g. [{name: 'org.freedesktop.DBus.Deprecated', value: 'true'}];
+     * absent when it has none.
      */
     annotation?: IntrospectAnnotation[]
 }
