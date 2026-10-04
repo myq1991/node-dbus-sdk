@@ -455,16 +455,39 @@ export class DBus extends EventEmitter {
      * @param objectPath - The object path or '*' to match any path.
      * @param interfaceName - The interface name or '*' to match any interface.
      * @param signalName - The signal name or '*' to match any signal.
+     * @returns The match rule, to be passed to releaseSignal when it is no longer needed.
      */
-    protected onSignal(uniqueName: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*'): void {
+    protected onSignal(uniqueName: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*'): string {
         const rules: Record<string, string> = {
             uniqueName: uniqueName,
             objectPath: objectPath,
             interfaceName: interfaceName,
             signalName: signalName
         }
-        this.#signalRulesMap.set(rules, this.formatMatchSignalRule(uniqueName, objectPath, interfaceName, signalName))
-        return this.addMatch(this.#signalRulesMap.get(rules)!)
+        const rule: string = this.formatMatchSignalRule(uniqueName, objectPath, interfaceName, signalName)
+        this.#signalRulesMap.set(rules, rule)
+        this.addMatch(rule)
+        return rule
+    }
+
+    /**
+     * Withdraws one registration of a match rule added by onSignal. The bus counts identical rules, so exactly one
+     * RemoveMatch is sent per registration; nothing is sent if the registration was already dropped (see the signal
+     * dispatch, which drops rules of signals nobody listens to any more) or the connection is closed.
+     *
+     * @param signalRuleString - The rule returned by onSignal.
+     */
+    protected releaseSignal(signalRuleString: string): void {
+        for (const [rules, rule] of this.#signalRulesMap) {
+            if (rule !== signalRuleString) continue
+            this.#signalRulesMap.delete(rules)
+            try {
+                this.removeMatch(rule)
+            } catch {
+                // Disconnected: the bus has forgotten the connection's rules anyway
+            }
+            return
+        }
     }
 
     /**
@@ -493,12 +516,13 @@ export class DBus extends EventEmitter {
                 objectPath: string | '*',
                 interfaceName: string | '*',
                 signalName: string | '*'
-            ): void => this.onSignal(
+            ): string => this.onSignal(
                 service,
                 objectPath,
                 interfaceName,
                 signalName
-            )
+            ),
+            (signalRuleString: string): void => this.releaseSignal(signalRuleString)
         )
         this.#signalEmitterWeakRefSet.add(new WeakRef(signalEmitter))
         return signalEmitter

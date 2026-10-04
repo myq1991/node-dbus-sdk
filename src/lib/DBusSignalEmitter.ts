@@ -5,6 +5,9 @@ import {CreateSignalEmitterOpts} from '../types/CreateSignalEmitterOpts'
  * A class that extends Node.js EventEmitter to handle DBus signal emissions.
  * Manages signal listeners and emitters for a specific DBus service, object path, and interface.
  * Supports wildcard '*' for unique name, object path, and interface to handle multiple sources.
+ *
+ * Each signal name with listeners holds one match rule on the bus: it is added with the first listener and
+ * removed with the last one (including once listeners after they fired).
  */
 export class DBusSignalEmitter extends EventEmitter {
 
@@ -33,15 +36,22 @@ export class DBusSignalEmitter extends EventEmitter {
     readonly #interface: string | '*'
 
     /**
-     * A handler function to be called when a signal is registered or emitted.
-     * Used to notify external systems about signal subscriptions or emissions.
+     * The match rule registered for each signal name that has listeners ('' when the handler returned none).
      */
-    protected readonly onSignalHandler: (service: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*') => void
+    readonly #rules: Map<string, string> = new Map()
+
+    /**
+     * Registers a match rule with the bus for a signal name and returns it.
+     */
+    protected readonly onSignalHandler: (service: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*') => string | void
+
+    /**
+     * Withdraws a match rule returned by onSignalHandler.
+     */
+    protected readonly offSignalHandler?: (signalRuleString: string) => void
 
     /**
      * The service name associated with this emitter.
-     * This is a public readonly property, though it is not initialized in the provided code.
-     * Likely set elsewhere or intended for future use.
      */
     public readonly service: string
 
@@ -74,16 +84,19 @@ export class DBusSignalEmitter extends EventEmitter {
 
     /**
      * Constructor for DBusSignalEmitter.
-     * Initializes the emitter with options and a handler for signal events.
+     * Initializes the emitter with options and handlers that add and remove match rules on the bus.
      *
      * @param opts - Options for creating the signal emitter, including uniqueName, objectPath, and interface.
      * @param signalEmitters - A set of all DBusSignalEmitter instances to manage active emitters.
-     * @param onSignalHandler - A callback function invoked when signals are registered or updated.
+     * @param onSignalHandler - Called to add the match rule for a signal name; returns the rule.
+     * @param offSignalHandler - Called with a rule returned by onSignalHandler once nothing listens to that signal.
      */
-    constructor(opts: CreateSignalEmitterOpts, signalEmitters: Set<DBusSignalEmitter>, onSignalHandler: (service: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*') => void) {
+    constructor(opts: CreateSignalEmitterOpts, signalEmitters: Set<DBusSignalEmitter>, onSignalHandler: (service: string | '*', objectPath: string | '*', interfaceName: string | '*', signalName: string | '*') => string | void, offSignalHandler?: (signalRuleString: string) => void) {
         super()
         this.#signalEmitters = signalEmitters
         this.onSignalHandler = onSignalHandler
+        this.offSignalHandler = offSignalHandler
+        this.service = opts.service
         this.#uniqueName = opts.uniqueName
         this.#objectPath = opts.objectPath
         this.#interface = opts.interface
@@ -91,14 +104,43 @@ export class DBusSignalEmitter extends EventEmitter {
 
     /**
      * Updates the unique name of the emitter if it is not set to wildcard '*'.
-     * Notifies the signal handler for each registered event with the updated unique name.
+     * Replaces the match rule of every subscribed signal with one for the new sender.
      *
      * @param newUniqueName - The new unique name to set for this emitter.
      */
     protected updateUniqueName(newUniqueName: string): void {
         if (this.uniqueName === '*') return
         this.#uniqueName = newUniqueName
-        this.eventNames().forEach((eventName: string): void => this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName))
+        for (const eventName of [...this.#rules.keys()]) {
+            this.unsubscribe(eventName)
+            this.subscribe(eventName)
+        }
+    }
+
+    /**
+     * Adds the match rule for a signal name unless it already has one.
+     */
+    protected subscribe(eventName: string): void {
+        if (this.#rules.has(eventName)) return
+        const rule: string | void = this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
+        this.#rules.set(eventName, typeof rule === 'string' ? rule : '')
+    }
+
+    /**
+     * Removes the match rule for a signal name.
+     */
+    protected unsubscribe(eventName: string): void {
+        const rule: string | undefined = this.#rules.get(eventName)
+        if (rule === undefined) return
+        this.#rules.delete(eventName)
+        if (rule && this.offSignalHandler) this.offSignalHandler(rule)
+    }
+
+    /**
+     * Removes the match rule of a signal name that has no listeners left.
+     */
+    protected unsubscribeIfUnused(eventName: string): void {
+        if (!super.listenerCount(eventName)) this.unsubscribe(eventName)
     }
 
     /**
@@ -114,26 +156,24 @@ export class DBusSignalEmitter extends EventEmitter {
     }
 
     /**
-     * Adds a listener for the specified event (signal name) and notifies the signal handler.
-     * Overrides EventEmitter's addListener to include DBus-specific logic.
+     * Adds a listener for the specified event (signal name), subscribing to the signal if needed.
      *
      * @param eventName - The name of the event (signal) to listen for.
      * @param listener - The callback function to execute when the event is emitted.
      * @returns This instance for method chaining.
      */
     public addListener(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
+        this.subscribe(eventName)
         super.addListener(eventName, listener)
         this.updateSignalEmitters()
         return this
     }
 
     /**
-     * Emits an event (signal) with the provided arguments and updates the signal emitters set.
-     * Overrides EventEmitter's emit to include DBus-specific logic.
+     * Emits an event with the specified name and arguments.
      *
      * @param eventName - The name of the event (signal) to emit.
-     * @param args - Arguments to pass to the event listeners.
+     * @param args - The arguments to pass to the event listeners.
      * @returns True if the event had listeners, false otherwise.
      */
     public emit(eventName: string, ...args: any[]): boolean {
@@ -143,16 +183,16 @@ export class DBusSignalEmitter extends EventEmitter {
     }
 
     /**
-     * Returns an array of event names (signal names) for which this emitter has listeners.
+     * Returns an array of event names for which listeners are registered.
      *
-     * @returns An array of event names as strings.
+     * @returns An array of event names (signal names) as strings.
      */
     public eventNames(): string[] {
         return super.eventNames() as string[]
     }
 
     /**
-     * Returns the maximum number of listeners allowed for any event.
+     * Gets the maximum number of listeners allowed for any event.
      *
      * @returns The maximum number of listeners.
      */
@@ -161,10 +201,10 @@ export class DBusSignalEmitter extends EventEmitter {
     }
 
     /**
-     * Returns the number of listeners for a specific event.
+     * Returns the number of listeners for a specific event, optionally filtered by a specific listener.
      *
-     * @param eventName - The name of the event to check.
-     * @param listener - Optional specific listener function to count.
+     * @param eventName - The name of the event (signal) to check.
+     * @param listener - Optional specific listener to count.
      * @returns The number of listeners for the event.
      */
     public listenerCount(eventName: string, listener?: (...args: any[]) => void): number {
@@ -172,9 +212,9 @@ export class DBusSignalEmitter extends EventEmitter {
     }
 
     /**
-     * Returns an array of listener functions for a specific event.
+     * Returns a copy of the array of listeners for a specific event.
      *
-     * @param eventName - The name of the event to retrieve listeners for.
+     * @param eventName - The name of the event (signal) to get listeners for.
      * @returns An array of listener functions.
      */
     public listeners(eventName: string): Function[] {
@@ -182,78 +222,80 @@ export class DBusSignalEmitter extends EventEmitter {
     }
 
     /**
-     * Removes a specific listener for an event and updates the signal emitters set.
+     * Removes a listener for a specific event, unsubscribing from the signal when it was the last one.
      *
-     * @param eventName - The name of the event.
-     * @param listener - The listener function to remove.
+     * @param eventName - The name of the event (signal) to remove the listener from.
+     * @param listener - The callback function to remove.
      * @returns This instance for method chaining.
      */
     public off(eventName: string, listener: (...args: any[]) => void): this {
         super.off(eventName, listener)
+        this.unsubscribeIfUnused(eventName)
         this.updateSignalEmitters()
         return this
     }
 
     /**
-     * Adds a listener for an event and notifies the signal handler.
+     * Adds a listener for the specified event (signal name), subscribing to the signal if needed.
      *
      * @param eventName - The name of the event (signal) to listen for.
      * @param listener - The callback function to execute when the event is emitted.
      * @returns This instance for method chaining.
      */
     public on(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
+        this.subscribe(eventName)
         super.on(eventName, listener)
         this.updateSignalEmitters()
         return this
     }
 
     /**
-     * Adds a one-time listener for an event and notifies the signal handler.
+     * Adds a one-time listener for the specified event (signal name), subscribing to the signal if needed.
+     * The subscription ends with the listener's removal after it fires, unless other listeners remain.
      *
-     * @param eventName - The name of the event (signal) to listen for.
-     * @param listener - The callback function to execute once when the event is emitted.
+     * @param eventName - The name of the event (signal) to listen for once.
+     * @param listener - The callback function to execute when the event is emitted.
      * @returns This instance for method chaining.
      */
     public once(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
+        this.subscribe(eventName)
         super.once(eventName, listener)
         this.updateSignalEmitters()
         return this
     }
 
     /**
-     * Adds a listener to the beginning of the listeners array for an event and notifies the signal handler.
+     * Prepends a listener for the specified event (signal name), subscribing to the signal if needed.
      *
      * @param eventName - The name of the event (signal) to listen for.
      * @param listener - The callback function to execute when the event is emitted.
      * @returns This instance for method chaining.
      */
     public prependListener(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
+        this.subscribe(eventName)
         super.prependListener(eventName, listener)
         this.updateSignalEmitters()
         return this
     }
 
     /**
-     * Adds a one-time listener to the beginning of the listeners array for an event and notifies the signal handler.
+     * Prepends a one-time listener for the specified event (signal name), subscribing to the signal if needed.
      *
-     * @param eventName - The name of the event (signal) to listen for.
-     * @param listener - The callback function to execute once when the event is emitted.
+     * @param eventName - The name of the event (signal) to listen for once.
+     * @param listener - The callback function to execute when the event is emitted.
      * @returns This instance for method chaining.
      */
     public prependOnceListener(eventName: string, listener: (...args: any[]) => void): this {
-        this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
+        this.subscribe(eventName)
         super.prependOnceListener(eventName, listener)
         this.updateSignalEmitters()
         return this
     }
 
     /**
-     * Returns an array of raw listener functions for a specific event (including wrappers like 'once').
+     * Returns a copy of the array of raw listeners for a specific event, including wrappers like once.
      *
-     * @param eventName - The name of the event to retrieve listeners for.
+     * @param eventName - The name of the event (signal) to get raw listeners for.
      * @returns An array of raw listener functions.
      */
     public rawListeners(eventName: string): Function[] {
@@ -261,26 +303,33 @@ export class DBusSignalEmitter extends EventEmitter {
     }
 
     /**
-     * Removes all listeners for an event (or all events if no event name is provided) and updates the signal emitters set.
+     * Removes all listeners for a specific event or all events, unsubscribing from the affected signals.
      *
-     * @param eventName - Optional name of the event to remove listeners for.
+     * @param eventName - Optional name of the event (signal) to remove listeners from.
      * @returns This instance for method chaining.
      */
     public removeAllListeners(eventName?: string): this {
-        super.removeAllListeners(eventName)
+        const affected: string[] = eventName === undefined ? [...this.#rules.keys()] : [eventName]
+        if (eventName === undefined) {
+            super.removeAllListeners()
+        } else {
+            super.removeAllListeners(eventName)
+        }
+        affected.forEach((name: string): void => this.unsubscribeIfUnused(name))
         this.updateSignalEmitters()
         return this
     }
 
     /**
-     * Removes a specific listener for an event and updates the signal emitters set.
+     * Removes a specific listener for an event, unsubscribing from the signal when it was the last one.
      *
-     * @param eventName - The name of the event.
-     * @param listener - The listener function to remove.
+     * @param eventName - The name of the event (signal) to remove the listener from.
+     * @param listener - The callback function to remove.
      * @returns This instance for method chaining.
      */
     public removeListener(eventName: string, listener: (...args: any[]) => void): this {
         super.removeListener(eventName, listener)
+        this.unsubscribeIfUnused(eventName)
         this.updateSignalEmitters()
         return this
     }
@@ -288,7 +337,7 @@ export class DBusSignalEmitter extends EventEmitter {
     /**
      * Sets the maximum number of listeners allowed for any event.
      *
-     * @param n - The maximum number of listeners to set.
+     * @param n - The maximum number of listeners.
      * @returns This instance for method chaining.
      */
     public setMaxListeners(n: number): this {

@@ -8,11 +8,8 @@ import {DBusMessageType} from '../../lib/enums/DBusMessageType'
 import {DBusMessageFlags} from '../../lib/enums/DBusMessageFlags'
 import {MockBusStream} from '../helpers/MockBusStream'
 import {decodeWireMessage} from '../helpers/WireMessage'
-import {knownBug} from '../helpers/KnownBug'
 
 const RULE: string = 'type=signal,sender=:1.9,path=/obj,interface=org.example.I,member=Changed'
-
-const REMOVE_MATCH_BUG: string = 'removing listeners never sends RemoveMatch, so the bus keeps routing the signals to the connection'
 
 let serial: number = 5000
 
@@ -68,7 +65,16 @@ describe('signal match rules', (): void => {
         assert.deepEqual(rulesSent('AddMatch'), [RULE])
     })
 
-    it('removes the match rule when the last listener is removed', knownBug(REMOVE_MATCH_BUG), async (): Promise<void> => {
+    it('adds one match rule however many listeners a signal has', async (): Promise<void> => {
+        const signals: DBusSignalEmitter = emitter()
+        signals.on('Changed', (): void => undefined)
+        signals.on('Changed', (): void => undefined)
+        signals.once('Changed', (): void => undefined)
+        await flush()
+        assert.deepEqual(rulesSent('AddMatch'), [RULE])
+    })
+
+    it('removes the match rule when the last listener is removed', async (): Promise<void> => {
         const signals: DBusSignalEmitter = emitter()
         const listener = (): void => undefined
         signals.on('Changed', listener)
@@ -77,7 +83,7 @@ describe('signal match rules', (): void => {
         assert.equal(activeRegistrations(), 0)
     })
 
-    it('removes as many registrations as it added', knownBug(REMOVE_MATCH_BUG), async (): Promise<void> => {
+    it('removes as many registrations as it added', async (): Promise<void> => {
         const signals: DBusSignalEmitter = emitter()
         const first = (): void => undefined
         const second = (): void => undefined
@@ -89,14 +95,14 @@ describe('signal match rules', (): void => {
         assert.equal(activeRegistrations(), 0)
     })
 
-    it('removes the match rule after a once listener has fired', knownBug(REMOVE_MATCH_BUG), async (): Promise<void> => {
+    it('removes the match rule after a once listener has fired', async (): Promise<void> => {
         emitter().once('Changed', (): void => undefined)
         stream.deliver(changedSignal())
         await flush()
         assert.equal(activeRegistrations(), 0)
     })
 
-    it('removes the match rules on removeAllListeners', knownBug(REMOVE_MATCH_BUG), async (): Promise<void> => {
+    it('removes the match rules on removeAllListeners', async (): Promise<void> => {
         const signals: DBusSignalEmitter = emitter()
         signals.on('Changed', (): void => undefined)
         signals.removeAllListeners()
