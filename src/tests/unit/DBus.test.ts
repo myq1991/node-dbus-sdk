@@ -142,6 +142,34 @@ describe('DBus message dispatch', (): void => {
             await assert.rejects(dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Late'}), {name: 'org.freedesktop.DBus.Error.Disconnected'})
         })
 
+        it('rejects a call with a TimeoutError when no reply arrives in time', async (): Promise<void> => {
+            const pending: Promise<any[]> = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Slow', timeout: 50})
+            const call: DBusMessage = await stream.nextOutgoing()
+            await assert.rejects(withTimeout(pending, 1000, 'pending call'), {code: 'E_TIMEOUT'})
+            // A reply arriving after the timeout is ignored
+            stream.deliver(methodReturn(call.header.serial, 's', 'too late'))
+            await flush()
+        })
+
+        it('resolves a call whose reply arrives before its timeout', async (): Promise<void> => {
+            const pending: Promise<any[]> = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Quick', timeout: 1000})
+            const call: DBusMessage = await stream.nextOutgoing()
+            stream.deliver(methodReturn(call.header.serial, 's', 'in time'))
+            assert.deepEqual(await pending, ['in time'])
+        })
+
+        it('applies the connection callTimeout to calls without their own', async (): Promise<void> => {
+            dbus.callTimeout = 50
+            const defaulted: Promise<any[]> = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Slow'})
+            await stream.nextOutgoing()
+            await assert.rejects(withTimeout(defaulted, 1000, 'pending call'), {code: 'E_TIMEOUT'})
+            const own: Promise<any[]> = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Slow', timeout: 2000})
+            const call: DBusMessage = await stream.nextOutgoing()
+            await new Promise<void>((resolve): NodeJS.Timeout => setTimeout(resolve, 100))
+            stream.deliver(methodReturn(call.header.serial, 's', 'own timeout'))
+            assert.deepEqual(await own, ['own timeout'])
+        })
+
         it('releases completed calls', async (): Promise<void> => {
             const control: WeakRef<object> = ((): WeakRef<object> => new WeakRef({}))()
             const completed: WeakRef<Promise<any[]>> = await (async (): Promise<WeakRef<Promise<any[]>>> => {

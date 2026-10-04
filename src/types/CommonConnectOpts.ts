@@ -13,4 +13,9 @@ export interface CommonConnectOpts {
      * Optional flag to enable auto convert bigint to javascript number for DBus messages.
      */
     convertBigIntToNumber?: boolean
+    /**
+     * Default number of milliseconds to wait for the reply to a method call before rejecting it with a TimeoutError,
+     * for calls that do not set their own timeout. Unset means no timeout.
+     */
+    callTimeout?: number
 }

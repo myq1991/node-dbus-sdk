@@ -15,7 +15,7 @@ import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 import {ServiceBasicInfo} from './types/ServiceBasicInfo'
 import {RequestNameFlags} from './lib/enums/RequestNameFlags'
 import {RequestNameResultCode} from './lib/enums/RequestNameResultCode'
-import {MessageDecodeError, ServiceNotFoundError} from './lib/Errors'
+import {MessageDecodeError, ServiceNotFoundError, TimeoutError} from './lib/Errors'
 import {DBusMessageHeader} from './types/DBusMessageHeader'
 import EventEmitter from 'node:events'
 import {ReplyOpts} from './types/ReplyOpts'
@@ -61,6 +61,12 @@ export class DBus extends EventEmitter {
      * Maps serial numbers to callback functions for resolving or rejecting the call.
      */
     #inflightCalls: Record<number, InflightCall> = {}
+
+    /**
+     * Default number of milliseconds to wait for a method call's reply before rejecting it with a TimeoutError,
+     * for calls without their own timeout (see InvokeOpts.timeout). Undefined means no timeout.
+     */
+    public callTimeout: number | undefined
 
     /**
      * Removes and returns the pending call a reply belongs to.
@@ -146,6 +152,7 @@ export class DBus extends EventEmitter {
      */
     public static async connect(opts: ConnectOpts): Promise<DBus> {
         const bus: DBus = new DBus(await DBusConnection.createConnection(opts))
+        bus.callTimeout = opts.callTimeout
         return await bus.initialize()
     }
 
@@ -358,7 +365,17 @@ export class DBus extends EventEmitter {
                 signature: opts.signature ? opts.signature : undefined
             }, ...opts.args ? opts.args : []))
         } else {
-            return new Promise<any[]>((resolve, reject) => {
+            return new Promise<any[]>((resolveCall, rejectCall) => {
+                const timeout: number | undefined = opts.timeout ?? this.callTimeout
+                let timer: NodeJS.Timeout | undefined
+                const resolve = (response: any[]): void => {
+                    clearTimeout(timer)
+                    resolveCall(response)
+                }
+                const reject = (error: Error): void => {
+                    clearTimeout(timer)
+                    rejectCall(error)
+                }
                 const message: DBusMessage = new DBusMessage({
                     serial: this.#serial++,
                     type: DBusMessageType.METHOD_CALL,
@@ -372,10 +389,17 @@ export class DBus extends EventEmitter {
                 this.#inflightCalls[message.header.serial] = [resolve, reject]
                 try {
                     this.write(message.toBuffer())
-                } catch (error) {
+                } catch (error: any) {
                     // Nothing was sent (encoding failed or the connection is closed), so no reply will ever come
                     delete this.#inflightCalls[message.header.serial]
-                    reject(error)
+                    return reject(error)
+                }
+                if (timeout !== undefined && timeout > 0) {
+                    timer = setTimeout((): void => {
+                        // Forget the call, so a reply arriving later is ignored
+                        this.#takeInflightCall(message.header.serial)
+                        reject(new TimeoutError(`No reply to ${opts.interface}.${opts.method} on ${opts.service} within ${timeout} ms`))
+                    }, timeout)
                 }
             })
         }

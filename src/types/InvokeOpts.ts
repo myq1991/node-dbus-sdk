@@ -39,4 +39,10 @@ export interface InvokeOpts {
      * This is an array of values matching the signature if provided.
      */
     args?: any[]
+    /**
+     * Milliseconds to wait for the reply before the call is rejected with a TimeoutError.
+     * Defaults to the connection's callTimeout; without either, the call waits until a reply arrives or the
+     * connection closes.
+     */
+    timeout?: number
 }
