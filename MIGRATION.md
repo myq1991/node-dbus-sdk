@@ -69,6 +69,33 @@ are internal. Objects and interfaces are linked by `addObject`/`addInterface` an
 `DBusSignedValue.toPlain` returns plain JavaScript values: bigint for 64-bit integers, Buffer for byte arrays, and NaN
 or -0 where they occur. Unlike the old name suggested, the result cannot always be passed to `JSON.stringify`.
 
+### Decoding options
+
+`advancedResponse` and `convertBigIntToNumber` are replaced by `decode` (see `DecodeOpts` in the README). It can be
+set for a connection, as before, and also per call, proxy, signal emitter or message.
+
+| 1.x | 2.0 |
+|---|---|
+| `DBus.connect({advancedResponse: true})` | `DBus.connect({decode: {types: 'all'}})`, or per call: `invoke({…, decode: {types: 'all'}})` |
+| `DBus.connect({convertBigIntToNumber: true})` | `DBus.connect({decode: {int64: 'number'}})` |
+| `new DBusBufferDecoder(endianness, buffer, offset, convertBigIntToNumber)` | `new DBusBufferDecoder(endianness, buffer, offset)`, then `decode(signature, {int64: 'number'})` |
+| `decoder.decode(signature, true)` | `decoder.decode(signature, {types: 'all'})` |
+| `DBusMessage.decode(…, advancedResponse, convertBigIntToNumber)` | `DBusMessage.decode(…, decode)` |
+| `new DBusConnection(stream, …, advancedResponse, convertBigIntToNumber)` | `new DBusConnection(stream, …, decode)` |
+
+`int64: 'number'` converts only safe integers (within ±2^53 - 1). Larger values stay `bigint`. Before, they silently
+lost precision.
+
+### Typed values
+
+| 1.x | 2.0 |
+|---|---|
+| `value.$signature` (the type code, e.g. `'a'`) | `value.signature`, the complete signature, e.g. `'a{sv}'` |
+| `value.$value` (internal tree) | `value.value` for the plain value; `items` (`DBusArray`), `fields` (`DBusStruct`), `key` / `content` (`DBusDictEntry`), `content` (`DBusVariant`) for typed contents |
+| `value.$arrayItemSignature` | the element type is part of `value.signature` |
+| `DBusSignedValue.parse(signature, value)` | `new DBusSignedValue(signature, value)` for one type |
+| `new DBusSignedValue(dataType, value)` with a parsed type | `new DBusSignedValue(signatureString, value)` |
+
 ## Removed
 
 - `HandshakeOpts.simple` and `HandshakeOpts.direct`. They were never used and had no effect.
@@ -112,6 +139,16 @@ or -0 where they occur. Unlike the old name suggested, the result cannot always 
     call fail.
 - **Signals after `stop()`.** Emitting a signal's event after the service stopped no longer throws a
   `Disconnected` error from your `emit` call. Nothing is sent.
+- **Received values keep their types when sent again.** A value that came in a variant goes back out with the type
+  it came with, when the object, array or Map holding it is sent again and the value still fits that type. Before, it
+  got an inferred type: `u` came back as `i`, `o` as `s`, and an empty `as` as `ai`. Copies made by spreading or
+  rebuilding the container infer types as before; decode with `types: 'variants'` to keep types in copies.
+- **Container type classes check their contents when constructed.** `DBusArray`, `DBusStruct` and `DBusDictEntry`
+  reject plain values and mixed types at once. Before, the encoder failed later with `Unsupported type: undefined`.
+  `DBusArray` takes the element type of an empty array as a class or a signature (`new DBusArray([], 'a{sv}')`).
+- **Messages without a signature.** A message with arguments but no signature used to be sent without its arguments.
+  Now the signature is taken from the arguments when all of them are typed, and plain arguments without a signature
+  are rejected.
 - **Library errors have names.** `error.name` is the class name (`'TimeoutError'`, `'InvalidValueError'`, …) instead
   of `'Error'`. A library error thrown in a method handler therefore reaches the caller as `<service>.<ClassName>`
   instead of `<service>.Error`.
@@ -137,6 +174,9 @@ or -0 where they occur. Unlike the old name suggested, the result cannot always 
   `null`. More managers can be nested by adding an `ObjectManagerInterface` to other objects.
 - `DBusSignalEmitter.onAny(listener)` receives every selected signal with its sender, object path, interface and name.
 - `DBus.connected` tells whether the connection is open.
+- `DecodeOpts`: `types` (`'none'`, `'variants'`, `'all'`), `dictionaries` (`'object'`, `'map'`), `int64`
+  (`'bigint'`, `'number'`), for connections, calls, proxies, signal emitters and messages (`message.getBody(decode)`).
+- `DBusSignedValue.signature` and `.value` on every typed value, and the contents of container type classes.
 
 - `withContext: true` on `defineMethod`: the handler receives the caller (`context.sender`) as an extra last argument.
 - `annotations` on methods, arguments, properties and signals, and `defineAnnotation` on interfaces.

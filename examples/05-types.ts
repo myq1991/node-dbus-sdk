@@ -6,7 +6,7 @@
  *
  * Run: node examples/05-types.ts   (in this repository: npm run example -- examples/05-types.ts)
  */
-import {DBus, DBusSignedValue, DBusUInt32, LocalInterface, LocalObject, LocalService} from 'dbus-sdk'
+import {DBus, DBusSignedValue, DBusUInt32, LocalInterface, LocalObject, LocalService, type MethodCallContext} from 'dbus-sdk'
 
 const SIGNATURES: string[] = ['y', 'b', 'n', 'q', 'i', 'u', 'x', 't', 'd', 's', 'o', 'g', 'as', 'ay', '(si)', 'a{si}', 'a{is}', 'a(ss)', 'a{sv}', 'v']
 
@@ -19,6 +19,17 @@ SIGNATURES.forEach((signature: string, index: number): void => {
         outputArgs: [{type: signature}],
         method: (value: unknown): unknown => value
     })
+})
+// Types(a{sv}) answers with the type each variant arrived with, read from the call's message decoded with types kept
+echo.defineMethod({
+    name: 'Types',
+    inputArgs: [{type: 'a{sv}'}],
+    outputArgs: [{type: 'a{ss}'}],
+    withContext: true,
+    method: (_values: unknown, context: MethodCallContext): Record<string, string> => {
+        const [received] = context.message.getBody({types: 'variants'})
+        return Object.fromEntries(Object.entries(received as Record<string, DBusSignedValue>).map(([key, value]): [string, string] => [key, value.signature]))
+    }
 })
 const object: LocalObject = new LocalObject('/org/example/Echo')
 object.addInterface(echo)
@@ -81,6 +92,23 @@ show('a{sv} with typed values', await roundTrip('a{sv}', {count: new DBusSignedV
 // --- Through a proxy, arguments take the signature from introspection: plain values are enough
 const proxy = await bus.getInterface('org.example.Echo', '/org/example/Echo', 'org.example.Echo1')
 show('proxy, a{si} as a plain object', await proxy.method[`Echo_${SIGNATURES.indexOf('a{si}')}`]({one: 1}))
+
+// --- Receiving with types kept: decode {types: 'variants'} gives each variant's content as a type class instance,
+//     with .signature and .value; {types: 'all'} does so for every value
+const [typed] = await bus.invoke({
+    service: 'org.example.Echo', objectPath: '/org/example/Echo', interface: 'org.example.Echo1',
+    method: `Echo_${SIGNATURES.indexOf('a{sv}')}`, signature: 'a{sv}', args: [{mtu: new DBusUInt32(1500), dns: new DBusSignedValue('au', [])}],
+    decode: {types: 'variants'}
+})
+show('types variants: mtu, dns', [`${typed.mtu.constructor.name} ${typed.mtu.signature} ${typed.mtu.value}`, `${typed.dns.signature} ${JSON.stringify(typed.dns.value)}`])
+// Received plain values keep their types too when the object holding them is sent again, even after a change in
+// place; a copy made by spreading infers them again
+const types = async (value: unknown): Promise<unknown> => (await bus.invoke({service: 'org.example.Echo', objectPath: '/org/example/Echo', interface: 'org.example.Echo1', method: 'Types', signature: 'a{sv}', args: [value]}))[0]
+const [plain] = await bus.invoke({service: 'org.example.Echo', objectPath: '/org/example/Echo', interface: 'org.example.Echo1', method: `Echo_${SIGNATURES.indexOf('a{sv}')}`, signature: 'a{sv}', args: [{mtu: new DBusUInt32(1500), dns: new DBusSignedValue('au', [])}]})
+plain.mtu = 9000
+show('sent back after a change in place', await types(plain))
+show('sent back as a spread copy', await types({...plain}))
+show('types variants, sent back as a copy', await types({...typed}))
 
 // --- Values that do not fit their type are rejected before anything is sent
 for (const [signature, value] of [['y', 256], ['u', -1], ['b', 'false'], ['o', 'no/slash']] as [string, unknown][]) {

@@ -61,8 +61,7 @@ const remote = await DBus.connect({busAddress: 'tcp:host=192.168.1.10,port=55556
 | `timeout` | Milliseconds to wait for the connection (default 20000). |
 | `callTimeout` | Default milliseconds to wait for each method reply (default: no limit). |
 | `authMethods` | Authentication mechanisms to try, in order (default `['EXTERNAL', 'DBUS_COOKIE_SHA1', 'ANONYMOUS']`). |
-| `convertBigIntToNumber` | Return 64-bit integers as `number` instead of `bigint`. Values beyond 2⁵³ lose precision. |
-| `advancedResponse` | Return received values as type class instances that keep their DBus type (see [Types](#types)). |
+| `decode` | How received values are given by default: plain values, or with their DBus types kept; dictionaries as objects or Maps; 64-bit integers as `bigint` or `number` (see [Receiving values](#receiving-values)). |
 
 `bus.uniqueName` is the connection's name on the bus, e.g. `:1.42`. `await bus.disconnect()` closes the connection.
 
@@ -272,15 +271,15 @@ How DBus types map to JavaScript values, in both directions. [05-types.ts](examp
 | DBus | You send | You receive |
 |---|---|---|
 | `y` `n` `q` `i` `u` (integers up to 32 bits) | `number` (or `bigint`) | `number` |
-| `x` `t` (64-bit integers) | `bigint`, `number` or decimal string | `bigint` (`number` with `convertBigIntToNumber`) |
+| `x` `t` (64-bit integers) | `bigint`, `number` or decimal string | `bigint` (`number` with `int64: 'number'`) |
 | `d` (double) | `number` | `number` |
 | `b` (boolean) | `true` / `false` (or `1` / `0`) | `boolean` |
 | `s` `o` `g` (string, object path, signature) | `string` | `string` |
 | `ay` (bytes) | `Buffer`, `Uint8Array` or `number[]` | `Buffer` |
 | `a…` (array) | array | array |
-| `a{…}` (dictionary) | object, `Map`, or array of `[key, value]` pairs | object (keys become strings) |
+| `a{…}` (dictionary) | object, `Map`, or array of `[key, value]` pairs | object, whose keys are strings (`Map` with `dictionaries: 'map'`) |
 | `(…)` (struct) | array of the fields | array of the fields |
-| `v` (variant) | any value; its type is inferred (below) | the content's value (its type is not kept) |
+| `v` (variant) | any value; its type is inferred (below) | the content's value (see [Receiving values](#receiving-values)) |
 | `h` (file descriptor) | not supported | not supported |
 
 **Variants.** A plain value given for `v` is sent with an inferred type:
@@ -290,9 +289,64 @@ How DBus types map to JavaScript values, in both directions. [05-types.ts](examp
 - An array → `a` plus the items' type. Items of different types make a struct instead, e.g. `[1, 'a']` → `(is)`.
 - A `Map` → `a{…v}` keyed by its keys' type. Any other object → `a{sv}`.
 
-`DBusSignedValue.inferSignature(value)` tells you which signature a value gets. To choose a type yourself, wrap the
-value as `new DBusSignedValue('u', 7)`, or use a type class: `new DBusUInt32(7)`, `new DBusObjectPath('/a')`, and so
-on, one per DBus type. These work anywhere a value goes, and are most useful inside variants and `a{sv}`.
+`DBusSignedValue.inferSignature(value)` tells you which signature a value gets.
+
+**Explicit types.** To choose a type yourself, give the value as a `DBusSignedValue`: a signature and a value.
+Containers may hold plain values, which take their types from the signature, and typed values, which keep theirs.
+Typed values work anywhere a value goes, and are most useful inside variants and `a{sv}`.
+
+```typescript
+new DBusSignedValue('u', 7)
+new DBusSignedValue('a{sv}', {mtu: new DBusUInt32(1500), name: 'eth0'})
+new DBusSignedValue('as', [])          // an empty array of strings
+new DBusSignedValue('(uu)', [1, 2])
+```
+
+The type classes are the same thing with the type in their name, one per DBus type: `new DBusUInt32(7)` is
+`new DBusSignedValue('u', 7)`, and `DBusObjectPath`, `DBusInt64` and the others work the same way. The container classes
+(`DBusArray`, `DBusStruct`, `DBusDictEntry`, `DBusVariant`) build containers from typed values without writing a
+signature, e.g. `new DBusStruct([new DBusUInt32(1), new DBusUInt32(2)])` for `(uu)`. Every typed value has
+`.signature`, its complete signature, and `.value`, its plain value.
+
+A message's arguments need a signature: `invoke`, `emitSignal` and `DBusMessage` take it from the arguments when every
+one of them is typed, and reject plain arguments without one.
+
+### Receiving values
+
+Received values are plain JavaScript values by default. `DecodeOpts` changes that:
+
+| Option | Values | Effect |
+|---|---|---|
+| `types` | `'none'` (default) | Plain values everywhere; a variant gives its content. |
+| | `'variants'` | The content of each variant is a type class instance (`DBusUInt32`, `DBusArray`, …); the rest is plain. |
+| | `'all'` | Every value is a type class instance. |
+| `dictionaries` | `'object'` (default) / `'map'` | Dictionaries as objects, whose keys are strings, or as Maps, whose keys keep their type. |
+| `int64` | `'bigint'` (default) / `'number'` | 64-bit integers as `bigint`, or as `number` when they are safe integers (larger ones stay `bigint`). |
+
+Set defaults with `DBus.connect({decode})`, or `LocalService.run({decode})` for the arguments a service's methods
+and setters receive. Override them per call (`invoke({…, decode})`, `getProperty({…, decode})`), per proxy
+(`getInterface(service, path, iface, {decode})`, `getObjectManager(service, path, {decode})`), per signal emitter
+(`createSignalEmitter({…, decode})`) or per message (`message.getBody(decode)`).
+
+**Sending received values back.** Values that come in variants are often sent back: read settings, change one, write
+them back (NetworkManager's `GetSettings` and `Update`). Their DBus types matter there, since a service may ignore a
+`u` sent as `i`.
+
+- **Plain values, changed in place.** The library remembers the types the values in a variant arrived with, on the
+  object, array or Map that holds them. When that container is sent again, each value still fitting its type keeps
+  it, e.g. `settings.ethernet.mtu = 9000` is sent as `u` again.
+- **A new object made by spreading or rebuilding the container** does not carry that memory: its values get inferred
+  types. The same applies to a lone variant value taken out of its container, such as what a proxy method returns.
+- **With `types: 'variants'`** the values carry their types themselves, so copies keep them too:
+
+  ```typescript
+  const proxy = await bus.getInterface(service, path, iface, {decode: {types: 'variants'}})
+  const settings = await proxy.method.GetSettings()                // settings.ethernet.mtu is a DBusUInt32
+  await proxy.method.Update({...settings, ethernet: {...settings.ethernet, mtu: new DBusUInt32(9000)}})
+  ```
+
+- **Integer-keyed dictionaries decoded as objects** come back with their entries in ascending key order (objects
+  order integer keys). The entries are the same; use `dictionaries: 'map'` to keep the order.
 
 **Validation.** Values that the DBus specification does not allow are rejected with an `InvalidValueError`,
 `SignatureError` or `ObjectPathError` before anything is sent.

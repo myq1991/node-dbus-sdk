@@ -150,7 +150,11 @@ describe('examples', {skip: (!PrivateBus.available && 'dbus-daemon not found') |
             '{ name: \'disk\', size: 1099511627776n, ratio: 0.5, tags: [ \'a\', \'b\' ] }',
             '{ count: 7, path: \'/a\' }',
             'InvalidValueError: BYTE must be an integer from 0 to 255, got 256',
-            'ObjectPathError: Invalid DBus object path'
+            'ObjectPathError: Invalid DBus object path',
+            '[ \'DBusUInt32 u 1500\', \'au []\' ]',
+            'sent back after a change in place        { mtu: \'u\', dns: \'au\' }',
+            'sent back as a spread copy               { mtu: \'i\', dns: \'ai\' }',
+            'types variants, sent back as a copy      { mtu: \'u\', dns: \'au\' }'
         ]) assert.ok(run.stdout.includes(expected), `missing "${expected}" in:\n${run.stdout}`)
     })
 
