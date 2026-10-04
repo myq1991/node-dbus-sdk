@@ -5,7 +5,6 @@ import {PrivateBus} from '../helpers/PrivateBus'
 import {GDBusEchoService, pygobjectAvailable} from '../helpers/GDBus'
 import {loadWireMatrix, WireMatrix} from '../helpers/TaggedValue'
 import {withTimeout} from '../helpers/Async'
-import {knownBug} from '../helpers/KnownBug'
 
 const matrix: WireMatrix = loadWireMatrix()
 
@@ -37,17 +36,19 @@ describe('UNIX_FD values over a real bus', {skip: (!PrivateBus.available && 'dbu
         }
     }
 
-    it('fails a call whose reply carries a file descriptor instead of waiting forever', knownBug('file descriptor passing is not negotiated and calls have no reply timeout, so the bus drops the reply and the call never settles'), async (): Promise<void> => {
+    // The bus cannot deliver such a reply to a connection that did not negotiate file descriptor passing, so it
+    // never arrives; a timeout is what ends the call
+    it('ends a call whose reply carries a file descriptor when a timeout is set', async (): Promise<void> => {
         await withClient(async (client: DBus): Promise<void> => {
-            const call: Promise<any[]> = client.invoke({service: GDBusEchoService.SERVICE_NAME, objectPath: GDBusEchoService.OBJECT_PATH, interface: GDBusEchoService.INTERFACE, method: 'GetFd'})
-            await assert.rejects(withTimeout(call, 3000, 'GetFd'), (error: Error): boolean => !error.message.startsWith('Timed out'))
+            const call: Promise<any[]> = client.invoke({service: GDBusEchoService.SERVICE_NAME, objectPath: GDBusEchoService.OBJECT_PATH, interface: GDBusEchoService.INTERFACE, method: 'GetFd', timeout: 500})
+            await assert.rejects(withTimeout(call, 3000, 'GetFd'), {code: 'E_TIMEOUT'})
         })
     })
 
-    it('refuses to send a UNIX_FD value it cannot attach a file descriptor for', knownBug('UNIX_FD values are sent as bare indexes without any file descriptor attached'), async (): Promise<void> => {
+    it('refuses to send a UNIX_FD value it cannot attach a file descriptor for', async (): Promise<void> => {
         await withClient(async (client: DBus): Promise<void> => {
             const call: Promise<any[]> = client.invoke({service: GDBusEchoService.SERVICE_NAME, objectPath: GDBusEchoService.OBJECT_PATH, interface: GDBusEchoService.INTERFACE, method: matrix.echoMethods.h, signature: 'h', args: [0]})
-            await assert.rejects(withTimeout(call, 3000, 'echo h'))
+            await assert.rejects(withTimeout(call, 3000, 'echo h'), {code: 'E_INVALID_VALUE', message: /file descriptors/})
         })
     })
 })

@@ -83,6 +83,13 @@ export class DBusBufferEncoder {
     protected length: number = 0
 
     /**
+     * Whether UNIX_FD values may be written. Messages sent by this library cannot carry file descriptors (Node.js
+     * sockets cannot pass them), so DBusMessage turns this off to reject such values instead of sending indexes
+     * that refer to nothing.
+     */
+    public allowUnixFd: boolean = true
+
+    /**
      * Constructor for DBusBufferEncoder.
      * Initializes the encoder with the specified endianness and an optional initial buffer.
      * Optionally aligns the buffer to a specified boundary if provided.
@@ -293,6 +300,7 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeUnixFD(fdIndex: number): this {
+        if (!this.allowUnixFd) throw new InvalidValueError('UNIX_FD values cannot be sent: this library cannot pass file descriptors')
         return this.writeUInt32(integer(fdIndex, 0, 0xFFFFFFFF, 'UNIX_FD'))
     }
 

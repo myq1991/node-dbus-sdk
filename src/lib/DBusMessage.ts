@@ -79,6 +79,7 @@ export class DBusMessage {
         let bodyBuff: Buffer = Buffer.alloc(0)
         if (this.header.signature && this.body.length > 0) {
             const bodyEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
+            bodyEncoder.allowUnixFd = false // No file descriptors can be attached to the message
             // Encode the body based on the signature; handle single vs. multiple arguments
             bodyBuff = bodyEncoder.encode(this.header.signature, this.body.length > 1 ? this.body : this.body[0])
             bodyLength = bodyBuff.length

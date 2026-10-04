@@ -31,6 +31,12 @@ Whether you're building a client to interact with existing DBus services or expo
   handling. Methods can be called with or without expecting a reply (`invoke` with `noReply` option).
 - **Replies**: Supports sending replies to method calls (`reply`) with both success responses (`METHOD_RETURN`) and
   error responses (`ERROR`).
+- **Timeouts**: By default a call waits until its reply arrives or the connection closes; on close it is rejected with
+  `org.freedesktop.DBus.Error.Disconnected`. You can set a limit with `timeout` (milliseconds) on `invoke`, with
+  `callTimeout` when connecting, or with `dbus.callTimeout`. The limit also applies to calls made through
+  `DBusInterface`. A call without a reply in time is rejected with a `TimeoutError`.
+- **File descriptors**: Node.js sockets cannot pass file descriptors, so `UNIX_FD` (`h`) values cannot be sent and are
+  rejected with an error. Replies that carry file descriptors never reach the connection, so give such calls a timeout.
 
 ### 3. **Signal Handling**
 
