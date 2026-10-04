@@ -15,13 +15,22 @@ export const gdbusCliAvailable: boolean = !spawnSync('gdbus', ['help']).error
 export const pygobjectAvailable: boolean = spawnSync('python3', ['-c', 'import gi; gi.require_version("Gio", "2.0")']).status === 0
 
 /**
+ * The environment for gdbus: it prints text in the locale's character set, so under a non-UTF-8 locale (e.g. the
+ * POSIX default of containers) non-ASCII characters in replies come out as '?'.
+ */
+function utf8Environment(): NodeJS.ProcessEnv {
+    const locale: string = process.env.LC_ALL || process.env.LC_CTYPE || process.env.LANG || ''
+    return /utf-?8/i.test(locale) ? process.env : {...process.env, LC_ALL: 'C.UTF-8'}
+}
+
+/**
  * Calls a method with `gdbus call`, passing arguments in GVariant text form.
  *
  * @returns The reply as printed by gdbus (GVariant text of the reply tuple).
  */
 export function gdbusCall(address: string, service: string, objectPath: string, method: string, args: string[]): Promise<string> {
     return new Promise<string>((resolve, reject): void => {
-        execFile('gdbus', ['call', '--address', address, '--dest', service, '--object-path', objectPath, '--method', method, '--timeout', '3', '--', ...args], {timeout: 5000}, (error, stdout: string, stderr: string): void => {
+        execFile('gdbus', ['call', '--address', address, '--dest', service, '--object-path', objectPath, '--method', method, '--timeout', '3', '--', ...args], {timeout: 5000, env: utf8Environment()}, (error, stdout: string, stderr: string): void => {
             if (error) return reject(new Error(`${stderr.trim() || error.message}`))
             resolve(stdout.trim())
         })
