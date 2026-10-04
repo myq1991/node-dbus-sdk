@@ -232,12 +232,7 @@ export class LocalObject {
         localInterface.setObject(this) // Link the interface to this object
         this.#interfaceMap.set(localInterface.name, localInterface)
         addSuccess = true
-        if (addSuccess) {
-            const addedInterfaceRecord: Record<string, Record<string, any>> = {}
-            // Fetch managed properties and notify the object manager
-            addedInterfaceRecord[localInterface.name] = localInterface.getManagedProperties()
-            this.service?.objectManager?.interfacesAdded(this, addedInterfaceRecord)
-        }
+        if (addSuccess) this.service?.announceInterfacesAdded(this, [localInterface.name])
         return addSuccess
     }
 
@@ -289,7 +284,7 @@ export class LocalObject {
             }
         }
         // If removal was successful, notify the object manager of the removed interface
-        if (removedInterface && removeSuccess) this.service?.objectManager?.interfacesRemoved(this, [removedInterface.name])
+        if (removedInterface && removeSuccess) this.service?.announceInterfacesRemoved(this.name, [removedInterface.name])
         return removeSuccess
     }
 

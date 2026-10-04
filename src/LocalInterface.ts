@@ -83,7 +83,42 @@ export class LocalInterface {
         signature: string
         getter?: () => any
         setter?: (value: any) => Promise<void>
+        // Whether announced changes carry the new value; false for emitPropertiesChanged: {emitValue: false}
+        sendValue: boolean
     }> = {}
+
+    /**
+     * Whether a PropertiesChanged signal is already scheduled for the changes queued in this turn of the event loop.
+     */
+    #propertyChangeScheduled: boolean = false
+
+    /**
+     * Queues a change of a property for the next PropertiesChanged signal: with its current value, or as invalidated
+     * when the property does not send values, has no getter, or cannot be read now. Changes queued in the same turn
+     * of the event loop go out in one signal.
+     */
+    #queuePropertyChange(name: string): void {
+        const property = this.#definedProperties[name]
+        let value: DBusSignedValue | undefined
+        if (property.sendValue && property.getter) {
+            try {
+                value = this.getPropertySignedValue(name)
+            } catch {
+                value = undefined
+            }
+        }
+        if (value) {
+            this.#propertiesEmitValueChanges.push({[name]: value})
+        } else {
+            this.#propertiesNotEmitValueChanges.push(name)
+        }
+        if (this.#propertyChangeScheduled) return
+        this.#propertyChangeScheduled = true
+        setImmediate((): void => {
+            this.#propertyChangeScheduled = false
+            this.#propertyChangeHandler()
+        })
+    }
 
     /**
      * An array of IntrospectSignal objects for introspection.
@@ -123,7 +158,11 @@ export class LocalInterface {
     #propertyChangeHandler(): void {
         if (!this.#propertiesEmitValueChanges.length && !this.#propertiesNotEmitValueChanges.length) return
         const propertiesInterface: PropertiesInterface | undefined = this.object?.propertiesInterface
-        if (!propertiesInterface) return
+        if (!propertiesInterface || !this.dbus?.connected) {
+            this.#propertiesEmitValueChanges = []
+            this.#propertiesNotEmitValueChanges = []
+            return
+        }
         const changedProperties: Record<string, DBusSignedValue> = this.#propertiesEmitValueChanges.reduce((previousValue: Record<string, DBusSignedValue>, currentValue: Record<string, DBusSignedValue>): Record<string, DBusSignedValue> => ({
             ...previousValue,
             ...currentValue
@@ -131,7 +170,7 @@ export class LocalInterface {
         const changedPropertyNames: string[] = [...new Set(this.#propertiesNotEmitValueChanges)]
         this.#propertiesEmitValueChanges = []
         this.#propertiesNotEmitValueChanges = []
-        propertiesInterface.emitPropertiesChanged(this.#name, changedProperties, changedPropertyNames)
+        propertiesInterface.sendPropertiesChanged(this.#name, changedProperties, changedPropertyNames)
     }
 
     #object: LocalObject | undefined
@@ -507,8 +546,8 @@ export class LocalInterface {
      *
      * With emitPropertiesChanged, a change made through the setter (a DBus Set call, or setProperty from your own
      * code) sends org.freedesktop.DBus.Properties.PropertiesChanged, with the new value or, with
-     * `{emitValue: false}`, as invalidated. A value changed some other way, e.g. a read-only property, is announced
-     * with `object.propertiesInterface.emitPropertiesChanged(iface.name, {Name: iface.getPropertySignedValue('Name')})`.
+     * `{emitValue: false}`, as invalidated. Announce a value changed some other way, e.g. a read-only property updated
+     * by the service, with emitPropertiesChanged(name).
      *
      * @example
      * let volume = 50
@@ -537,24 +576,19 @@ export class LocalInterface {
         const userSetter: ((value: any) => unknown) | undefined = opts.setter
         const emitChanges: boolean | EmitPropertiesChangedOpts | undefined = opts.emitPropertiesChanged
         // true or {emitValue: true} sends the new value; {emitValue: false} only invalidates the property
-        const emitValue: boolean = typeof emitChanges === 'boolean' ? emitChanges : !!emitChanges?.emitValue
+        const propertyName: string = opts.name
         // The setter is registered whether or not changes are announced, and is awaited so that errors (thrown or
         // rejected) reach the caller and PropertiesChanged reports the value after the setter has completed
         const setter: ((value: any) => Promise<void>) | undefined = userSetter ? async (value: any): Promise<void> => {
             await userSetter(value)
-            if (!emitChanges) return
-            if (emitValue && getter) {
-                this.#propertiesEmitValueChanges.push({[opts.name]: this.getPropertySignedValue(opts.name)})
-            } else {
-                // A write-only property has no value to send
-                this.#propertiesNotEmitValueChanges.push(opts.name)
-            }
-            setImmediate((): void => this.#propertyChangeHandler())
+            if (emitChanges) this.#queuePropertyChange(propertyName)
         } : undefined
         this.#definedProperties[opts.name] = {
             signature: opts.type,
             getter: getter,
-            setter: setter
+            setter: setter,
+            // {emitValue: false} only invalidates; otherwise changes carry the value
+            sendValue: !(typeof emitChanges === 'object' && !emitChanges.emitValue)
         }
         this.#introspectProperties.push(LocalInterface.annotated<IntrospectProperty>({
             name: opts.name,
@@ -562,6 +596,32 @@ export class LocalInterface {
             access: access
         }, opts.annotations))
         return this
+    }
+
+    /**
+     * Announces that properties changed, with org.freedesktop.DBus.Properties.PropertiesChanged. Use it for values
+     * that change other than through their setter, e.g. a read-only property updated by the service itself; clients
+     * that cache properties (proxies, object manager clients) rely on it.
+     *
+     * Each property is sent with its current value from the getter, typed by its signature, or as invalidated when it
+     * was defined with `emitPropertiesChanged: {emitValue: false}`, has no getter, or its getter throws. Changes
+     * announced in the same turn of the event loop, including those made through setters, go out in one signal.
+     * Nothing is sent while the interface is not on an object of a running service.
+     *
+     * @example
+     * battery = 42
+     * iface.emitPropertiesChanged('Percentage')
+     * iface.emitPropertiesChanged(['State', 'TimeToEmpty'])
+     *
+     * @param names - The name or names of the changed properties.
+     * @throws {Error} Named 'org.freedesktop.DBus.Error.UnknownProperty' when a property is not defined.
+     */
+    public emitPropertiesChanged(names: string | string[]): void {
+        const propertyNames: string[] = Array.isArray(names) ? names : [names]
+        for (const name of propertyNames) {
+            if (!this.#definedProperties[name]) throw createDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
+        }
+        for (const name of propertyNames) this.#queuePropertyChange(name)
     }
 
     /**
@@ -598,7 +658,8 @@ export class LocalInterface {
         opts.name = this.validateDBusSignalName(opts.name)
         this.#definedSignals[opts.name] = {
             listener: (...args: any[]): void => {
-                if (!this.dbus || !this.object) return // Skip if DBus or object context is not available
+                // Signals are sent only while the interface is on an object of a running service
+                if (!this.dbus?.connected || !this.object) return
                 this.dbus.emitSignal({
                     objectPath: this.object.name,
                     interface: this.#name,
@@ -715,9 +776,9 @@ export class LocalInterface {
     }
 
     /**
-     * Gets all readable properties as a record of DBusSignedValue objects.
-     * Iterates through the defined properties that have a getter and retrieves their current values
-     * as DBusSignedValue instances; write-only properties are left out.
+     * Gets all readable properties as a record of DBusSignedValue objects, as GetAll and the object manager report
+     * them. Write-only properties, and properties that cannot be read now (the getter throws or returns a value that
+     * does not fit the type), are left out.
      *
      * @returns A record mapping property names to their corresponding DBusSignedValue instances.
      */
@@ -726,7 +787,12 @@ export class LocalInterface {
         for (const propertyName of this.listPropertyNames()) {
             // Write-only properties have no value to report
             if (!this.#definedProperties[propertyName].getter) continue
-            record[propertyName] = this.getPropertySignedValue(propertyName)
+            try {
+                record[propertyName] = this.getPropertySignedValue(propertyName)
+            } catch {
+                // A property that cannot be read now (its getter throws, or its value does not fit its type) is left
+                // out, as GDBus does, rather than failing GetAll, GetManagedObjects or InterfacesAdded as a whole
+            }
         }
         return record
     }

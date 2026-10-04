@@ -5,13 +5,13 @@
 Everything below is exported by `dbus-sdk`. For a guided introduction see the [README](../README.md); for
 complete programs see [examples](../examples/README.md).
 
-- [Client](#client): `DBus`, `DBusService`, `DBusObject`, `DBusInterface`, `DBusSignalEmitter`
+- [Client](#client): `DBus`, `DBusService`, `DBusObject`, `DBusInterface`, `DBusSignalEmitter`, `DBusObjectManager`
 - [Service](#service): `LocalService`, `LocalObject`, `LocalInterface`, `createDBusError`, `PropertiesInterface`, `IntrospectableInterface`, `PeerInterface`, `ObjectManagerInterface`
 - [Values and signatures](#values-and-signatures): `DBusSignedValue`, `Signature`, `RequestNameFlags`, `RequestNameResultCode`, `DBusPropertyAccess`, `DBusMessageType`, `DBusMessageFlags`, `DBusMessageEndianness`
 - [Type classes](#type-classes): `DBusArray`, `DBusBoolean`, `DBusByte`, `DBusDictEntry`, `DBusDouble`, `DBusInt16`, `DBusInt32`, `DBusInt64`, `DBusObjectPath`, `DBusSignature`, `DBusString`, `DBusStruct`, `DBusUInt16`, `DBusUInt32`, `DBusUInt64`, `DBusUnixFD`, `DBusVariant`
 - [Errors](#errors): `AccessPropertyForbiddenError`, `AlignmentError`, `AuthError`, `CreateStreamFailedError`, `InterfaceNotFoundError`, `InvalidValueError`, `LocalInterfaceExistsError`, `LocalInterfaceInvalidAnnotationError`, `LocalInterfaceInvalidMethodNameError`, `LocalInterfaceInvalidNameError`, `LocalInterfaceInvalidPropertyNameError`, `LocalInterfaceInvalidSignalNameError`, `LocalInterfaceMethodDefinedError`, `LocalInterfacePropertyDefinedError`, `LocalInterfaceSignalDefinedError`, `LocalObjectInvalidNameError`, `LocalObjectPathExistsError`, `LocalServiceInvalidNameError`, `MessageDecodeError`, `NotEnoughParamsError`, `ObjectPathError`, `ReadBufferError`, `SerialError`, `ServiceNotFoundError`, `SignatureError`, `TimeoutError`, `UnknownBusAddressError`, `UnknownBusTypeError`, `UserPermissionError`
 - [Low level](#low-level): `DBusConnection`, `DBusMessage`, `DBusBufferEncoder`, `DBusBufferDecoder`
-- [Option and data types](#option-and-data-types): `BusAddressConnectOpts`, `BusNameBasicInfo`, `ConnectOpts`, `CreateConnectOpts`, `CreateSignalEmitterOpts`, `DataType`, `DBusInterfaceOpts`, `DBusMessageHeader`, `DBusObjectOpts`, `DBusServiceOpts`, `DBusTypeCode`, `DefineMethodArgumentOpts`, `DefineMethodOpts`, `DefinePropertyOpts`, `DefineSignalArgumentOpts`, `DefineSignalOpts`, `EmitPropertiesChangedOpts`, `EmitSignalOpts`, `GetPropertyValueOpts`, `HandshakeOpts`, `IntrospectAnnotation`, `IntrospectInterface`, `IntrospectMethod`, `IntrospectMethodArgument`, `IntrospectNode`, `IntrospectProperty`, `IntrospectSignal`, `IntrospectSignalArgument`, `InvokeOpts`, `MethodCall`, `MethodCallContext`, `NamedMethodCall`, `NamedNoReplyMethodCall`, `NoReplyMethodCall`, `PropertyOperation`, `ReplyOpts`, `SetPropertyValueOpts`, `SocketConnectOpts`, `StopServiceOpts`, `StreamConnectOpts`, `TCPConnectOpts`
+- [Option and data types](#option-and-data-types): `BusAddressConnectOpts`, `BusNameBasicInfo`, `ConnectOpts`, `CreateConnectOpts`, `CreateSignalEmitterOpts`, `DataType`, `DBusInterfaceOpts`, `DBusMessageHeader`, `DBusObjectManagerOpts`, `DBusObjectOpts`, `DBusServiceOpts`, `DBusTypeCode`, `DefineMethodArgumentOpts`, `DefineMethodOpts`, `DefinePropertyOpts`, `DefineSignalArgumentOpts`, `DefineSignalOpts`, `EmitPropertiesChangedOpts`, `EmitSignalOpts`, `GetPropertyValueOpts`, `HandshakeOpts`, `IntrospectAnnotation`, `IntrospectInterface`, `IntrospectMethod`, `IntrospectMethodArgument`, `IntrospectNode`, `IntrospectProperty`, `IntrospectSignal`, `IntrospectSignalArgument`, `InvokeOpts`, `LocalServiceOpts`, `MethodCall`, `MethodCallContext`, `NamedMethodCall`, `NamedNoReplyMethodCall`, `NoReplyMethodCall`, `PropertyOperation`, `ReceivedSignal`, `ReplyOpts`, `SetPropertyValueOpts`, `SocketConnectOpts`, `StopServiceOpts`, `StreamConnectOpts`, `TCPConnectOpts`
 
 ## Client
 
@@ -34,6 +34,11 @@ for calls without their own timeout (see InvokeOpts.timeout). Undefined means no
 Getter for the unique name of this DBus connection.
 
 Returns: The unique name assigned by the DBus daemon (e.g., ':1.123').
+
+#### `readonly connected: boolean`
+
+Whether the connection is open. It becomes false when the connection closes, from disconnect() or because the
+bus went away; 'connectionClose' is emitted then.
 
 #### `DBus.connect(opts?: CreateConnectOpts): Promise<DBus>`
 
@@ -345,6 +350,26 @@ Returns: The object proxy.
 
 Throws: {ServiceNotFoundError} As getService.
 
+#### `getObjectManager(service: string, objectPath?: string): Promise<DBusObjectManager>`
+
+A client for a service's org.freedesktop.DBus.ObjectManager, holding an up-to-date copy of the objects it
+manages with their interfaces and properties. A service that is not running but activatable is started.
+
+- `service`: The service's well-known name.
+- `objectPath`: Path of the service's object manager (default '/'). Services document it; BlueZ uses '/', UDisks2 '/org/freedesktop/UDisks2'.
+
+```typescript
+const manager = await bus.getObjectManager('org.freedesktop.UDisks2', '/org/freedesktop/UDisks2')
+manager.on('objectAdded', (path, interfaces) => console.log(path, Object.keys(interfaces)))
+```
+
+Returns: The object manager client, with its objects loaded.
+
+Throws: {ServiceNotFoundError} As getService.
+
+Throws: {Error} The DBus error GetManagedObjects failed with, e.g. 'org.freedesktop.DBus.Error.UnknownMethod'
+when the path has no object manager.
+
 #### `getInterface(service: string, objectPath: string, iface: string): Promise<DBusInterface>`
 
 A proxy for an interface of an object, built by introspecting the object. This is the usual way to call
@@ -604,6 +629,29 @@ Initializes the emitter with options and handlers that add and remove match rule
 - `onSignalHandler`: Called to add the match rule for a signal name; returns the rule.
 - `offSignalHandler`: Called with a rule returned by onSignalHandler once nothing listens to that signal.
 
+#### `onAny(listener: (signal: ReceivedSignal) => void): this`
+
+Listens to every signal this emitter selects, like on('*', ...), but with where each one came from: the
+listener gets a ReceivedSignal with the sender, object path, interface, name and arguments. Useful when the
+emitter selects several objects (objectPath '*'), since signal listeners receive only the arguments.
+
+- `listener`: Called with each signal.
+
+```typescript
+const properties = bus.createSignalEmitter({service: 'org.example.App', uniqueName: owner, objectPath: '*', interface: 'org.freedesktop.DBus.Properties'})
+properties.onAny((signal) => console.log(signal.objectPath, signal.name, signal.args))
+```
+
+Returns: This emitter.
+
+#### `offAny(listener: (signal: ReceivedSignal) => void): this`
+
+Removes a listener added with onAny; the match rule goes with the last one.
+
+- `listener`: The listener to remove.
+
+Returns: This emitter.
+
 #### `addListener(eventName: string, listener: (...args: any[]) => void): this`
 
 Adds a listener for the specified event (signal name), subscribing to the signal if needed.
@@ -730,6 +778,105 @@ Sets the maximum number of listeners allowed for any event.
 
 Returns: This instance for method chaining.
 
+### class `DBusObjectManager` (extends EventEmitter)
+
+A client for a service's org.freedesktop.DBus.ObjectManager: keeps a local copy of the objects it manages, their
+interfaces and their properties, and tells you when they change. Get one from DBus.getObjectManager.
+
+The copy is filled with GetManagedObjects and kept up to date with InterfacesAdded, InterfacesRemoved and
+PropertiesChanged. When the service leaves the bus its objects are removed; when it comes back they are read
+again. Values are plain JavaScript values, as everywhere else.
+
+```typescript
+const manager = await bus.getObjectManager('org.bluez')
+for (const path of manager.listObjectPaths()) console.log(path, manager.listInterfaceNames(path))
+manager.on('objectAdded', (path, interfaces) => console.log('new', path, Object.keys(interfaces)))
+manager.on('propertiesChanged', (path, iface, changed) => console.log(path, changed))
+const device = await manager.getInterface('/org/bluez/hci0/dev_00_11_22_33_44_55', 'org.bluez.Device1')
+await device.method.Connect()
+manager.close()
+```
+
+#### `readonly service: string`
+
+The well-known name of the service, e.g. 'org.bluez'.
+
+#### `readonly objectPath: string`
+
+Path of the object implementing org.freedesktop.DBus.ObjectManager, e.g. '/'.
+
+#### `new DBusObjectManager(opts: DBusObjectManagerOpts): DBusObjectManager`
+
+Created by DBus.getObjectManager, which also loads the objects; not meant to be constructed directly.
+
+- `opts`: The connection, the service, its current owner, and the path of its object manager.
+
+#### `listObjectPaths(): string[]`
+
+The paths of the managed objects, e.g. ['/org/bluez/hci0'].
+
+Returns: The object paths, in the order the objects appeared.
+
+#### `listInterfaceNames(objectPath: string): string[]`
+
+The interfaces of a managed object.
+
+- `objectPath`: The object's path.
+
+Returns: The interface names; empty when the object is not managed.
+
+#### `getProperties(objectPath: string, interfaceName: string): Record<string, any> | undefined`
+
+The properties of an interface of a managed object, as last reported by the service.
+
+- `objectPath`: The object's path.
+- `interfaceName`: The interface name.
+
+Returns: A copy of {property: value}; undefined when the object or interface is not managed.
+
+#### `getManagedObjects(): Record<string, Record<string, Record<string, any>>>`
+
+Everything managed, in the shape GetManagedObjects returns.
+
+Returns: A copy of {object path: {interface: {property: value}}}.
+
+#### `getObject(objectPath: string): Promise<DBusObject>`
+
+A proxy for a managed object, to call its methods; see DBus.getObject.
+
+- `objectPath`: The object's path.
+
+Returns: The object proxy.
+
+#### `getInterface(objectPath: string, interfaceName: string): Promise<DBusInterface>`
+
+A proxy for an interface of a managed object, to call its methods and use its properties; see
+DBus.getInterface.
+
+- `objectPath`: The object's path.
+- `interfaceName`: The interface name.
+
+Returns: The interface proxy.
+
+Throws: {InterfaceNotFoundError} When the object does not have the interface.
+
+#### `close(): void`
+
+Stops following the service: removes the match rules and listeners. The local copy keeps its last state.
+
+#### `on(eventName, listener)`
+
+Listens to an event of this DBusObjectManager:
+
+| Event | Listener arguments | Emitted when |
+|---|---|---|
+| `objectAdded` | `(objectPath: string, interfaces: Record<string, Record<string, any>>)` | when an object appears, with its {interface: {property: value}} |
+| `objectRemoved` | `(objectPath: string, interfaceNames: string[])` | when an object disappears, with the interfaces it had |
+| `interfacesAdded` | `(objectPath: string, interfaces: Record<string, Record<string, any>>)` | when an existing object gains interfaces |
+| `interfacesRemoved` | `(objectPath: string, interfaceNames: string[])` | when an object loses some, but not all, of its interfaces |
+| `propertiesChanged` | `(objectPath: string, interfaceName: string, changed: Record<string, any>, invalidated: string[])` | when PropertiesChanged arrives for a managed object, after the copy was updated (invalidated properties are removed from it) |
+| `error` | `(error: Error)` | when reading the objects again after the service restarted fails |
+
 ## Service
 
 Providing a service: its objects, interfaces, methods, properties and signals.
@@ -756,11 +903,8 @@ The DBus connection of the running service (set by run).
 
 #### `readonly objectManager: ObjectManagerInterface | undefined`
 
-Getter for the ObjectManager interface associated with this service.
-Provides access to the 'org.freedesktop.DBus.ObjectManager' interface on the root object,
-if available, for managing object hierarchies.
-
-Returns: The ObjectManagerInterface instance if found on the root object, otherwise undefined.
+The service's object manager, at the path given by the objectManagerPath option ('/' by default); undefined
+with objectManagerPath null.
 
 #### `readonly name: string`
 
@@ -769,15 +913,21 @@ Returns the validated service name set during construction.
 
 Returns: The service name as a string (e.g., 'org.example.Service').
 
-#### `new LocalService(serviceName: string): LocalService`
+#### `new LocalService(serviceName: string, opts?: LocalServiceOpts): LocalService`
 
-Constructor for LocalService.
-Initializes the service with a validated service name and adds a root object
-to serve as the base of the object hierarchy.
+Creates a service with its root object '/' and, unless objectManagerPath is null, an object manager.
 
-- `serviceName`: The DBus service name to be validated and set (e.g., 'org.example.Service').
+- `serviceName`: The well-known name to request, e.g. 'org.example.Service'.
+- `opts`: objectManagerPath: where the object manager is ('/' by default), or null for none.
 
-Throws: {LocalServiceInvalidNameError} If the provided name does not meet DBus naming criteria.
+```typescript
+new LocalService('org.example.Greeter')                                         // object manager at '/'
+new LocalService('org.example.App', {objectManagerPath: '/org/example/App'})    // manages the objects below it
+```
+
+Throws: {LocalServiceInvalidNameError} If the name is not a valid DBus bus name.
+
+Throws: {LocalObjectInvalidNameError} If objectManagerPath is not a valid object path.
 
 #### `run(opts?: RunServiceOpts): Promise<RequestNameResultCode>`
 
@@ -1098,8 +1248,8 @@ or throw, which the caller of Set sees as a DBus error.
 
 With emitPropertiesChanged, a change made through the setter (a DBus Set call, or setProperty from your own
 code) sends org.freedesktop.DBus.Properties.PropertiesChanged, with the new value or, with
-`{emitValue: false}`, as invalidated. A value changed some other way, e.g. a read-only property, is announced
-with `object.propertiesInterface.emitPropertiesChanged(iface.name, {Name: iface.getPropertySignedValue('Name')})`.
+`{emitValue: false}`, as invalidated. Announce a value changed some other way, e.g. a read-only property updated
+by the service, with emitPropertiesChanged(name).
 
 - `opts`: Name, type signature, getter and/or setter, emitPropertiesChanged and annotations.
 
@@ -1119,6 +1269,27 @@ Returns: This interface, for chaining.
 Throws: {LocalInterfacePropertyDefinedError} If a property with the same name is already defined.
 
 Throws: {LocalInterfaceInvalidPropertyNameError} If the name is not a valid DBus member name.
+
+#### `emitPropertiesChanged(names: string | string[]): void`
+
+Announces that properties changed, with org.freedesktop.DBus.Properties.PropertiesChanged. Use it for values
+that change other than through their setter, e.g. a read-only property updated by the service itself; clients
+that cache properties (proxies, object manager clients) rely on it.
+
+Each property is sent with its current value from the getter, typed by its signature, or as invalidated when it
+was defined with `emitPropertiesChanged: {emitValue: false}`, has no getter, or its getter throws. Changes
+announced in the same turn of the event loop, including those made through setters, go out in one signal.
+Nothing is sent while the interface is not on an object of a running service.
+
+- `names`: The name or names of the changed properties.
+
+```typescript
+battery = 42
+iface.emitPropertiesChanged('Percentage')
+iface.emitPropertiesChanged(['State', 'TimeToEmpty'])
+```
+
+Throws: {Error} Named 'org.freedesktop.DBus.Error.UnknownProperty' when a property is not defined.
 
 #### `removeProperty(name: string): this`
 
@@ -1213,9 +1384,9 @@ Throws: {Error} Named 'org.freedesktop.DBus.Error.UnknownProperty' or '...Proper
 
 #### `getManagedProperties(): Record<string, DBusSignedValue>`
 
-Gets all readable properties as a record of DBusSignedValue objects.
-Iterates through the defined properties that have a getter and retrieves their current values
-as DBusSignedValue instances; write-only properties are left out.
+Gets all readable properties as a record of DBusSignedValue objects, as GetAll and the object manager report
+them. Write-only properties, and properties that cannot be read now (the getter throws or returns a value that
+does not fit the type), are left out.
 
 Returns: A record mapping property names to their corresponding DBusSignedValue instances.
 
@@ -1263,17 +1434,6 @@ Constructor for the PropertiesInterface.
 Initializes the interface with the name 'org.freedesktop.DBus.Properties'
 and defines methods for getting and setting properties ('Get', 'GetAll', 'Set'),
 as well as a signal ('PropertiesChanged') for notifying about property changes.
-
-#### `emitPropertiesChanged(interfaceName: string, changedProperties: Record<string, any>, invalidatedProperties?: string[]): void`
-
-Emits the 'PropertiesChanged' signal to notify listeners of property updates.
-Used to inform clients about changes to property values or invalidation of properties on a specific interface.
-The signal includes the interface name, a record of changed properties with their new values,
-and an optional array of invalidated property names.
-
-- `interfaceName`: The name of the interface whose properties have changed (e.g., 'org.example.Interface').
-- `changedProperties`: A record of property names and their new values that have been updated.
-- `invalidatedProperties`: An optional array of property names that are no longer valid, defaults to an empty array.
 
 ### class `IntrospectableInterface` (extends LocalInterface)
 
@@ -1325,11 +1485,18 @@ and 'Ping' for connectivity testing.
 
 ### class `ObjectManagerInterface` (extends LocalInterface)
 
-A class representing the DBus ObjectManager interface.
-Implements the 'org.freedesktop.DBus.ObjectManager' interface, which provides
-functionality for managing a hierarchy of objects and their interfaces.
-This interface allows clients to retrieve all managed objects and receive signals
-when interfaces are added or removed from objects.
+org.freedesktop.DBus.ObjectManager for a LocalService: GetManagedObjects lists the objects below this interface's
+object with their interfaces and properties, and InterfacesAdded / InterfacesRemoved announce objects and
+interfaces as they are added and removed.
+
+A LocalService has one on '/' by default (see LocalServiceOpts.objectManagerPath). Adding one to another object
+nests a manager: each object is reported by the nearest manager above it.
+
+```typescript
+const sub = new LocalObject('/org/example/Sub')
+sub.addInterface(new ObjectManagerInterface())   // reports the objects below /org/example/Sub
+service.addObject(sub)
+```
 
 #### `new ObjectManagerInterface(): ObjectManagerInterface`
 
@@ -1337,24 +1504,6 @@ Constructor for the ObjectManagerInterface.
 Initializes the interface with the name 'org.freedesktop.DBus.ObjectManager'
 and defines the 'GetManagedObjects' method to retrieve all managed objects,
 as well as 'InterfacesAdded' and 'InterfacesRemoved' signals to notify about changes.
-
-#### `interfacesAdded(localObject: LocalObject, interfacesAndProperties: Record<string, Record<string, any>>): void`
-
-Emits the 'InterfacesAdded' signal to notify clients of new interfaces.
-Triggered when one or more interfaces are added to a specific object.
-The signal includes the object path and a record of the added interfaces along with their properties.
-
-- `localObject`: The LocalObject instance to which interfaces were added.
-- `interfacesAndProperties`: A record mapping interface names to their properties and values.
-
-#### `interfacesRemoved(localObject: LocalObject, interfaces: string[]): void`
-
-Emits the 'InterfacesRemoved' signal to notify clients of removed interfaces.
-Triggered when one or more interfaces are removed from a specific object.
-The signal includes the object path and an array of the names of the removed interfaces.
-
-- `localObject`: The LocalObject instance from which interfaces were removed.
-- `interfaces`: An array of interface names that were removed from the object.
 
 ## Values and signatures
 
@@ -2712,6 +2861,26 @@ Used to correlate a reply or error message with the original request. Optional a
 The name of the error, if the message type is an error.
 This is a string identifier for the error (e.g., 'org.freedesktop.DBus.Error.UnknownMethod'). Optional and may be undefined.
 
+### interface `DBusObjectManagerOpts`
+
+What a DBusObjectManager is created with, by DBus.getObjectManager.
+
+#### `dbus: DBus`
+
+The connection.
+
+#### `service: string`
+
+The service's well-known name.
+
+#### `uniqueName: string`
+
+The unique name of the service's current owner.
+
+#### `objectPath: string`
+
+Path of the object implementing org.freedesktop.DBus.ObjectManager.
+
 ### interface `DBusObjectOpts`
 
 Interface defining options for a DBus object.
@@ -3252,6 +3421,18 @@ connection closes.
 
 Send the call without waiting for a reply (NO_REPLY_EXPECTED); invoke then returns nothing.
 
+### interface `LocalServiceOpts`
+
+Options for creating a LocalService.
+
+#### `objectManagerPath?: string | null | undefined`
+
+Where the service's org.freedesktop.DBus.ObjectManager is, which announces objects as they are added and
+removed: '/' by default, a path such as '/org/example/App' to manage only the objects below it (the service
+creates an object there; add interfaces to it with service.getObject(path)), or null for no object manager.
+More managers can be added by adding an ObjectManagerInterface to any object; each object is reported by its
+nearest manager above it.
+
 ### type `MethodCall`
 
 ```typescript
@@ -3336,6 +3517,34 @@ Retrieves the current value of the property.
 This method queries the DBus object to get the current value of the property.
 
 Returns: A Promise that resolves with the current value of the property.
+
+### interface `ReceivedSignal`
+
+A signal as received, with where it came from: what DBusSignalEmitter.onAny listeners get.
+
+#### `sender: string`
+
+Unique bus name of the sender, e.g. ':1.42'.
+
+#### `objectPath: string`
+
+Object path the signal was emitted from.
+
+#### `interface: string`
+
+Interface of the signal.
+
+#### `name: string`
+
+Name of the signal, e.g. 'PropertiesChanged'.
+
+#### `args: any[]`
+
+The signal's arguments, as a listener of the signal's name receives them.
+
+#### `message: DBusMessage`
+
+The signal message itself, for anything else in its header.
 
 ### interface `ReplyOpts`
 

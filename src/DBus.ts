@@ -1,4 +1,5 @@
 import {DBusService} from './DBusService'
+import {DBusObjectManager} from './DBusObjectManager'
 import {DBusObject} from './DBusObject'
 import {DBusInterface} from './DBusInterface'
 import {CreateConnectOpts} from './types/CreateConnectOpts'
@@ -11,7 +12,7 @@ import {GetPropertyValueOpts} from './types/GetPropertyValueOpts'
 import {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 import {CreateSignalEmitterOpts} from './types/CreateSignalEmitterOpts'
-import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
+import {ANY_SIGNAL_EVENT, DBusSignalEmitter} from './lib/DBusSignalEmitter'
 import {RequestNameFlags} from './lib/enums/RequestNameFlags'
 import {RequestNameResultCode} from './lib/enums/RequestNameResultCode'
 import {MessageDecodeError, ServiceNotFoundError, TimeoutError} from './lib/Errors'
@@ -27,7 +28,7 @@ import {DBusVariant} from './lib/datatypes/DBusVariant'
 /**
  * The resolve and reject functions of a method call waiting for its reply.
  */
-type InflightCall = [(response: any[]) => void, (error: Error) => void]
+type InflightCall = [(reply: DBusMessage) => void, (error: Error) => void]
 
 /**
  * Main class for interacting with a DBus connection.
@@ -140,6 +141,14 @@ export class DBus extends EventEmitter {
      */
     public get uniqueName(): string {
         return this.#uniqueName
+    }
+
+    /**
+     * Whether the connection is open. It becomes false when the connection closes, from disconnect() or because the
+     * bus went away; 'connectionClose' is emitted then.
+     */
+    public get connected(): boolean {
+        return this.#connection.connected
     }
 
     /**
@@ -385,44 +394,63 @@ export class DBus extends EventEmitter {
                 signature: opts.signature ? opts.signature : undefined
             }, ...opts.args ? opts.args : []))
         } else {
-            return new Promise<any[]>((resolveCall, rejectCall) => {
-                const timeout: number | undefined = opts.timeout ?? this.callTimeout
-                let timer: NodeJS.Timeout | undefined
-                const resolve = (response: any[]): void => {
-                    clearTimeout(timer)
-                    resolveCall(response)
-                }
-                const reject = (error: Error): void => {
-                    clearTimeout(timer)
-                    rejectCall(error)
-                }
-                const message: DBusMessage = new DBusMessage({
-                    serial: this.#serial++,
-                    type: DBusMessageType.METHOD_CALL,
-                    flags: DBusMessageFlags.REPLY_EXPECTED,
-                    destination: opts.service,
-                    path: opts.objectPath,
-                    interfaceName: opts.interface,
-                    member: opts.method,
-                    signature: opts.signature ? opts.signature : undefined
-                }, ...opts.args ? opts.args : [])
-                this.#inflightCalls[message.header.serial] = [resolve, reject]
-                try {
-                    this.write(message.toBuffer())
-                } catch (error: any) {
-                    // Nothing was sent (encoding failed or the connection is closed), so no reply will ever come
-                    delete this.#inflightCalls[message.header.serial]
-                    return reject(error)
-                }
-                if (timeout !== undefined && timeout > 0) {
-                    timer = setTimeout((): void => {
-                        // Forget the call, so a reply arriving later is ignored
-                        this.#takeInflightCall(message.header.serial)
-                        reject(new TimeoutError(`No reply to ${opts.interface}.${opts.method} on ${opts.service} within ${timeout} ms`))
-                    }, timeout)
-                }
-            })
+            return this.#call(opts).then((reply: DBusMessage): any[] => reply.body)
         }
+    }
+
+    /**
+     * @internal
+     * Like invoke, but resolves with the reply message itself, e.g. to compare its serial with those of signals
+     * from the same sender: a connection numbers everything it sends in order.
+     *
+     * @param opts - As for invoke; noReply is ignored.
+     * @returns The METHOD_RETURN message.
+     */
+    public invokeForReply(opts: InvokeOpts): Promise<DBusMessage> {
+        return this.#call(opts)
+    }
+
+    /**
+     * Sends a method call and resolves with its reply message (see invoke for timeouts and errors).
+     */
+    #call(opts: InvokeOpts): Promise<DBusMessage> {
+        return new Promise<DBusMessage>((resolveCall, rejectCall) => {
+            const timeout: number | undefined = opts.timeout ?? this.callTimeout
+            let timer: NodeJS.Timeout | undefined
+            const resolve = (reply: DBusMessage): void => {
+                clearTimeout(timer)
+                resolveCall(reply)
+            }
+            const reject = (error: Error): void => {
+                clearTimeout(timer)
+                rejectCall(error)
+            }
+            const message: DBusMessage = new DBusMessage({
+                serial: this.#serial++,
+                type: DBusMessageType.METHOD_CALL,
+                flags: DBusMessageFlags.REPLY_EXPECTED,
+                destination: opts.service,
+                path: opts.objectPath,
+                interfaceName: opts.interface,
+                member: opts.method,
+                signature: opts.signature ? opts.signature : undefined
+            }, ...opts.args ? opts.args : [])
+            this.#inflightCalls[message.header.serial] = [resolve, reject]
+            try {
+                this.write(message.toBuffer())
+            } catch (error: any) {
+                // Nothing was sent (encoding failed or the connection is closed), so no reply will ever come
+                delete this.#inflightCalls[message.header.serial]
+                return reject(error)
+            }
+            if (timeout !== undefined && timeout > 0) {
+                timer = setTimeout((): void => {
+                    // Forget the call, so a reply arriving later is ignored
+                    this.#takeInflightCall(message.header.serial)
+                    reject(new TimeoutError(`No reply to ${opts.interface}.${opts.method} on ${opts.service} within ${timeout} ms`))
+                }, timeout)
+            }
+        })
     }
 
     /**
@@ -607,7 +635,7 @@ export class DBus extends EventEmitter {
                 switch (message.header.type) {
                     case DBusMessageType.METHOD_RETURN: {
                         const call: InflightCall | undefined = this.#takeInflightCall(message.header.replySerial)
-                        return call?.[0](message.body)
+                        return call?.[0](message)
                     }
                     case DBusMessageType.ERROR: {
                         const call: InflightCall | undefined = this.#takeInflightCall(message.header.replySerial)
@@ -628,10 +656,12 @@ export class DBus extends EventEmitter {
                                 if (emitter.uniqueName !== '*' && emitter.uniqueName !== sender) return false
                                 if (emitter.objectPath !== '*' && emitter.objectPath !== objectPath) return false
                                 if (emitter.interface !== '*' && emitter.interface !== interfaceName) return false
-                                if (!emitter.eventNames().includes(signalName) && !emitter.eventNames().includes('*')) return false
+                                const eventNames: (string | symbol)[] = emitter.eventNames()
+                                if (!eventNames.includes(signalName) && !eventNames.includes('*') && !eventNames.includes(ANY_SIGNAL_EVENT)) return false
                                 const emitDirectly: boolean = emitter.emit(signalName, ...signalArgs)
                                 const emitWildcard: boolean = emitter.emit('*', signalName, ...signalArgs)
-                                return emitDirectly || emitWildcard
+                                const emitAny: boolean = emitter.emit(ANY_SIGNAL_EVENT, {sender, objectPath, interface: interfaceName, name: signalName, args: signalArgs, message})
+                                return emitDirectly || emitWildcard || emitAny
                             })())
                         })
                         if (emitResults.find((result: boolean): boolean => result)) return
@@ -1388,6 +1418,34 @@ export class DBus extends EventEmitter {
      */
     public async getObject(service: string, objectPath: string): Promise<DBusObject> {
         return (await this.getService(service)).getObject(objectPath)
+    }
+
+    /**
+     * A client for a service's org.freedesktop.DBus.ObjectManager, holding an up-to-date copy of the objects it
+     * manages with their interfaces and properties. A service that is not running but activatable is started.
+     *
+     * @example
+     * const manager = await bus.getObjectManager('org.freedesktop.UDisks2', '/org/freedesktop/UDisks2')
+     * manager.on('objectAdded', (path, interfaces) => console.log(path, Object.keys(interfaces)))
+     *
+     * @param service - The service's well-known name.
+     * @param objectPath - Path of the service's object manager (default '/'). Services document it; BlueZ uses '/',
+     *                     UDisks2 '/org/freedesktop/UDisks2'.
+     * @returns The object manager client, with its objects loaded.
+     * @throws {ServiceNotFoundError} As getService.
+     * @throws {Error} The DBus error GetManagedObjects failed with, e.g. 'org.freedesktop.DBus.Error.UnknownMethod'
+     *         when the path has no object manager.
+     */
+    public async getObjectManager(service: string, objectPath: string = '/'): Promise<DBusObjectManager> {
+        const dbusService: DBusService = await this.getService(service)
+        const manager: DBusObjectManager = new DBusObjectManager({dbus: this, service: service, uniqueName: dbusService.uniqueName, objectPath: objectPath})
+        try {
+            await manager.load()
+        } catch (error) {
+            manager.close()
+            throw error
+        }
+        return manager
     }
 
     /**

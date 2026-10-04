@@ -14,7 +14,7 @@ const SECTIONS: { title: string, intro: string, names?: string[], match?: (symbo
     {
         title: 'Client',
         intro: 'Connecting to a bus and using the services on it.',
-        names: ['DBus', 'DBusService', 'DBusObject', 'DBusInterface', 'DBusSignalEmitter']
+        names: ['DBus', 'DBusService', 'DBusObject', 'DBusInterface', 'DBusSignalEmitter', 'DBusObjectManager']
     },
     {
         title: 'Service',

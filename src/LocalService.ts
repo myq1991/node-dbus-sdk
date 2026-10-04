@@ -6,7 +6,7 @@ import {IntrospectableInterface} from './lib/common/IntrospectableInterface'
 import {LocalInterface} from './LocalInterface'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 import {createDBusError} from './lib/createDBusError'
-import {RootObject} from './lib/common/RootObject'
+import {LocalServiceOpts} from './types/LocalServiceOpts'
 import {ObjectManagerInterface} from './lib/common/ObjectManagerInterface'
 import {RunServiceOpts} from './types/RunServiceOpts'
 import {StopServiceOpts} from './types/StopServiceOpts'
@@ -63,15 +63,15 @@ export class LocalService {
         return this.#dbus
     }
 
+    readonly #objectManagerPath: string | null
+
     /**
-     * Getter for the ObjectManager interface associated with this service.
-     * Provides access to the 'org.freedesktop.DBus.ObjectManager' interface on the root object,
-     * if available, for managing object hierarchies.
-     *
-     * @returns The ObjectManagerInterface instance if found on the root object, otherwise undefined.
+     * The service's object manager, at the path given by the objectManagerPath option ('/' by default); undefined
+     * with objectManagerPath null.
      */
     public get objectManager(): ObjectManagerInterface | undefined {
-        return this.getObject('/')?.getInterface('org.freedesktop.DBus.ObjectManager')
+        if (this.#objectManagerPath === null) return
+        return this.getObject(this.#objectManagerPath)?.getInterface('org.freedesktop.DBus.ObjectManager')
     }
 
     /**
@@ -85,16 +85,27 @@ export class LocalService {
     }
 
     /**
-     * Constructor for LocalService.
-     * Initializes the service with a validated service name and adds a root object
-     * to serve as the base of the object hierarchy.
+     * Creates a service with its root object '/' and, unless objectManagerPath is null, an object manager.
      *
-     * @param serviceName - The DBus service name to be validated and set (e.g., 'org.example.Service').
-     * @throws {LocalServiceInvalidNameError} If the provided name does not meet DBus naming criteria.
+     * @example
+     * new LocalService('org.example.Greeter')                                         // object manager at '/'
+     * new LocalService('org.example.App', {objectManagerPath: '/org/example/App'})    // manages the objects below it
+     *
+     * @param serviceName - The well-known name to request, e.g. 'org.example.Service'.
+     * @param opts - objectManagerPath: where the object manager is ('/' by default), or null for none.
+     * @throws {LocalServiceInvalidNameError} If the name is not a valid DBus bus name.
+     * @throws {LocalObjectInvalidNameError} If objectManagerPath is not a valid object path.
      */
-    constructor(serviceName: string) {
+    constructor(serviceName: string, opts: LocalServiceOpts = {}) {
         this.#name = this.validateDBusServiceName(serviceName)
-        this.addObject(new RootObject()) // Add root object as the base of the hierarchy
+        this.#objectManagerPath = opts.objectManagerPath === undefined ? '/' : opts.objectManagerPath
+        // The root object always exists: it answers Introspect for '/' and is where clients start exploring
+        this.addObject(new LocalObject('/'))
+        if (this.#objectManagerPath !== null) {
+            const managerObject: LocalObject = this.getObject(this.#objectManagerPath) ?? new LocalObject(this.#objectManagerPath)
+            managerObject.addInterface(new ObjectManagerInterface())
+            this.addObject(managerObject)
+        }
     }
 
     /**
@@ -341,6 +352,57 @@ export class LocalService {
     }
 
     /**
+     * @internal
+     * The object manager that reports the object at a path: the ObjectManagerInterface on the nearest object above
+     * the path (never the object at the path itself).
+     *
+     * @param objectPath - The object's path.
+     * @returns The manager, or undefined when no object above the path has one.
+     */
+    public objectManagerOf(objectPath: string): ObjectManagerInterface | undefined {
+        let path: string = objectPath
+        while (path !== '/') {
+            path = path.substring(0, path.lastIndexOf('/')) || '/'
+            const manager: ObjectManagerInterface | undefined = this.#objectMap.get(path)?.getInterface<ObjectManagerInterface>('org.freedesktop.DBus.ObjectManager')
+            if (manager) return manager
+        }
+        return undefined
+    }
+
+    /**
+     * @internal
+     * Sends InterfacesAdded for interfaces of an object of this service, from the object's manager, while the service
+     * runs. Their properties are read only then.
+     *
+     * @param localObject - The object.
+     * @param interfaceNames - The names of the added interfaces.
+     */
+    public announceInterfacesAdded(localObject: LocalObject, interfaceNames: string[]): void {
+        if (!this.#dbus?.connected || !interfaceNames.length) return
+        const manager: ObjectManagerInterface | undefined = this.objectManagerOf(localObject.name)
+        if (!manager) return
+        const interfacesAndProperties: Record<string, Record<string, any>> = {}
+        for (const interfaceName of interfaceNames) {
+            const localInterface: LocalInterface | undefined = localObject.getInterface(interfaceName)
+            if (localInterface) interfacesAndProperties[interfaceName] = localInterface.getManagedProperties()
+        }
+        manager.interfacesAdded(localObject.name, interfacesAndProperties)
+    }
+
+    /**
+     * @internal
+     * Sends InterfacesRemoved for interfaces of an object of this service, from the object's manager, while the
+     * service runs.
+     *
+     * @param objectPath - The object's path.
+     * @param interfaceNames - The names of the removed interfaces.
+     */
+    public announceInterfacesRemoved(objectPath: string, interfaceNames: string[]): void {
+        if (!this.#dbus?.connected || !interfaceNames.length) return
+        this.objectManagerOf(objectPath)?.interfacesRemoved(objectPath, interfaceNames)
+    }
+
+    /**
      * Adds an object. While the service runs, the object manager announces it with InterfacesAdded.
      *
      * @param localObject - The object to add.
@@ -359,7 +421,7 @@ export class LocalService {
         localObject.setService(this) // Link the object to this service
         this.#objectMap.set(localObject.name, localObject)
         addSuccess = true
-        if (addSuccess) this.objectManager?.interfacesAdded(localObject, localObject.getManagedInterfaces())
+        if (addSuccess) this.announceInterfacesAdded(localObject, localObject.listInterfaceNames())
         return addSuccess
     }
 
@@ -413,9 +475,7 @@ export class LocalService {
                 removeSuccess = this.#objectMap.delete(result[0])
             }
         }
-        const removedInterfaceNames: string[] | undefined = removedObject?.listInterfaceNames()
-        // If removal was successful, notify the object manager of the removed interfaces
-        if (removedObject && removeSuccess) this.objectManager?.interfacesRemoved(removedObject, removedInterfaceNames ? removedInterfaceNames : [])
+        if (removedObject && removeSuccess) this.announceInterfacesRemoved(removedObject.name, removedObject.listInterfaceNames())
         return removeSuccess
     }
 

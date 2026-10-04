@@ -1,5 +1,12 @@
 import EventEmitter from 'node:events'
 import {CreateSignalEmitterOpts} from '../types/CreateSignalEmitterOpts'
+import {ReceivedSignal} from '../types/ReceivedSignal'
+
+/**
+ * @internal
+ * Event under which onAny listeners are registered; not a valid signal name, so it cannot collide with one.
+ */
+export const ANY_SIGNAL_EVENT: string = '**'
 
 /**
  * A class that extends Node.js EventEmitter to handle DBus signal emissions.
@@ -122,7 +129,8 @@ export class DBusSignalEmitter extends EventEmitter {
      */
     protected subscribe(eventName: string): void {
         if (this.#rules.has(eventName)) return
-        const rule: string | void = this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName)
+        // onAny listeners select every signal, like '*'
+        const rule: string | void = this.onSignalHandler(this.uniqueName, this.objectPath, this.interface, eventName === ANY_SIGNAL_EVENT ? '*' : eventName)
         this.#rules.set(eventName, typeof rule === 'string' ? rule : '')
     }
 
@@ -153,6 +161,32 @@ export class DBusSignalEmitter extends EventEmitter {
         } else {
             if (!this.#signalEmitters.has(this)) this.#signalEmitters.add(this)
         }
+    }
+
+    /**
+     * Listens to every signal this emitter selects, like on('*', ...), but with where each one came from: the
+     * listener gets a ReceivedSignal with the sender, object path, interface, name and arguments. Useful when the
+     * emitter selects several objects (objectPath '*'), since signal listeners receive only the arguments.
+     *
+     * @example
+     * const properties = bus.createSignalEmitter({service: 'org.example.App', uniqueName: owner, objectPath: '*', interface: 'org.freedesktop.DBus.Properties'})
+     * properties.onAny((signal) => console.log(signal.objectPath, signal.name, signal.args))
+     *
+     * @param listener - Called with each signal.
+     * @returns This emitter.
+     */
+    public onAny(listener: (signal: ReceivedSignal) => void): this {
+        return this.on(ANY_SIGNAL_EVENT, listener)
+    }
+
+    /**
+     * Removes a listener added with onAny; the match rule goes with the last one.
+     *
+     * @param listener - The listener to remove.
+     * @returns This emitter.
+     */
+    public offAny(listener: (signal: ReceivedSignal) => void): this {
+        return this.removeListener(ANY_SIGNAL_EVENT, listener)
     }
 
     /**

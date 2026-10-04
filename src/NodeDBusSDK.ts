@@ -24,6 +24,12 @@ export {DBusObject} from './DBusObject'
 export {DBusService} from './DBusService'
 
 /**
+ * Exports the DBusObjectManager class: a client for a service's org.freedesktop.DBus.ObjectManager that keeps an
+ * up-to-date copy of its objects (see DBus.getObjectManager).
+ */
+export {DBusObjectManager} from './DBusObjectManager'
+
+/**
  * Exports the LocalInterface class for defining local DBus interfaces.
  * Used to create custom interfaces for local services with methods, properties, and signals.
  */
@@ -466,6 +472,22 @@ export type {ReplyOpts} from './types/ReplyOpts'
  * Defines options for updating a property value on a remote object, including service, path, and value.
  */
 export type {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
+
+/**
+ * Exports the DBusObjectManagerOpts type: what a DBusObjectManager is created with.
+ */
+export type {DBusObjectManagerOpts} from './types/DBusObjectManagerOpts'
+
+/**
+ * Exports the ReceivedSignal type: a received signal with its sender, object path, interface, name and arguments,
+ * as DBusSignalEmitter.onAny listeners get it.
+ */
+export type {ReceivedSignal} from './types/ReceivedSignal'
+
+/**
+ * Exports the LocalServiceOpts type: options for creating a LocalService, such as where its object manager is.
+ */
+export type {LocalServiceOpts} from './types/LocalServiceOpts'
 
 /**
  * Exports the StopServiceOpts type for stopping a LocalService, immediately or gracefully.

@@ -1,13 +1,18 @@
 import {LocalInterface} from '../../LocalInterface'
 import EventEmitter from 'node:events'
-import {LocalObject} from '../../LocalObject'
 
 /**
- * A class representing the DBus ObjectManager interface.
- * Implements the 'org.freedesktop.DBus.ObjectManager' interface, which provides
- * functionality for managing a hierarchy of objects and their interfaces.
- * This interface allows clients to retrieve all managed objects and receive signals
- * when interfaces are added or removed from objects.
+ * org.freedesktop.DBus.ObjectManager for a LocalService: GetManagedObjects lists the objects below this interface's
+ * object with their interfaces and properties, and InterfacesAdded / InterfacesRemoved announce objects and
+ * interfaces as they are added and removed.
+ *
+ * A LocalService has one on '/' by default (see LocalServiceOpts.objectManagerPath). Adding one to another object
+ * nests a manager: each object is reported by the nearest manager above it.
+ *
+ * @example
+ * const sub = new LocalObject('/org/example/Sub')
+ * sub.addInterface(new ObjectManagerInterface())   // reports the objects below /org/example/Sub
+ * service.addObject(sub)
  */
 export class ObjectManagerInterface extends LocalInterface {
 
@@ -67,49 +72,40 @@ export class ObjectManagerInterface extends LocalInterface {
     }
 
     /**
-     * Retrieves all managed objects, their interfaces, and properties.
-     * Iterates through all objects in the associated service and collects their
-     * managed interfaces and properties into a nested structure.
-     * If no service or objects are available, returns an empty record.
+     * The objects this manager reports with their interfaces and readable properties: the objects below its own
+     * path whose nearest manager it is (an object below a nested manager belongs to that one), not its own object.
      *
-     * @returns A record mapping object paths to their interfaces
-     *          and properties as a nested structure (Record<string, Record<string, Record<string, any>>>).
+     * @returns {object path: {interface: {property: value}}}.
      */
     protected getManagedObjects(): Record<string, Record<string, Record<string, any>>> {
         const managedObjects: Record<string, Record<string, Record<string, any>>> = {}
-        const objects: LocalObject[] | undefined = this.object?.service?.getObjects()
-        if (!objects || !this.object) return managedObjects
-        // Only the objects below the manager are managed by it, not the manager's own object
-        const managerPath: string = this.object.name
-        const childPrefix: string = managerPath === '/' ? '/' : `${managerPath}/`
-        for (const object of objects) {
-            if (object.name === managerPath || !object.name.startsWith(childPrefix)) continue
-            managedObjects[object.name] = object.getManagedInterfaces()
+        const service = this.object?.service
+        if (!service) return managedObjects
+        for (const object of service.getObjects()) {
+            if (service.objectManagerOf(object.name) === this) managedObjects[object.name] = object.getManagedInterfaces()
         }
         return managedObjects
     }
 
     /**
-     * Emits the 'InterfacesAdded' signal to notify clients of new interfaces.
-     * Triggered when one or more interfaces are added to a specific object.
-     * The signal includes the object path and a record of the added interfaces along with their properties.
+     * @internal
+     * Sends InterfacesAdded for an object this manager reports.
      *
-     * @param localObject - The LocalObject instance to which interfaces were added.
-     * @param interfacesAndProperties - A record mapping interface names to their properties and values.
+     * @param objectPath - The object's path.
+     * @param interfacesAndProperties - The added interfaces with their readable properties.
      */
-    public interfacesAdded(localObject: LocalObject, interfacesAndProperties: Record<string, Record<string, any>>): void {
-        this.#eventEmitter.emit('InterfacesAdded', localObject.name, interfacesAndProperties)
+    public interfacesAdded(objectPath: string, interfacesAndProperties: Record<string, Record<string, any>>): void {
+        this.#eventEmitter.emit('InterfacesAdded', objectPath, interfacesAndProperties)
     }
 
     /**
-     * Emits the 'InterfacesRemoved' signal to notify clients of removed interfaces.
-     * Triggered when one or more interfaces are removed from a specific object.
-     * The signal includes the object path and an array of the names of the removed interfaces.
+     * @internal
+     * Sends InterfacesRemoved for an object this manager reports.
      *
-     * @param localObject - The LocalObject instance from which interfaces were removed.
-     * @param interfaces - An array of interface names that were removed from the object.
+     * @param objectPath - The object's path.
+     * @param interfaces - The names of the removed interfaces.
      */
-    public interfacesRemoved(localObject: LocalObject, interfaces: string[]): void {
-        this.#eventEmitter.emit('InterfacesRemoved', localObject.name, interfaces)
+    public interfacesRemoved(objectPath: string, interfaces: string[]): void {
+        this.#eventEmitter.emit('InterfacesRemoved', objectPath, interfaces)
     }
 }

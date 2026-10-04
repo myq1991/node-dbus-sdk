@@ -139,16 +139,15 @@ export class PropertiesInterface extends LocalInterface {
     }
 
     /**
-     * Emits the 'PropertiesChanged' signal to notify listeners of property updates.
-     * Used to inform clients about changes to property values or invalidation of properties on a specific interface.
-     * The signal includes the interface name, a record of changed properties with their new values,
-     * and an optional array of invalidated property names.
+     * @internal
+     * Sends org.freedesktop.DBus.Properties.PropertiesChanged for an interface of this object. Announce changes of
+     * your own properties with LocalInterface.emitPropertiesChanged, which types the values.
      *
-     * @param interfaceName - The name of the interface whose properties have changed (e.g., 'org.example.Interface').
-     * @param changedProperties - A record of property names and their new values that have been updated.
-     * @param invalidatedProperties - An optional array of property names that are no longer valid, defaults to an empty array.
+     * @param interfaceName - The interface whose properties changed.
+     * @param changedProperties - The changed properties with their new values.
+     * @param invalidatedProperties - Properties that changed without their value being sent.
      */
-    public emitPropertiesChanged(interfaceName: string, changedProperties: Record<string, any>, invalidatedProperties: string[] = []): void {
+    public sendPropertiesChanged(interfaceName: string, changedProperties: Record<string, any>, invalidatedProperties: string[] = []): void {
         this.eventEmitter.emit('PropertiesChanged', interfaceName, changedProperties, invalidatedProperties)
     }
 }
