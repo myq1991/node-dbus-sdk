@@ -178,7 +178,8 @@ export class DBusConnection extends EventEmitter {
                 const clientChallenge: string = randomBytes(16).toString('hex')
                 const cookie: string = await this.getCookie(cookieContext, cookieId)
                 const response: string = this.sha1([serverChallenge, clientChallenge, cookie].join(':'))
-                const reply: string = Buffer.from(`${clientChallenge}${response}`, 'ascii').toString('hex')
+                // The response is "<client challenge> <hash>", hex-encoded (DBus specification, DBUS_COOKIE_SHA1)
+                const reply: string = Buffer.from(`${clientChallenge} ${response}`, 'ascii').toString('hex')
                 stream.write(`DATA ${reply}\r\n`)
                 return await successAndBegin()
             case 'ANONYMOUS':

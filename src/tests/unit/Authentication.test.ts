@@ -72,7 +72,7 @@ describe('authentication internals', (): void => {
     })
 
     describe('DBUS_COOKIE_SHA1', (): void => {
-        it('answers the challenge in the format the specification requires', knownBug('the DBUS_COOKIE_SHA1 response omits the space between client challenge and hash, so the bus rejects it'), async (): Promise<void> => {
+        it('answers the challenge in the format the specification requires', async (): Promise<void> => {
             const server: CookieAuthServer = new CookieAuthServer()
             const handshake: Promise<DBusConnection> = withTimeout(DBusConnection.createConnection({stream: server, authMethods: ['DBUS_COOKIE_SHA1']}), 2000, 'handshake')
             await handshake.catch((): void => undefined)

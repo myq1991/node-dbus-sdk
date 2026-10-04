@@ -91,7 +91,7 @@ describe('transports', {skip: !PrivateBus.available && 'dbus-daemon not found', 
     })
 
     describe('TCP with DBUS_COOKIE_SHA1, the usual configuration of TCP buses', (): void => {
-        it('connects', knownBug('the DBUS_COOKIE_SHA1 response omits the space between client challenge and hash, so the bus rejects it'), async (): Promise<void> => {
+        it('connects', async (): Promise<void> => {
             const cookieBus: PrivateBus = await PrivateBus.start({tcp: true, auth: ['DBUS_COOKIE_SHA1']})
             try {
                 const dbus: DBus = await cookieBus.withHome((): Promise<DBus> => withTimeout(DBus.connect({busAddress: cookieBus.tcpAddress}), 3000, 'connect'))

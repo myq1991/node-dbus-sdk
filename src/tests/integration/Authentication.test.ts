@@ -5,9 +5,6 @@ import {AuthError} from '../../lib/Errors'
 import {CreateConnectOpts} from '../../types/CreateConnectOpts'
 import {PrivateBus} from '../helpers/PrivateBus'
 import {withTimeout} from '../helpers/Async'
-import {knownBug} from '../helpers/KnownBug'
-
-const COOKIE_RESPONSE_BUG: string = 'the DBUS_COOKIE_SHA1 response omits the space between client challenge and hash, so the bus rejects it'
 
 /**
  * Connects with the given options against the bus (using its keyring HOME), checks a round trip and disconnects.
@@ -36,7 +33,7 @@ describe('authentication', {skip: !PrivateBus.available && 'dbus-daemon not foun
         })
 
         for (const mechanism of ['EXTERNAL', 'DBUS_COOKIE_SHA1', 'ANONYMOUS']) {
-            it(`authenticates with ${mechanism}`, mechanism === 'DBUS_COOKIE_SHA1' ? knownBug(COOKIE_RESPONSE_BUG) : {}, async (): Promise<void> => {
+            it(`authenticates with ${mechanism}`, async (): Promise<void> => {
                 await assertAuthenticates(bus, {busAddress: bus.unixAddress, authMethods: [mechanism]})
             })
         }
@@ -44,7 +41,7 @@ describe('authentication', {skip: !PrivateBus.available && 'dbus-daemon not foun
 
     describe('fallback through the default mechanism order', (): void => {
         for (const accepted of ['DBUS_COOKIE_SHA1', 'ANONYMOUS']) {
-            it(`reaches ${accepted} when the bus only accepts it`, accepted === 'DBUS_COOKIE_SHA1' ? knownBug(COOKIE_RESPONSE_BUG) : {}, async (): Promise<void> => {
+            it(`reaches ${accepted} when the bus only accepts it`, async (): Promise<void> => {
                 const bus: PrivateBus = await PrivateBus.start({auth: [accepted]})
                 try {
                     await assertAuthenticates(bus, {busAddress: bus.unixAddress})
