@@ -1,5 +1,5 @@
 import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
-import {ObjectPathError, SignatureError} from './Errors'
+import {InvalidValueError, ObjectPathError, SignatureError} from './Errors'
 import {DBusSignedValue} from './DBusSignedValue'
 import {Signature} from './Signature'
 import {DataType} from '../types/DataType'
@@ -9,6 +9,49 @@ import {DataType} from '../types/DataType'
  */
 const ALIGNMENT: Record<string, number> = {
     y: 1, b: 4, n: 2, q: 2, i: 4, u: 4, x: 8, t: 8, d: 8, h: 4, s: 4, o: 4, g: 1, a: 4, '(': 8, '{': 8, v: 1
+}
+
+/**
+ * Describes a value for error messages.
+ */
+function describe(value: any): string {
+    if (typeof value === 'string') return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}…` : value)
+    if (typeof value === 'bigint') return `${value}n`
+    if (value === null || typeof value !== 'object') return String(value)
+    return Object.prototype.toString.call(value)
+}
+
+/**
+ * Checks that a value is an integer within [min, max] (a number, or a bigint for convenience) and returns it as a number.
+ *
+ * @throws {InvalidValueError} Otherwise, instead of writing a truncated, wrapped or NaN value.
+ */
+function integer(value: any, min: number, max: number, typeName: string): number {
+    const number: number = typeof value === 'bigint' ? Number(value) : value
+    if (typeof number !== 'number' || !Number.isInteger(number) || number < min || number > max) {
+        throw new InvalidValueError(`${typeName} must be an integer from ${min} to ${max}, got ${describe(value)}`)
+    }
+    return number
+}
+
+/**
+ * Checks that a value is an integer within [min, max] given as a bigint, an integer number or a decimal string.
+ *
+ * @throws {InvalidValueError} Otherwise.
+ */
+function integer64(value: any, min: bigint, max: bigint, typeName: string): bigint {
+    let big: bigint | undefined
+    try {
+        if (typeof value === 'bigint') big = value
+        else if (typeof value === 'number' && Number.isInteger(value)) big = BigInt(value)
+        else if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) big = BigInt(value.trim())
+    } catch {
+        big = undefined
+    }
+    if (big === undefined || big < min || big > max) {
+        throw new InvalidValueError(`${typeName} must be an integer from ${min} to ${max}, got ${describe(value)}`)
+    }
+    return big
 }
 
 /**
@@ -110,9 +153,10 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeByte(value: number): this {
+        const byte: number = integer(value, 0, 0xFF, 'BYTE')
         // Claim first: growing replaces this.buffer, which must not be read before that
         const offset: number = this.claim(1, 1)
-        this.buffer.writeUInt8(value & 0xFF, offset) // Ensure value is in the range 0-255
+        this.buffer[offset] = byte
         return this
     }
 
@@ -124,7 +168,10 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeBoolean(value: boolean): this {
-        return this.writeUInt32(value ? 1 : 0)
+        if (value !== true && value !== false && value !== 1 && value !== 0) {
+            throw new InvalidValueError(`BOOLEAN must be true, false, 1 or 0, got ${describe(value)}`)
+        }
+        return this.writeLength(value ? 1 : 0)
     }
 
     /**
@@ -135,6 +182,7 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeInt16(value: number): this {
+        value = integer(value, -0x8000, 0x7FFF, 'INT16')
         const offset: number = this.claim(2, 2)
         if (this.littleEndian) this.buffer.writeInt16LE(value, offset)
         else this.buffer.writeInt16BE(value, offset)
@@ -149,6 +197,7 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeUInt16(value: number): this {
+        value = integer(value, 0, 0xFFFF, 'UINT16')
         const offset: number = this.claim(2, 2)
         if (this.littleEndian) this.buffer.writeUInt16LE(value, offset)
         else this.buffer.writeUInt16BE(value, offset)
@@ -163,6 +212,7 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeInt32(value: number): this {
+        value = integer(value, -0x80000000, 0x7FFFFFFF, 'INT32')
         const offset: number = this.claim(4, 4)
         if (this.littleEndian) this.buffer.writeInt32LE(value, offset)
         else this.buffer.writeInt32BE(value, offset)
@@ -177,6 +227,13 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeUInt32(value: number): this {
+        return this.writeLength(integer(value, 0, 0xFFFFFFFF, 'UINT32'))
+    }
+
+    /**
+     * Writes a UINT32 computed by the encoder itself (a length or a boolean), which needs no validation.
+     */
+    private writeLength(value: number): this {
         const offset: number = this.claim(4, 4)
         if (this.littleEndian) this.buffer.writeUInt32LE(value, offset)
         else this.buffer.writeUInt32BE(value, offset)
@@ -191,6 +248,7 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeInt64(value: bigint): this {
+        value = integer64(value, -(2n ** 63n), 2n ** 63n - 1n, 'INT64')
         const offset: number = this.claim(8, 8)
         if (this.littleEndian) this.buffer.writeBigInt64LE(value, offset)
         else this.buffer.writeBigInt64BE(value, offset)
@@ -205,6 +263,7 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeUInt64(value: bigint): this {
+        value = integer64(value, 0n, 2n ** 64n - 1n, 'UINT64')
         const offset: number = this.claim(8, 8)
         if (this.littleEndian) this.buffer.writeBigUInt64LE(value, offset)
         else this.buffer.writeBigUInt64BE(value, offset)
@@ -219,6 +278,7 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeDouble(value: number): this {
+        if (typeof value !== 'number') throw new InvalidValueError(`DOUBLE must be a number, got ${describe(value)}`)
         const offset: number = this.claim(8, 8)
         if (this.littleEndian) this.buffer.writeDoubleLE(value, offset)
         else this.buffer.writeDoubleBE(value, offset)
@@ -233,7 +293,7 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeUnixFD(fdIndex: number): this {
-        return this.writeUInt32(fdIndex)
+        return this.writeUInt32(integer(fdIndex, 0, 0xFFFFFFFF, 'UNIX_FD'))
     }
 
     /**
@@ -244,9 +304,14 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeString(value: string): this {
-        if (typeof value !== 'string') throw new TypeError(`The value of a STRING must be a string, got ${typeof value}`)
+        if (typeof value !== 'string') throw new InvalidValueError(`STRING must be a string, got ${describe(value)}`)
+        if (value.includes('\0')) throw new InvalidValueError(`STRING must not contain NUL characters, got ${describe(value)}`)
+        // A lone UTF-16 surrogate has no UTF-8 encoding (Buffer would silently write U+FFFD instead)
+        if (typeof (value as any).isWellFormed === 'function' && !(value as any).isWellFormed()) {
+            throw new InvalidValueError(`STRING must be valid Unicode, got one with a lone surrogate: ${describe(value)}`)
+        }
         const length: number = Buffer.byteLength(value, 'utf8')
-        this.writeUInt32(length)
+        this.writeLength(length)
         this.reserve(length + 1)
         // Buffer.write rejects an offset at the end of the buffer even for zero bytes, so skip empty strings
         if (length) this.buffer.write(value, this.length, length, 'utf8')
@@ -265,6 +330,7 @@ export class DBusBufferEncoder {
      * @throws {ObjectPathError} If the object path format is invalid.
      */
     public writeObjectPath(value: string): this {
+        if (typeof value !== 'string') throw new ObjectPathError(`OBJECT_PATH must be a string, got ${describe(value)}`)
         // Validate object path format according to DBus specification
         const objectPathRegex: RegExp = /^\/(?:[a-zA-Z0-9_]+(?:\/[a-zA-Z0-9_]+)*)?$/
         if (!objectPathRegex.test(value)) throw new ObjectPathError(`Invalid DBus object path: "${value}". Object path must start with '/' and consist of elements separated by '/', where each element starts with a letter or underscore and contains only letters, numbers, or underscores.`)
@@ -280,9 +346,18 @@ export class DBusBufferEncoder {
      * @throws {SignatureError} If the signature length exceeds 255 bytes.
      */
     public writeSignature(value: string): this {
+        if (typeof value !== 'string') throw new SignatureError(`SIGNATURE must be a string, got ${describe(value)}`)
         const length: number = Buffer.byteLength(value, 'utf8')
         // Validate signature length does not exceed 255 bytes (SIGNATURE length field is 8-bit unsigned integer)
         if (length > 255) throw new SignatureError(`DBus signature length exceeds maximum of 255 bytes: "${value}"`)
+        Signature.parseSignature(value) // Throws for anything that is not a valid signature
+        return this.writeSignatureBytes(value, length)
+    }
+
+    /**
+     * Writes a signature known to be valid (e.g. one built from a type), skipping validation.
+     */
+    private writeSignatureBytes(value: string, length: number = Buffer.byteLength(value, 'utf8')): this {
         this.reserve(length + 2)
         this.buffer[this.length] = length
         if (length) this.buffer.write(value, this.length + 1, length, 'utf8')
@@ -357,7 +432,8 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeVariant(signedValue: DBusSignedValue): this {
-        this.writeSignature(this.variantSignature(signedValue))
+        // Built from the content's type, which the parser has already checked
+        this.writeSignatureBytes(this.variantSignature(signedValue))
         return this.writeSignedValue(signedValue)
     }
 

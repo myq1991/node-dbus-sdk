@@ -178,6 +178,26 @@ than the intricacies of DBus's binary format or type system. This approach makes
 use cases (where explicit type control is needed) and accessible for simpler scenarios (where automatic type inference
 suffices).
 
+### Validation
+
+Values the DBus specification does not allow are rejected with an `InvalidValueError` (or `SignatureError` and
+`ObjectPathError`). Before, some of them were silently changed. The rules:
+
+- Integers must be integers within their type's range. A `bigint` is accepted for any integer type. A decimal string
+  is accepted for `x`/`t`.
+- `b` accepts only `true`, `false`, `1` and `0`.
+- `d` requires a number.
+- Strings must not contain NUL characters or lone UTF-16 surrogates.
+- `o` and `g` values must be a valid object path or signature.
+- Signatures must follow the structural rules: no empty structs, dict entries only as array elements and only with a
+  basic key type, at most 32 nested arrays and 32 nested structs, and at most 255 characters.
+
+When a dictionary is given as an object, its property names are converted to the key type. For example, `{1: 'a'}`
+works for `a{is}`, and `{false: 'a'}` works for `a{bs}`.
+
+Received data is checked the same way. Messages with invalid UTF-8, NUL characters, malformed object paths or
+signatures, non-zero padding, or arrays over 64 MiB are reported as errors instead of being decoded.
+
 ## Quick Start Guide
 
 Below are two practical examples to help you quickly get started with `dbus-sdk`. The first example demonstrates how to

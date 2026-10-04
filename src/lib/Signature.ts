@@ -2,22 +2,16 @@ import {DataType, Types} from '../types/DataType'
 import {SignatureError} from './Errors'
 
 /**
- * A mapping of opening brackets to their corresponding closing brackets.
- * Used to validate and parse nested structures like dictionaries and structs in DBus signatures.
+ * Type codes of the basic types, which are the only types allowed as dictionary keys.
  */
-const match: Record<string, string> = {
-    '{': '}',
-    '(': ')'
-}
+const BASIC_TYPES: string = 'ybnqiuxtdsogh'
 
 /**
- * A mapping of known DBus signature type characters to a boolean flag.
- * Used to validate whether a character represents a valid DBus type during signature parsing.
+ * Limits from the DBus specification.
  */
-const knownTypes: Record<string, boolean> = {}
-'(){}ybnqiuxtdsogarvehm*?@&^'.split('').forEach(function (c) {
-    knownTypes[c] = true
-})
+const MAX_SIGNATURE_LENGTH: number = 255
+const MAX_ARRAY_DEPTH: number = 32
+const MAX_STRUCT_DEPTH: number = 32
 
 /**
  * Class for handling DBus signature parsing and compatibility checking.
@@ -35,74 +29,62 @@ export class Signature {
      * @throws {SignatureError} If the signature is invalid or contains unrecognized types.
      */
     public static parseSignature(signature: string): DataType[] {
+        if (typeof signature !== 'string') throw new SignatureError(`A signature must be a string, got ${typeof signature}`)
+        if (signature.length > MAX_SIGNATURE_LENGTH) throw new SignatureError(`Signature longer than ${MAX_SIGNATURE_LENGTH} characters: "${signature}"`)
         let index: number = 0
 
-        /**
-         * Advances the index and returns the next character from the signature string as a Types enum value.
-         * Returns null if the end of the string is reached.
-         *
-         * @returns The next character as a Types value, or null if at the end of the signature.
-         */
-        function next(): Types {
-            if (index < signature.length) {
-                const c: string = signature[index]
-                ++index
-                return c as Types
-            }
-            return null as any
+        const fail = (reason: string): never => {
+            throw new SignatureError(`Bad signature "${signature}": ${reason}`)
         }
 
         /**
-         * Parses a single type character into a DataType object, handling nested structures recursively.
-         * Validates the type and processes nested children for arrays, structs, and dictionary entries.
+         * Parses one complete type starting at the current position.
          *
-         * @param c - The current type character (as a Types enum value) to parse.
-         * @returns A DataType object representing the parsed type and its children (if any).
-         * @throws {SignatureError} If the signature is malformed or ends unexpectedly.
+         * @param arrayDepth - Arrays enclosing this type.
+         * @param structDepth - Structs and dict entries enclosing this type (they share one limit).
+         * @param inArray - Whether this type is the element type of an array, the only place a dict entry may appear.
          */
-        function parseOne(c: Types): DataType {
-            const parsingType: Types = c
-
-            /**
-             * Checks if the current character exists (i.e., not null) and throws an error if the signature ends unexpectedly.
-             *
-             * @param c - The character to check.
-             * @returns The same character if it exists.
-             * @throws {SignatureError} If the character is null (unexpected end of signature).
-             */
-            function checkNotEnd(c: Types) {
-                if (!c) throw new SignatureError(`Bad signature: unexpected end (${parsingType})`)
-                return c
-            }
-
-            // Validate that the type character is a known DBus type
-            if (!knownTypes[c])
-                throw new SignatureError(`Unknown type: "${c}" in signature "${signature}"`)
-
-            let ele: Types
-            const res: DataType = {type: c, child: []}
+        const parseOne = (arrayDepth: number, structDepth: number, inArray: boolean): DataType => {
+            if (index >= signature.length) fail('unexpected end')
+            const c: string = signature[index++]
             switch (c) {
-                case 'a': // Array type - must be followed by the element type
-                    ele = next()
-                    checkNotEnd(ele)
-                    res.child!.push(parseOne(ele))
-                    return res
-                case '{': // Dictionary entry - key-value pair, must be closed with '}'
-                case '(': // Struct - ordered list of types, must be closed with ')'
-                    while ((ele = next()) !== null && ele !== match[c])
-                        res.child!.push(parseOne(ele))
-                    checkNotEnd(ele)
-                    return res
+                case 'a':
+                    if (arrayDepth >= MAX_ARRAY_DEPTH) fail(`arrays nested deeper than ${MAX_ARRAY_DEPTH}`)
+                    if (index >= signature.length) fail('array without element type')
+                    return {type: 'a', child: [parseOne(arrayDepth + 1, structDepth, true)]}
+                case '(': {
+                    if (structDepth >= MAX_STRUCT_DEPTH) fail(`structs nested deeper than ${MAX_STRUCT_DEPTH}`)
+                    const fields: DataType[] = []
+                    while (index < signature.length && signature[index] !== ')') fields.push(parseOne(arrayDepth, structDepth + 1, false))
+                    if (index >= signature.length) fail('struct not closed')
+                    index++
+                    if (!fields.length) fail('empty struct')
+                    return {type: '(', child: fields}
+                }
+                case '{': {
+                    if (!inArray) fail('dict entry outside an array')
+                    if (structDepth >= MAX_STRUCT_DEPTH) fail(`structs nested deeper than ${MAX_STRUCT_DEPTH}`)
+                    const entry: DataType[] = []
+                    while (index < signature.length && signature[index] !== '}') entry.push(parseOne(arrayDepth, structDepth + 1, false))
+                    if (index >= signature.length) fail('dict entry not closed')
+                    index++
+                    if (entry.length !== 2) fail(`dict entry with ${entry.length} types instead of a key and a value`)
+                    if (!BASIC_TYPES.includes(entry[0].type)) fail(`dict entry key of type "${entry[0].type}" (keys must be basic types)`)
+                    return {type: '{', child: entry}
+                }
+                case ')':
+                case '}':
+                    return fail(`unexpected "${c}"`)
+                default:
+                    if (c === 'v' || BASIC_TYPES.includes(c)) return {type: c as Types, child: []}
+                    return fail(`unknown type code "${c}"`)
             }
-            // For basic types (e.g., 's', 'i'), no children are added
-            return res
         }
 
         // Parse the entire signature string into an array of top-level DataType objects
-        const ret: DataType[] = []
-        let c: Types
-        while ((c = next()) !== null) ret.push(parseOne(c))
-        return ret
+        const types: DataType[] = []
+        while (index < signature.length) types.push(parseOne(0, 0, false))
+        return types
     }
 
     /**

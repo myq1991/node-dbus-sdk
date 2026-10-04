@@ -5,12 +5,36 @@ import {DataType} from '../types/DataType'
 import {AlignmentError, InvalidValueError, ReadBufferError, SignatureError} from './Errors'
 import {DBusTypeClass} from './DBusTypeClass'
 import {SignedValueToTypeClassInstance} from './SignedValueToTypeClassInstance'
+import * as nodeBuffer from 'node:buffer'
+import {TextDecoder} from 'node:util'
 
 /**
  * Alignment in bytes of each DBus type code, per the DBus specification.
  */
 const ALIGNMENT: Record<string, number> = {
     y: 1, b: 4, n: 2, q: 2, i: 4, u: 4, x: 8, t: 8, d: 8, h: 4, s: 4, o: 4, g: 1, a: 4, '(': 8, '{': 8, v: 1
+}
+
+/**
+ * The largest array the specification allows: 64 MiB.
+ */
+const MAX_ARRAY_LENGTH: number = 64 * 1024 * 1024
+
+const OBJECT_PATH: RegExp = /^\/(?:[a-zA-Z0-9_]+(?:\/[a-zA-Z0-9_]+)*)?$/
+
+const utf8Decoder: TextDecoder = new TextDecoder('utf-8', {fatal: true})
+
+/**
+ * Whether the bytes are valid UTF-8, using Node's native check where available (Node 18.14+).
+ */
+function isValidUtf8(bytes: Buffer): boolean {
+    if (typeof nodeBuffer.isUtf8 === 'function') return nodeBuffer.isUtf8(bytes)
+    try {
+        utf8Decoder.decode(bytes)
+        return true
+    } catch {
+        return false
+    }
 }
 
 /**
@@ -84,6 +108,10 @@ export class DBusBufferDecoder {
         // Ensure the new offset does not exceed the buffer length
         if (this.offset > this.buffer.length) {
             throw new AlignmentError(`Alignment exceeds buffer length: attempted to align to ${alignment} bytes, resulting offset ${this.offset} exceeds buffer length ${this.buffer.length}`)
+        }
+        // The specification requires padding bytes to be zero
+        for (let i: number = this.offset - padding; i < this.offset; i++) {
+            if (this.buffer[i] !== 0) throw new InvalidValueError(`Alignment padding at offset ${i} is not zero`)
         }
         return this
     }
@@ -333,6 +361,20 @@ export class DBusBufferDecoder {
     }
 
     /**
+     * Converts `length` bytes at the current offset to a string, rejecting what the specification forbids in
+     * STRING and OBJECT_PATH values: invalid UTF-8 (which would otherwise become U+FFFD) and NUL characters.
+     */
+    protected readText(length: number): string {
+        const value: string = this.buffer.toString('utf8', this.offset, this.offset + length)
+        if (value.includes('\0')) throw new InvalidValueError(`String at offset ${this.offset} contains a NUL byte`)
+        // Invalid UTF-8 always decodes to U+FFFD, so the bytes only need checking when that character appears
+        if (value.includes('\uFFFD') && !isValidUtf8(this.buffer.subarray(this.offset, this.offset + length))) {
+            throw new InvalidValueError(`String at offset ${this.offset} is not valid UTF-8`)
+        }
+        return value
+    }
+
+    /**
      * Reads a STRING type value from the buffer.
      * STRING consists of a 32-bit length field followed by UTF-8 encoded characters and a null terminator.
      * The length field requires 4-byte alignment.
@@ -363,7 +405,7 @@ export class DBusBufferDecoder {
         }
 
         // Read the string content as UTF-8 encoded text
-        const value: string = this.buffer.toString('utf8', this.offset, this.offset + length)
+        const value: string = this.readText(length)
         this.offset += length // Increment offset by string length
 
         // Check and skip the null terminator (must be 0)
@@ -407,7 +449,7 @@ export class DBusBufferDecoder {
         }
 
         // Read the object path content as UTF-8 encoded text
-        const value: string = this.buffer.toString('utf8', this.offset, this.offset + length)
+        const value: string = this.readText(length)
         this.offset += length // Increment offset by path length
 
         // Check and skip the null terminator (must be 0)
@@ -417,6 +459,7 @@ export class DBusBufferDecoder {
         }
         this.offset += 1 // Increment offset by 1 byte for null terminator
 
+        if (!OBJECT_PATH.test(value)) throw new InvalidValueError(`Invalid OBJECT_PATH: "${value}"`)
         return new DBusSignedValue('o', value)
     }
 
@@ -428,7 +471,7 @@ export class DBusBufferDecoder {
      * @throws {ReadBufferError} If there are not enough bytes left in the buffer to read the SIGNATURE length or content.
      * @throws {ReadBufferError} If the null terminator is not found or is invalid.
      */
-    public readSignature(): DBusSignedValue {
+    public readSignature(validate: boolean = true): DBusSignedValue {
         // No alignment needed for 1-byte length field
         // Check if there is enough data in the buffer to read the length field (1 byte)
         if (this.offset + 1 > this.buffer.length) {
@@ -446,6 +489,7 @@ export class DBusBufferDecoder {
 
         // Read the signature content as ASCII text
         const value: string = this.buffer.toString('ascii', this.offset, this.offset + length)
+        if (validate) Signature.parseSignature(value) // Throws SignatureError for an invalid signature
         this.offset += length // Increment offset by signature length
 
         // Check and skip the null terminator (must be 0)
@@ -474,6 +518,9 @@ export class DBusBufferDecoder {
         }
         const byteLength: number = this.endianness === DBusMessageEndianness.LE ? this.buffer.readUInt32LE(this.offset) : this.buffer.readUInt32BE(this.offset)
         this.offset += 4
+        if (byteLength > MAX_ARRAY_LENGTH) {
+            throw new InvalidValueError(`ARRAY of ${byteLength} bytes exceeds the maximum of 64 MiB (${MAX_ARRAY_LENGTH} bytes)`)
+        }
         // The elements start at the element type's alignment (also for empty arrays); the padding is not counted in
         // the length. Alignment is relative to the start of the data, like every other value.
         this.align(ALIGNMENT[elementType.type] || 1)
@@ -560,7 +607,8 @@ export class DBusBufferDecoder {
         }
 
         // Read the signature of the contained type
-        const signatureValue: DBusSignedValue = this.readSignature()
+        // Not validated here: it is parsed right below, which rejects invalid signatures
+        const signatureValue: DBusSignedValue = this.readSignature(false)
 
         // Extract the signature string from the DBusSignedValue
         const variantSignature = signatureValue.$value as string

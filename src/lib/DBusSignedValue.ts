@@ -119,6 +119,34 @@ export class DBusSignedValue {
     }
 
     /**
+     * Converts an object property name back to a dictionary key of the given type: object keys are always strings,
+     * so {1: 'a'} for a{is} or {false: 'a'} for a{bs} arrive as '1' and 'false'.
+     *
+     * @param type - The type code of the dictionary's keys.
+     * @param name - The property name.
+     * @returns The key in its own type; invalid keys are returned unchanged for the encoder to reject.
+     */
+    protected static keyFromPropertyName(type: string, name: string): any {
+        switch (type) {
+            case 'y':
+            case 'n':
+            case 'q':
+            case 'i':
+            case 'u':
+            case 'h':
+            case 'd':
+                return name.trim() === '' ? name : Number(name)
+            case 'x':
+            case 't':
+                return name // The encoder accepts decimal strings for 64-bit integers
+            case 'b':
+                return name === 'true' ? true : name === 'false' ? false : name
+            default:
+                return name
+        }
+    }
+
+    /**
      * Converts an item to a value of the given type, the one rule for every slot (arguments, struct fields, array
      * items, dictionary keys and values): a DBusSignedValue is used as it is, except that one whose type is not
      * 'v' placed into a variant slot becomes the variant's content; anything else is converted.
@@ -249,7 +277,7 @@ export class DBusSignedValue {
                                         if (!keyDataType || !valueDataType) {
                                             throw new SignatureError('Invalid dictionary child types')
                                         }
-                                        const keyObj: DBusSignedValue = DBusSignedValue.typed(keyDataType, key)
+                                        const keyObj: DBusSignedValue = DBusSignedValue.typed(keyDataType, DBusSignedValue.keyFromPropertyName(keyDataType.type, key))
                                         const valObj: DBusSignedValue = DBusSignedValue.typed(valueDataType, val)
                                         // Create a DBusSignedValue for a single dictionary entry {...}
                                         return new DBusSignedValue(dataType.child![0], [keyObj, valObj])
