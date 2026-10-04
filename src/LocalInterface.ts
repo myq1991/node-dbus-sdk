@@ -1,6 +1,6 @@
 import {DBusPropertyAccess} from './lib/enums/DBusPropertyAccess'
 import {DefineMethodArgumentOpts, DefineMethodOpts} from './types/DefineMethodOpts'
-import {DefinePropertyOpts} from './types/DefinePropertyOpts'
+import {DefinePropertyOpts, emitPropertiesChangedOpts} from './types/DefinePropertyOpts'
 import {DefineSignalOpts} from './types/DefineSignalOpts'
 import {IntrospectMethod} from './types/IntrospectMethod'
 import {IntrospectProperty} from './types/IntrospectProperty'
@@ -70,7 +70,7 @@ export class LocalInterface {
     #definedProperties: Record<string, {
         signature: string
         getter?: () => any
-        setter?: (value: any) => void
+        setter?: (value: any) => Promise<void>
     }> = {}
 
     /**
@@ -434,26 +434,23 @@ export class LocalInterface {
         if (opts.getter && opts.setter) access = DBusPropertyAccess.READWRITE
         opts.name = this.validateDBusPropertyName(opts.name)
         const getter: (() => any) | undefined = opts.getter
-        let setter: ((value: any) => void) | undefined = undefined
-        if (opts.emitPropertiesChanged && opts.setter) {
-            if ((typeof opts.emitPropertiesChanged === 'boolean' && opts.emitPropertiesChanged) || opts.emitPropertiesChanged.emitValue) {
-                // Emit property changed signal with the new value
-                setter = (value: any): void => {
-                    opts.setter!(value)
-                    const changedProperties: Record<string, any> = {}
-                    changedProperties[opts.name] = this.getPropertySignedValue(opts.name)
-                    this.#propertiesEmitValueChanges.push(changedProperties)
-                    setImmediate((): void => this.#propertyChangeHandler())
-                }
+        const userSetter: ((value: any) => unknown) | undefined = opts.setter
+        const emitChanges: boolean | emitPropertiesChangedOpts | undefined = opts.emitPropertiesChanged
+        // true or {emitValue: true} sends the new value; {emitValue: false} only invalidates the property
+        const emitValue: boolean = typeof emitChanges === 'boolean' ? emitChanges : !!emitChanges?.emitValue
+        // The setter is registered whether or not changes are announced, and is awaited so that errors (thrown or
+        // rejected) reach the caller and PropertiesChanged reports the value after the setter has completed
+        const setter: ((value: any) => Promise<void>) | undefined = userSetter ? async (value: any): Promise<void> => {
+            await userSetter(value)
+            if (!emitChanges) return
+            if (emitValue && getter) {
+                this.#propertiesEmitValueChanges.push({[opts.name]: this.getPropertySignedValue(opts.name)})
             } else {
-                // Emit property changed signal without the new value (invalidated only)
-                setter = (value: any): void => {
-                    opts.setter!(value)
-                    this.#propertiesNotEmitValueChanges.push(opts.name)
-                    setImmediate((): void => this.#propertyChangeHandler())
-                }
+                // A write-only property has no value to send
+                this.#propertiesNotEmitValueChanges.push(opts.name)
             }
-        }
+            setImmediate((): void => this.#propertyChangeHandler())
+        } : undefined
         this.#definedProperties[opts.name] = {
             signature: opts.type,
             getter: getter,
@@ -568,7 +565,7 @@ export class LocalInterface {
      * @throws {DBusError} If the property is not found, the value signature does not match the expected type,
      *                     or the property is read-only (no setter defined).
      */
-    public setProperty(name: string, value: any): void {
+    public async setProperty(name: string, value: any): Promise<void> {
         if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         try {
             // Encode and decode the value to ensure it matches the property's signature
@@ -578,8 +575,9 @@ export class LocalInterface {
         } catch (e) {
             throw CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The property signature '${this.#definedProperties[name].signature}' does not match its value.`)
         }
-        if (this.#definedProperties[name].setter) return this.#definedProperties[name].setter(value)
-        throw CreateDBusError('org.freedesktop.DBus.Error.PropertyReadOnly', `Property ${name} is read only`)
+        const setter: ((value: any) => Promise<void>) | undefined = this.#definedProperties[name].setter
+        if (!setter) throw CreateDBusError('org.freedesktop.DBus.Error.PropertyReadOnly', `Property ${name} is read only`)
+        await setter(value)
     }
 
     /**
@@ -611,15 +609,17 @@ export class LocalInterface {
     }
 
     /**
-     * Gets all managed properties as a record of DBusSignedValue objects.
-     * Iterates through all defined property names on this interface and retrieves their current values
-     * as DBusSignedValue instances, providing a comprehensive view of the interface's properties.
+     * Gets all readable properties as a record of DBusSignedValue objects.
+     * Iterates through the defined properties that have a getter and retrieves their current values
+     * as DBusSignedValue instances; write-only properties are left out.
      *
      * @returns A record mapping property names to their corresponding DBusSignedValue instances.
      */
     public getManagedProperties(): Record<string, DBusSignedValue> {
         const record: Record<string, DBusSignedValue> = {}
         for (const propertyName of this.propertyNames()) {
+            // Write-only properties have no value to report
+            if (!this.#definedProperties[propertyName].getter) continue
             record[propertyName] = this.getPropertySignedValue(propertyName)
         }
         return record

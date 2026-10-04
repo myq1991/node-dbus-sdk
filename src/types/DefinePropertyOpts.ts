@@ -51,8 +51,9 @@ export interface DefinePropertyOpts {
     /**
      * An optional setter function for updating the property value.
      * This function takes the new value as an argument and is called when the property is modified
-     * via DBus (e.g., through the 'Set' method), returning void synchronously. If not provided,
-     * the property is considered read-only and attempts to write to it may result in an error.
+     * via DBus (e.g., through the 'Set' method). It may return a Promise, which is awaited before the call is
+     * answered; an error it throws or rejects with is returned to the caller as a DBus error (use CreateDBusError
+     * to choose the error name). If not provided, the property is read-only.
      */
-    setter?: (value: any) => void
+    setter?: (value: any) => unknown
 }

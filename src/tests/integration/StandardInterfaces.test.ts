@@ -23,7 +23,7 @@ describe('standard interfaces of a LocalObject', {skip: !PrivateBus.available &&
     let service: LocalService
     let client: DBus
     let properties: DBusInterface
-    const state: { name: string, mode: string } = {name: 'initial', mode: 'auto'}
+    const state: { name: string, mode: string, delayed: string } = {name: 'initial', mode: 'auto', delayed: 'initial'}
 
     before(async (): Promise<void> => {
         bus = await PrivateBus.start()
@@ -31,6 +31,13 @@ describe('standard interfaces of a LocalObject', {skip: !PrivateBus.available &&
         object.addInterface(new LocalInterface(INTERFACE)
             .defineProperty({name: 'Name', type: 's', emitPropertiesChanged: true, getter: (): string => state.name, setter: (value: string): string => state.name = value})
             .defineProperty({name: 'Count', type: 'u', getter: (): number => 7})
+            .defineProperty({
+                name: 'Delayed', type: 's', emitPropertiesChanged: true, getter: (): string => state.delayed,
+                setter: async (value: string): Promise<void> => {
+                    await new Promise<void>((resolve): NodeJS.Timeout => setTimeout(resolve, 20))
+                    state.delayed = value
+                }
+            })
             .defineProperty({name: 'Mode', type: 's', emitPropertiesChanged: {emitValue: false}, getter: (): string => state.mode, setter: (value: string): string => state.mode = value}))
         service = new LocalService(SERVICE_NAME)
         service.addObject(object)
@@ -66,7 +73,7 @@ describe('standard interfaces of a LocalObject', {skip: !PrivateBus.available &&
         })
 
         it('gets all properties of the interface', async (): Promise<void> => {
-            assert.deepEqual(await call('GetAll', INTERFACE), {Name: state.name, Count: 7, Mode: state.mode})
+            assert.deepEqual(await call('GetAll', INTERFACE), {Name: state.name, Count: 7, Delayed: state.delayed, Mode: state.mode})
         })
 
         it('sets a property', async (): Promise<void> => {
@@ -90,6 +97,14 @@ describe('standard interfaces of a LocalObject', {skip: !PrivateBus.available &&
             assert.deepEqual(await changed, [INTERFACE, {Name: 'announced'}, []])
         })
 
+        it('announces the value of an asynchronous setter once it has completed', async (): Promise<void> => {
+            const changed: Promise<any[]> = nextEvent(properties.signal, 'PropertiesChanged')
+            await withTimeout(client.listNames(), 2000, 'sync')
+            await call('Set', INTERFACE, 'Delayed', 'later')
+            assert.equal(state.delayed, 'later', 'Set answered before the setter completed')
+            assert.deepEqual(await changed, [INTERFACE, {Delayed: 'later'}, []])
+        })
+
         it('announces an invalidated property without its value', async (): Promise<void> => {
             const changed: Promise<any[]> = nextEvent(properties.signal, 'PropertiesChanged')
             await withTimeout(client.listNames(), 2000, 'sync')
@@ -103,8 +118,6 @@ describe('standard interfaces of a LocalObject', {skip: !PrivateBus.available &&
     })
 
     describe('write-only properties', (): void => {
-        const WRITE_ONLY_BUG: string = 'adding an interface reads every property for InterfacesAdded, so an interface with a write-only property cannot be added'
-
         /**
          * Runs a check against a separate service exposing a write-only property next to a readable one.
          */
@@ -113,7 +126,7 @@ describe('standard interfaces of a LocalObject', {skip: !PrivateBus.available &&
             const object: LocalObject = new LocalObject(PATH)
             object.addInterface(new LocalInterface(INTERFACE)
                 .defineProperty({name: 'Visible', type: 's', getter: (): string => 'shown'})
-                .defineProperty({name: 'Secret', type: 's', setter: (value: string): string => written.secret = value}))
+                .defineProperty({name: 'Secret', type: 's', emitPropertiesChanged: true, setter: (value: string): string => written.secret = value}))
             const writeOnlyService: LocalService = new LocalService('org.example.WriteOnly')
             writeOnlyService.addObject(object)
             await withTimeout(writeOnlyService.run({busAddress: bus.address}), 3000, 'start service')
@@ -124,20 +137,29 @@ describe('standard interfaces of a LocalObject', {skip: !PrivateBus.available &&
             }
         }
 
-        it('sets a write-only property', knownBug(WRITE_ONLY_BUG), async (): Promise<void> => {
+        it('sets a write-only property', async (): Promise<void> => {
             await withWriteOnlyService(async (writeOnly: DBusInterface, written: { secret: string }): Promise<void> => {
                 await withTimeout(writeOnly.method.Set(INTERFACE, 'Secret', 'hidden'), 2000, 'Set')
                 assert.equal(written.secret, 'hidden')
             })
         })
 
-        it('rejects getting a write-only property', knownBug(WRITE_ONLY_BUG), async (): Promise<void> => {
+        it('rejects getting a write-only property', async (): Promise<void> => {
             await withWriteOnlyService(async (writeOnly: DBusInterface): Promise<void> => {
                 await assert.rejects(withTimeout(writeOnly.method.Get(INTERFACE, 'Secret'), 2000, 'Get'), {name: /^org\.freedesktop\.DBus\.Error\./})
             })
         })
 
-        it('leaves write-only properties out of GetAll', knownBug(WRITE_ONLY_BUG), async (): Promise<void> => {
+        it('announces a changed write-only property as invalidated', async (): Promise<void> => {
+            await withWriteOnlyService(async (writeOnly: DBusInterface): Promise<void> => {
+                const changed: Promise<any[]> = nextEvent(writeOnly.signal, 'PropertiesChanged')
+                await withTimeout(client.listNames(), 2000, 'sync')
+                await withTimeout(writeOnly.method.Set(INTERFACE, 'Secret', 'announced'), 2000, 'Set')
+                assert.deepEqual(await changed, [INTERFACE, {}, ['Secret']])
+            })
+        })
+
+        it('leaves write-only properties out of GetAll', async (): Promise<void> => {
             await withWriteOnlyService(async (writeOnly: DBusInterface): Promise<void> => {
                 assert.deepEqual(await withTimeout(writeOnly.method.GetAll(INTERFACE), 2000, 'GetAll'), {Visible: 'shown'})
             })

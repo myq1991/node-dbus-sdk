@@ -224,7 +224,11 @@ configured.
   implementation.
 - **`removeMethod(name: string): this`**: Removes a defined method by name.
 - **`defineProperty(opts: DefinePropertyOpts): this`**: Defines a custom property with type, access mode (read/write),
-  getter/setter functions, and optional property change signal emission.
+  getter/setter functions, and optional property change signal emission. The access mode follows from the functions
+  given: a getter only is read-only, a setter only is write-only (left out of `GetAll` and `InterfacesAdded`).
+  The setter may be `async`. `Properties.Set` waits for it before answering, and an error it throws or rejects with
+  becomes a DBus error reply. Use `CreateDBusError(name, message)` to choose the error name.
+  `PropertiesChanged` is emitted after the setter has completed.
 - **`removeProperty(name: string): this`**: Removes a defined property by name.
 - **`defineSignal(opts: DefineSignalOpts): this`**: Defines a custom signal with arguments and an associated
   `EventEmitter` for triggering.

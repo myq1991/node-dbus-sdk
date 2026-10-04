@@ -139,14 +139,14 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
             assert.equal(await withTimeout(iface.property.Label.get(), 2000, 'get Label'), 'changed')
         })
 
-        it('writes a property that does not emit PropertiesChanged', knownBug('the setter is only registered when emitPropertiesChanged is enabled'), async (): Promise<void> => {
+        it('writes a property that does not emit PropertiesChanged', async (): Promise<void> => {
             await withTimeout(iface.property.Plain.set('changed'), 2000, 'set Plain')
             assert.equal(server.state.plain, 'changed')
         })
 
         // Uses its own service: the test runner attributes an unhandled rejection to the hook or test that created
         // the service's connection, and it must land on this test rather than on the shared before() hook.
-        it('returns a validation error from an asynchronous setter to the caller', knownBug('the promise returned by a setter is discarded, so its rejection is unhandled and crashes the process'), async (): Promise<void> => {
+        it('returns a validation error from an asynchronous setter to the caller', async (): Promise<void> => {
             const validating: TestService = createTestService('org.example.Validating')
             await withTimeout(validating.service.run({busAddress: bus.address}), 5000, 'start validating service')
             try {

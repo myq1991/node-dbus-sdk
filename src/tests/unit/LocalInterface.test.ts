@@ -63,18 +63,18 @@ describe('LocalInterface', (): void => {
     })
 
     describe('properties', (): void => {
-        it('reads and writes through getter and setter', knownBug('the setter is only registered when emitPropertiesChanged is enabled'), (): void => {
+        it('reads and writes through getter and setter', async (): Promise<void> => {
             const iface: LocalInterface = createInterface()
-            iface.setProperty('Label', 'changed')
+            await iface.setProperty('Label', 'changed')
             assert.equal(iface.getProperty('Label'), 'changed')
         })
 
-        it('rejects a value that does not match the property type', (): void => {
-            assert.throws((): void => createInterface().setProperty('Label', {not: 'a string'}), {name: 'org.freedesktop.DBus.Error.InvalidArgs'})
+        it('rejects a value that does not match the property type', async (): Promise<void> => {
+            await assert.rejects(createInterface().setProperty('Label', {not: 'a string'}), {name: 'org.freedesktop.DBus.Error.InvalidArgs'})
         })
 
-        it('rejects writing a read-only property', (): void => {
-            assert.throws((): void => createInterface().setProperty('Version', 4), {name: 'org.freedesktop.DBus.Error.PropertyReadOnly'})
+        it('rejects writing a read-only property', async (): Promise<void> => {
+            await assert.rejects(createInterface().setProperty('Version', 4), {name: 'org.freedesktop.DBus.Error.PropertyReadOnly'})
         })
 
         it('rejects an unknown property', (): void => {
@@ -124,7 +124,7 @@ describe('LocalInterface', (): void => {
             assert.deepEqual(unhandled, [])
         })
 
-        it('surfaces errors from an asynchronous setter instead of leaving them unhandled', knownBug('the promise returned by a setter is discarded, so its rejection is unhandled and crashes the process'), async (): Promise<void> => {
+        it('surfaces errors from an asynchronous setter instead of leaving them unhandled', async (): Promise<void> => {
             const {iface} = createValidatingInterface()
             const {result, unhandled} = await catchUnhandledRejections(async (): Promise<void> => iface.setProperty('AsyncChecked', 'invalid'))
             assert.deepEqual(unhandled, [])
@@ -132,7 +132,7 @@ describe('LocalInterface', (): void => {
             assert.equal((result as PromiseRejectedResult).reason.name, 'org.example.Error.Invalid')
         })
 
-        it('completes an asynchronous setter before reporting success', knownBug('the promise returned by a setter is discarded, so the value is not yet applied when Set returns'), async (): Promise<void> => {
+        it('completes an asynchronous setter before reporting success', async (): Promise<void> => {
             const {iface, state} = createValidatingInterface()
             await iface.setProperty('AsyncChecked', 'valid')
             assert.equal(state.value, 'valid')
@@ -140,7 +140,7 @@ describe('LocalInterface', (): void => {
     })
 
     describe('write-only properties', (): void => {
-        it('can be added to an object', knownBug('adding an interface reads every property for InterfacesAdded, so an interface with a write-only property cannot be added'), (): void => {
+        it('can be added to an object', (): void => {
             const iface: LocalInterface = new LocalInterface('org.example.WriteOnly').defineProperty({name: 'Secret', type: 's', setter: (): void => undefined})
             assert.doesNotThrow((): boolean => new LocalObject('/org/example/WriteOnly').addInterface(iface))
         })

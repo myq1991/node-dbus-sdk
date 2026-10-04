@@ -121,13 +121,12 @@ export class PropertiesInterface extends LocalInterface {
     protected async set(interfaceName: string, propertyName: string, value: any): Promise<void> {
         const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
         if (!targetInterface) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownInterface', `Interface ${interfaceName} not found`)
-        targetInterface.setProperty(propertyName, value)
+        await targetInterface.setProperty(propertyName, value)
     }
 
     /**
-     * Retrieves all properties of the specified interface as a key-value map.
-     * Iterates through all property names of the target interface, retrieves their values using the `get` method,
-     * and constructs a single record of property names and values. Returns an empty object if the interface is not found.
+     * Retrieves all readable properties of the specified interface as a key-value map.
+     * Write-only properties are left out. Returns an empty object if the interface is not found.
      *
      * @param interfaceName - The name of the interface to retrieve properties from (e.g., 'org.example.Interface').
      * @returns A Promise resolving to a record (object) mapping property names to their values.
@@ -135,20 +134,8 @@ export class PropertiesInterface extends LocalInterface {
     protected async getAll(interfaceName: string): Promise<Record<string, any>> {
         const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
         if (!targetInterface) return {}
-        const rawValues: Record<string, any>[] = await Promise.all(targetInterface.propertyNames().map((propertyName: string): Promise<Record<string, any>> => {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    const resultObject: Record<string, any> = {}
-                    resultObject[propertyName] = await this.get(interfaceName, propertyName)
-                    return resolve(resultObject)
-                } catch (e) {
-                    return reject(e)
-                }
-            })
-        }))
-        let result: Record<string, any> = {}
-        rawValues.forEach((rawValue: Record<string, any>): Record<string, any> => result = Object.assign(result, rawValue))
-        return result
+        // Readable properties only: a write-only property has no value and must not make the whole call fail
+        return targetInterface.getManagedProperties()
     }
 
     /**
