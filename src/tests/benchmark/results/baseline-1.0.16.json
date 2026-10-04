@@ -1,0 +1,538 @@
+{
+  "label": "baseline-1.0.16",
+  "date": "2026-10-04T07:34:42.420Z",
+  "environment": {
+    "library": "dbus-sdk@1.0.16",
+    "commit": "bbd9fe4",
+    "node": "v24.11.1",
+    "platform": "darwin 27.0.0 arm64",
+    "cpu": "Apple M4 × 10",
+    "memory": "32 GiB",
+    "dbusDaemon": "D-Bus Message Bus Daemon 1.16.2"
+  },
+  "outcomes": [
+    {
+      "group": "codec",
+      "name": "method call arguments (su) [28 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 0.875,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 2.084,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 0.458,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 1,
+          "unit": "µs",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "PropertiesChanged (sa{sv}as) [148 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 5.25,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 8.542,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 3.542,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 6.666,
+          "unit": "µs",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "GetManagedObjects, 200 objects [50408 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 2671.417,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 4073.334,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 1470.458,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 1944.5,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode throughput": {
+          "value": 17.995249315777453,
+          "unit": "MiB/s",
+          "better": "higher"
+        },
+        "decode throughput": {
+          "value": 32.69240939993271,
+          "unit": "MiB/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "ay 1 KiB [1028 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 152.042,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 188.75,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 71.833,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 86,
+          "unit": "µs",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "ay 16 KiB [16388 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 11139.25,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 11845.917,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 1889.125,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 2744.208,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode throughput": {
+          "value": 1.403040123640786,
+          "unit": "MiB/s",
+          "better": "higher"
+        },
+        "decode throughput": {
+          "value": 8.2730442386108,
+          "unit": "MiB/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "ay 256 KiB [262148 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 2189825.4590000003,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 2212705.583,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 35167.5,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 37468.459,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode throughput": {
+          "value": 0.11416609194571685,
+          "unit": "MiB/s",
+          "better": "higher"
+        },
+        "decode throughput": {
+          "value": 7.108944755733721,
+          "unit": "MiB/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "as 1000 strings [15601 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 945.2909999999999,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 2203.375,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 115.834,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 135.75,
+          "unit": "µs",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "as 10000 strings [159602 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 72114.834,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 75297.45800000001,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 1833.5,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 4039.0829999999996,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode throughput": {
+          "value": 2.110638266838003,
+          "unit": "MiB/s",
+          "better": "higher"
+        },
+        "decode throughput": {
+          "value": 83.0151776640689,
+          "unit": "MiB/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "a{si} 1000 entries [16008 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 1239.375,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 2695.291,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 27504.834,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 29140.042,
+          "unit": "µs",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "a{si} 4000 entries [88004 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 34725.25,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode p95": {
+          "value": 35057.541,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 1092227.834,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode p95": {
+          "value": 1100912.7920000001,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode throughput": {
+          "value": 2.4168912978600767,
+          "unit": "MiB/s",
+          "better": "higher"
+        },
+        "decode throughput": {
+          "value": 0.07684033672137275,
+          "unit": "MiB/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "complete method call message (header + sa{sv}) [212 bytes]",
+      "metrics": {
+        "encode median": {
+          "value": 8.958,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "decode median": {
+          "value": 5.791,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "encode rate": {
+          "value": 111632.06072784103,
+          "unit": "messages/s",
+          "better": "higher"
+        },
+        "decode rate": {
+          "value": 172681.7475392851,
+          "unit": "messages/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "codec",
+      "name": "signature parsing (a{oa{sa{sv}}}(ia{s(xv)})as)",
+      "metrics": {
+        "parse median": {
+          "value": 0.5,
+          "unit": "µs",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "method call latency, sequential Add(ii) → i, 2000 calls",
+      "metrics": {
+        "p50": {
+          "value": 67.083,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "p95": {
+          "value": 101.08300000000001,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "p99": {
+          "value": 157.125,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "rate": {
+          "value": 14906.906369721091,
+          "unit": "calls/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "method call throughput, 10000 Add calls, 16 in flight",
+      "metrics": {
+        "rate": {
+          "value": 77621.04415797553,
+          "unit": "calls/s",
+          "better": "higher"
+        },
+        "total": {
+          "value": 128.831042,
+          "unit": "ms",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "method call throughput, 10000 Add calls, 128 in flight",
+      "metrics": {
+        "rate": {
+          "value": 86842.83917656245,
+          "unit": "calls/s",
+          "better": "higher"
+        },
+        "total": {
+          "value": 115.150542,
+          "unit": "ms",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "property get latency, 1000 Properties.Get calls",
+      "metrics": {
+        "p50": {
+          "value": 63.917,
+          "unit": "µs",
+          "better": "lower"
+        },
+        "p95": {
+          "value": 89.291,
+          "unit": "µs",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "payload round trip, EchoBytes(ay) 1 KiB",
+      "metrics": {
+        "median": {
+          "value": 0.776375,
+          "unit": "ms",
+          "better": "lower"
+        },
+        "throughput": {
+          "value": 2.515697955240702,
+          "unit": "MiB/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "payload round trip, EchoBytes(ay) 64 KiB",
+      "metrics": {
+        "median": {
+          "value": 476.3835,
+          "unit": "ms",
+          "better": "lower"
+        },
+        "throughput": {
+          "value": 0.2623936387385373,
+          "unit": "MiB/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "payload round trip, EchoBytes(ay) 256 KiB",
+      "metrics": {
+        "median": {
+          "value": 7517.06325,
+          "unit": "ms",
+          "better": "lower"
+        },
+        "throughput": {
+          "value": 0.06651533762204276,
+          "unit": "MiB/s",
+          "better": "higher"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "payload round trip, EchoDict(a{sv}) 1000 entries",
+      "metrics": {
+        "median": {
+          "value": 67.54325,
+          "unit": "ms",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "signal throughput, 20000 signals from service to client",
+      "metrics": {
+        "rate": {
+          "value": 143057.29534089213,
+          "unit": "signals/s",
+          "better": "higher"
+        },
+        "total": {
+          "value": 139.804125,
+          "unit": "ms",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "connection setup: connect, getInterface, first call, disconnect",
+      "metrics": {
+        "median": {
+          "value": 1.161083,
+          "unit": "ms",
+          "better": "lower"
+        },
+        "p95": {
+          "value": 2.912542,
+          "unit": "ms",
+          "better": "lower"
+        }
+      }
+    },
+    {
+      "group": "bus",
+      "name": "memory retained per 1000 calls (after 20000 sequential calls and GC)",
+      "metrics": {
+        "heap growth": {
+          "value": 369.369140625,
+          "unit": "KiB",
+          "better": "lower"
+        }
+      }
+    }
+  ]
+}
