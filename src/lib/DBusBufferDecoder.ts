@@ -703,21 +703,22 @@ export class DBusBufferDecoder {
      * @throws {SignatureError} If the signature is empty or invalid.
      */
     public toSignedValues(signature: string): DBusTypeClass[] {
-        // Parse the signature string into an array of DataType objects
-        const dataTypes: DataType[] = Signature.parseSignature(signature)
+        return this.readValues(signature).map((value: DBusSignedValue): DBusTypeClass => SignedValueToTypeClassInstance(value))
+    }
 
-        // Validate that the signature is not empty
+    /**
+     * Reads one value per complete type of the signature.
+     *
+     * @param signature - The signature of the values to read.
+     * @returns The values read.
+     * @throws {SignatureError} If the signature is empty or invalid.
+     */
+    protected readValues(signature: string): DBusSignedValue[] {
+        const dataTypes: DataType[] = Signature.parseSignature(signature)
         if (dataTypes.length === 0) {
             throw new SignatureError('Empty signature provided')
         }
-
-        // Read each value based on its corresponding DataType
-        const results: DBusTypeClass[] = []
-        for (const dataType of dataTypes) {
-            const value: DBusSignedValue = this.readSignedValue(dataType)
-            results.push(SignedValueToTypeClassInstance(value))
-        }
-        return results
+        return dataTypes.map((dataType: DataType): DBusSignedValue => this.readSignedValue(dataType))
     }
 
     /**
@@ -731,6 +732,7 @@ export class DBusBufferDecoder {
      */
     public decode(signature: string, typed: boolean = false): any[] {
         // Read values as DBusSignedValue instances and convert them based on the typed parameter
-        return typed ? this.toSignedValues(signature) : DBusSignedValue.toJSON(this.toSignedValues(signature) as any)
+        // Plain values come straight from the decoded values; only typed results need DBusTypeClass instances
+        return typed ? this.toSignedValues(signature) : DBusSignedValue.toJSON(this.readValues(signature))
     }
 }
