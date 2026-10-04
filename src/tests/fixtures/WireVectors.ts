@@ -26,9 +26,6 @@ export interface WireVector {
     decodeBug?: string
 }
 
-const ARRAY_PADDING_BUG: string = 'array content of 8-byte aligned element types is not padded to 8 after the length field'
-const NESTED_ALIGNMENT_BUG: string = 'array content is aligned relative to the array start instead of the message start'
-const VARIANT_ARGUMENT_BUG: string = 'a DBusSignedValue passed for a top-level variant in a multi-argument signature is written without the variant signature'
 
 /**
  * Wire-format vectors derived from the DBus specification (alignment, padding, length fields),
@@ -65,12 +62,12 @@ export const WireVectors: WireVector[] = [
     {signature: 'ay', args: [[1, 2, 3]], wire: hex('03000000 010203'), decoded: [Buffer.from([1, 2, 3])]},
     {signature: 'ai', args: [[1, 2]], wire: hex('08000000 01000000 02000000')},
     {signature: 'as', args: [['a', 'bc']], wire: hex('0f000000 01000000 6100 0000 02000000 626300')},
-    {signature: 'ax', args: [[1n]], wire: hex('08000000 00000000 0100000000000000'), encodeBug: ARRAY_PADDING_BUG, decodeBug: ARRAY_PADDING_BUG},
-    {signature: 'ad', args: [[1]], wire: hex('08000000 00000000 000000000000f03f'), encodeBug: ARRAY_PADDING_BUG, decodeBug: ARRAY_PADDING_BUG},
-    {signature: 'ax', args: [[]], wire: hex('00000000 00000000'), encodeBug: ARRAY_PADDING_BUG},
+    {signature: 'ax', args: [[1n]], wire: hex('08000000 00000000 0100000000000000')},
+    {signature: 'ad', args: [[1]], wire: hex('08000000 00000000 000000000000f03f')},
+    {signature: 'ax', args: [[]], wire: hex('00000000 00000000')},
     {signature: 'a(ii)', args: [[[1, 2]]], wire: hex('08000000 00000000 01000000 02000000')},
     {signature: 'aax', args: [[[1n]]], wire: hex('0c000000 08000000 0100000000000000')},
-    {signature: 'yaax', args: [1, [[1n]]], wire: hex('01000000 10000000 08000000 00000000 0100000000000000'), encodeBug: NESTED_ALIGNMENT_BUG, decodeBug: NESTED_ALIGNMENT_BUG},
+    {signature: 'yaax', args: [1, [[1n]]], wire: hex('01000000 10000000 08000000 00000000 0100000000000000')},
 
     // Dictionaries
     {signature: 'a{sv}', args: [{a: 1}], wire: hex('10000000 00000000 01000000 6100 016900 000000 01000000')},
@@ -84,8 +81,8 @@ export const WireVectors: WireVector[] = [
     {signature: 'v', args: [1.5], wire: hex('01 6400 0000000000 000000000000f83f')},
     {signature: 'v', args: [new DBusSignedValue('u', 7)], wire: hex('01 7500 00 07000000'), decoded: [7]},
     {signature: '(yv)', args: [[1, 1n]], wire: hex('01 017800 00000000 0100000000000000')},
-    {signature: 'av', args: [[1n]], wire: hex('0c000000 017800 00 0100000000000000'), encodeBug: NESTED_ALIGNMENT_BUG, decodeBug: NESTED_ALIGNMENT_BUG},
-    {signature: 'sv', args: ['a', new DBusSignedValue('u', 7)], wire: hex('01000000 6100 017500 000000 07000000'), decoded: ['a', 7], encodeBug: VARIANT_ARGUMENT_BUG},
-    {signature: 'sv', args: ['a', new DBusUint32(7)], wire: hex('01000000 6100 017500 000000 07000000'), decoded: ['a', 7], encodeBug: VARIANT_ARGUMENT_BUG},
+    {signature: 'av', args: [[1n]], wire: hex('0c000000 017800 00 0100000000000000')},
+    {signature: 'sv', args: ['a', new DBusSignedValue('u', 7)], wire: hex('01000000 6100 017500 000000 07000000'), decoded: ['a', 7]},
+    {signature: 'sv', args: ['a', new DBusUint32(7)], wire: hex('01000000 6100 017500 000000 07000000'), decoded: ['a', 7]},
     {signature: 'ssv', args: ['a', 'b', 'c'], wire: hex('01000000 6100 0000 01000000 6200 017300 000000 01000000 6300')}
 ]

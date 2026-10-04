@@ -7,6 +7,13 @@ import {DBusTypeClass} from './DBusTypeClass'
 import {SignedValueToTypeClassInstance} from './SignedValueToTypeClassInstance'
 
 /**
+ * Alignment in bytes of each DBus type code, per the DBus specification.
+ */
+const ALIGNMENT: Record<string, number> = {
+    y: 1, b: 4, n: 2, q: 2, i: 4, u: 4, x: 8, t: 8, d: 8, h: 4, s: 4, o: 4, g: 1, a: 4, '(': 8, '{': 8, v: 1
+}
+
+/**
  * A decoder for reading DBus data from a binary buffer, following the DBus wire format.
  * Supports various DBus data types with proper alignment and endianness handling.
  * This class provides methods to decode basic types (e.g., integers, strings) and
@@ -462,37 +469,25 @@ export class DBusBufferDecoder {
      */
     public readArray(elementType: DataType): DBusSignedValue {
         this.align(4) // Ensure 4-byte alignment for the length field
-        // Check if there is enough data in the buffer to read the length field (4 bytes)
         if (this.offset + 4 > this.buffer.length) {
             throw new ReadBufferError(`Cannot read ARRAY length: offset ${this.offset} exceeds buffer length ${this.buffer.length}`)
         }
-        // Read the byte length of the array data (32-bit unsigned integer)
-        let byteLength: number
-        if (this.endianness === DBusMessageEndianness.LE) {
-            byteLength = this.buffer.readUInt32LE(this.offset) // Read length as little-endian
-        } else {
-            byteLength = this.buffer.readUInt32BE(this.offset) // Read length as big-endian
+        const byteLength: number = this.endianness === DBusMessageEndianness.LE ? this.buffer.readUInt32LE(this.offset) : this.buffer.readUInt32BE(this.offset)
+        this.offset += 4
+        // The elements start at the element type's alignment (also for empty arrays); the padding is not counted in
+        // the length. Alignment is relative to the start of the data, like every other value.
+        this.align(ALIGNMENT[elementType.type] || 1)
+        const arrayEndOffset: number = this.offset + byteLength
+        if (arrayEndOffset > this.buffer.length) {
+            throw new ReadBufferError(`Cannot read ARRAY content: ${byteLength} bytes at offset ${this.offset} exceed buffer length ${this.buffer.length}`)
         }
-        this.offset += 4 // Increment offset by 4 bytes for length field
-        switch (elementType.type) {
-            case '{':
-            case '(':
-                this.align(8) // Special case: dictionary entries require 8-byte alignment
-        }
-        // Calculate the end offset of the array data
-        const arrayEndOffset = this.offset + byteLength
-        // Extract a sub-buffer for the array data to isolate reading
-        const arrayBuffer = this.buffer.subarray(this.offset, arrayEndOffset)
-        // Create a new decoder instance for the array sub-buffer to manage local offset
-        const arrayDecoder = new DBusBufferDecoder(this.endianness, arrayBuffer, 0, this.convertBigIntToNumber)
         const elements: DBusSignedValue[] = []
-        // Read elements until the sub-buffer is fully consumed
-        while (arrayDecoder.offset < arrayBuffer.length) {
-            const element = arrayDecoder.readSignedValue(elementType) // Recursively read each element
-            elements.push(element)
+        while (this.offset < arrayEndOffset) {
+            elements.push(this.readSignedValue(elementType)) // Recursively read each element
         }
-        // Update the main offset to the end of the array data
-        this.offset = arrayEndOffset
+        if (this.offset !== arrayEndOffset) {
+            throw new ReadBufferError(`ARRAY elements end at offset ${this.offset}, but its length says ${arrayEndOffset}`)
+        }
         return new DBusSignedValue({type: 'a', child: [elementType]}, elements)
     }
 

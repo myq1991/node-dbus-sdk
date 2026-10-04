@@ -43,9 +43,7 @@ export const LibdbusMessages: LibdbusMessageFixture[] = [
         command: 'dbus-send --type=signal /test test.Golden.Arrays array:int64:1,2 array:double:0.5 array:string:x,yz array:byte:1,2,3',
         signature: 'axadasay',
         raw: hex('6c04010143000000020000005500000001016f00050000002f74657374000000020173000b000000746573742e476f6c64656e0000000000030173000600000041727261797300000801670008617861646173617900000007017300040000003a312e32000000001000000000000000010000000000000002000000000000000800000000000000000000000000e03f0f000000010000007800000002000000797a000003000000010203'),
-        body: [[1n, 2n], [0.5], ['x', 'yz'], Buffer.from([1, 2, 3])],
-        encodeBug: 'array content of 8-byte aligned element types is not padded to 8 after the length field',
-        decodeBug: 'array content of 8-byte aligned element types is not padded to 8 after the length field'
+        body: [[1n, 2n], [0.5], ['x', 'yz'], Buffer.from([1, 2, 3])]
     },
     {
         name: 'dictionary and variant',

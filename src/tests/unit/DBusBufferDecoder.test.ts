@@ -57,15 +57,15 @@ describe('DBusBufferDecoder', (): void => {
             assert.deepEqual(roundTrip('a(si)', [[['a', 1], ['b', 2]]]), [[['a', 1], ['b', 2]]])
         })
 
-        it('keeps each dictionary separate in aa{sv}', knownBug('arrays whose first element is an object are merged into one object'), (): void => {
+        it('keeps each dictionary separate in aa{sv}', (): void => {
             assert.deepEqual(roundTrip('aa{sv}', [[{a: 1}, {b: 2}]]), [[{a: 1}, {b: 2}]])
         })
 
-        it('keeps each buffer separate in aay', knownBug('arrays whose first element is an object are merged into one object'), (): void => {
+        it('keeps each buffer separate in aay', (): void => {
             assert.deepEqual(roundTrip('aay', [[Buffer.from([1]), Buffer.from([2])]]), [[Buffer.from([1]), Buffer.from([2])]])
         })
 
-        it('keeps each dictionary separate in av', knownBug('arrays whose first element is an object are merged into one object'), (): void => {
+        it('keeps each dictionary separate in av', (): void => {
             assert.deepEqual(roundTrip('av', [[{a: 1}, {b: 2}]]), [[{a: 1}, {b: 2}]])
         })
 

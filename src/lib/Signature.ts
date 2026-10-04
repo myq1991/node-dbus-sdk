@@ -184,4 +184,43 @@ export class Signature {
         // All checks passed, signatures are compatible
         return true
     }
+
+    /**
+     * Converts a parsed type back into its signature string, e.g. {type: 'a', child: [{type: 's'}]} into 'as'.
+     *
+     * @param dataType - A complete type (see isComplete).
+     * @returns The signature of the type.
+     */
+    public static stringify(dataType: DataType): string {
+        const children: string = (dataType.child || []).map((child: DataType): string => Signature.stringify(child)).join('')
+        switch (dataType.type) {
+            case '(':
+                return `(${children})`
+            case '{':
+                return `{${children}}`
+            default:
+                return `${dataType.type}${children}`
+        }
+    }
+
+    /**
+     * Whether a parsed type carries its full structure: every container lists its child types
+     * (one for arrays, two for dict entries, at least one for structs).
+     *
+     * @param dataType - The type to check.
+     * @returns True if stringify() reproduces the full signature.
+     */
+    public static isComplete(dataType: DataType): boolean {
+        const children: DataType[] = dataType.child || []
+        switch (dataType.type) {
+            case 'a':
+                return children.length === 1 && Signature.isComplete(children[0])
+            case '{':
+                return children.length === 2 && children.every(Signature.isComplete)
+            case '(':
+                return children.length > 0 && children.every(Signature.isComplete)
+            default:
+                return children.length === 0
+        }
+    }
 }

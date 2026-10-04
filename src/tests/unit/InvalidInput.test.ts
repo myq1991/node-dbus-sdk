@@ -94,6 +94,11 @@ interface MalformedInput {
     signature: string
     wire: Buffer
     label: string
+    /**
+     * Required message of the error, when the input is also malformed in a less specific way that would be
+     * rejected anyway (the 64 MiB array cannot be provided in full, so its length also exceeds the data).
+     */
+    reason?: RegExp
     bug?: string
 }
 
@@ -101,8 +106,8 @@ interface MalformedInput {
  * Malformed wire data the decoder must reject rather than misread.
  */
 const MALFORMED_INPUTS: MalformedInput[] = [
-    {signature: 'ai', wire: hex('08000000 01000000'), label: 'array length beyond the end of the data', bug: 'an array length beyond the data is silently truncated'},
-    {signature: 'ay', wire: hex('01000004 00'), label: 'array longer than the 64 MiB maximum', bug: 'array lengths are not checked against the 64 MiB maximum'},
+    {signature: 'ai', wire: hex('08000000 01000000'), label: 'array length beyond the end of the data'},
+    {signature: 'ay', wire: hex('01000004 00'), label: 'array longer than the 64 MiB maximum', reason: /64 MiB|maximum|67108864/, bug: 'array lengths are not checked against the 64 MiB maximum'},
     {signature: 's', wire: hex('02000000 ff fe 00'), label: 'string that is not valid UTF-8', bug: 'invalid UTF-8 is replaced with U+FFFD instead of rejected'},
     {signature: 's', wire: hex('03000000 61 00 62 00'), label: 'string containing NUL', bug: 'strings containing NUL are accepted'},
     {signature: 'o', wire: hex('01000000 61 00'), label: 'invalid object path', bug: 'OBJECT_PATH values are not validated when decoding'},
@@ -137,7 +142,7 @@ describe('invalid input', (): void => {
     describe('decoder rejects malformed data', (): void => {
         for (const malformed of MALFORMED_INPUTS) {
             it(`${malformed.signature}: ${malformed.label}`, malformed.bug ? knownBug(malformed.bug) : {}, (): void => {
-                assert.throws((): any[] => new DBusBufferDecoder(DBusMessageEndianness.LE, malformed.wire).decode(malformed.signature))
+                assert.throws((): any[] => new DBusBufferDecoder(DBusMessageEndianness.LE, malformed.wire).decode(malformed.signature), malformed.reason || Error)
             })
         }
     })

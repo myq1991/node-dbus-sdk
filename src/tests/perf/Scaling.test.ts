@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import {DBusBufferEncoder} from '../../lib/DBusBufferEncoder'
 import {DBusBufferDecoder} from '../../lib/DBusBufferDecoder'
 import {DBusMessageEndianness} from '../../lib/enums/DBusMessageEndianness'
-import {knownBug} from '../helpers/KnownBug'
 
 /**
  * Inputs grow by this factor between the small and the large measurement.
@@ -65,15 +64,15 @@ function dictionary(n: number): Record<string, number> {
 }
 
 describe('encoding scales linearly with payload size', (): void => {
-    it('ay', knownBug('every write concatenates the whole buffer (Buffer.concat per value)'), (t: TestContext): void => {
+    it('ay', (t: TestContext): void => {
         assertLinear(t, 8 * 1024, (n: number): () => Buffer => encoder('ay', Buffer.alloc(n, 7)))
     })
 
-    it('as', knownBug('every write concatenates the whole buffer (Buffer.concat per value)'), (t: TestContext): void => {
+    it('as', (t: TestContext): void => {
         assertLinear(t, 2000, (n: number): () => Buffer => encoder('as', strings(n)))
     })
 
-    it('a{si}', knownBug('every write concatenates the whole buffer (Buffer.concat per value)'), (t: TestContext): void => {
+    it('a{si}', (t: TestContext): void => {
         assertLinear(t, 500, (n: number): () => Buffer => encoder('a{si}', dictionary(n)))
     })
 })
@@ -87,7 +86,7 @@ describe('decoding scales linearly with payload size', (): void => {
         assertLinear(t, 2000, (n: number): () => any[] => decoder('as', strings(n)))
     })
 
-    it('a{si}', knownBug('dictionary entries are merged with object spread, copying all previous keys each time'), (t: TestContext): void => {
+    it('a{si}', (t: TestContext): void => {
         assertLinear(t, 500, (n: number): () => any[] => decoder('a{si}', dictionary(n)))
     })
 })

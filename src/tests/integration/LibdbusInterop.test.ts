@@ -63,21 +63,21 @@ describe('interoperability with libdbus', {skip: !PrivateBus.available && 'dbus-
             assert.match(reply, /variant\s+uint32 3/)
         })
 
-        it('passes an int64 array', knownBug('array content of 8-byte aligned element types is not padded to 8 after the length field'), async (): Promise<void> => {
+        it('passes an int64 array', async (): Promise<void> => {
             const reply: string = await call('EchoInt64Array', 'array:int64:1,2')
             assert.match(reply, /int64 1\s+int64 2/)
         })
     })
 
     describe('library client through the validating daemon', (): void => {
-        it('sends an int64 array', knownBug('array content of 8-byte aligned element types is not padded to 8 after the length field'), async (): Promise<void> => {
+        it('sends an int64 array', async (): Promise<void> => {
             const iface: DBusInterface = await withTimeout(client.getInterface(serviceName, TEST_OBJECT_PATH, TEST_INTERFACE), 2000, 'get interface')
             assert.deepEqual(await withTimeout(iface.method.EchoInt64Array([1n, 2n]), 2000, 'EchoInt64Array'), [1n, 2n])
         })
     })
 
     describe('library client passing explicit variant values', (): void => {
-        it('sets a property passing a DBusSignedValue for the variant argument', knownBug('a DBusSignedValue passed for a top-level variant in a multi-argument signature is written without the variant signature'), async (): Promise<void> => {
+        it('sets a property passing a DBusSignedValue for the variant argument', async (): Promise<void> => {
             await withTimeout(client.invoke({
                 service: serviceName,
                 objectPath: TEST_OBJECT_PATH,

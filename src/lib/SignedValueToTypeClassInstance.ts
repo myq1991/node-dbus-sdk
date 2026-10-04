@@ -39,6 +39,13 @@ const typeClassConstructors: (typeof DBusTypeClass)[] = [
  * @throws {SignatureError} If the type signature of the input value is unknown or unsupported.
  */
 export function SignedValueToTypeClassInstance(value: DBusSignedValue): DBusTypeClass {
+    const instance: DBusTypeClass = toTypeClassInstance(value)
+    // Keep the complete type of an empty array (e.g. 'a{sv}'), which the type classes cannot express themselves
+    if (value.$signature === 'a') DBusSignedValue.setDataType(instance, DBusSignedValue.dataTypeOf(value))
+    return instance
+}
+
+function toTypeClassInstance(value: DBusSignedValue): DBusTypeClass {
     const signature = value.$signature
     // Handle basic types with direct mapping to DBusTypeClass-derived classes
     switch (signature) {
