@@ -1,3 +1,4 @@
+import {IntrospectAnnotation} from './IntrospectAnnotation'
 import {IntrospectMethod} from './IntrospectMethod'
 import {IntrospectProperty} from './IntrospectProperty'
 import {IntrospectSignal} from './IntrospectSignal'
@@ -30,4 +31,9 @@ export interface IntrospectInterface {
      * Each signal contains metadata such as its name and arguments for introspection purposes.
      */
     signal: IntrospectSignal[]
+
+    /**
+     * Annotations, if any.
+     */
+    annotation?: IntrospectAnnotation[]
 }

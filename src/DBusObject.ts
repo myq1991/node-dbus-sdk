@@ -10,8 +10,19 @@ import {IntrospectProperty} from './types/IntrospectProperty'
 import {IntrospectSignal} from './types/IntrospectSignal'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
+import {IntrospectAnnotation} from './types/IntrospectAnnotation'
 import {InterfaceNotFoundError} from './lib/Errors'
 import {DBusTypeClass} from './lib/DBusTypeClass'
+
+/**
+ * Copies the <annotation> children of a parsed introspection XML element, if any, onto its introspection entry.
+ */
+function withAnnotations<T extends { annotation?: IntrospectAnnotation[] }>(entry: T, element: any): T {
+    if (Array.isArray(element?.annotation) && element.annotation.length) {
+        entry.annotation = element.annotation.map((annotation: any): IntrospectAnnotation => ({name: annotation.$.name, value: annotation.$.value}))
+    }
+    return entry
+}
 
 export class DBusObject {
 
@@ -98,10 +109,10 @@ export class DBusObject {
                                     type: methodArgInfo.$.type,
                                     direction: methodArgInfo.$.direction
                                 }
-                                return introspectMethodArgument
+                                return withAnnotations(introspectMethodArgument, methodArgInfo)
                             })
                         }
-                        return introspectMethod
+                        return withAnnotations(introspectMethod, methodInfo)
                     }),
                     property: property.map(propertyInfo => {
                         const introspectProperty: IntrospectProperty = {
@@ -109,7 +120,7 @@ export class DBusObject {
                             type: propertyInfo.$.type,
                             access: propertyInfo.$.access
                         }
-                        return introspectProperty
+                        return withAnnotations(introspectProperty, propertyInfo)
                     }),
                     signal: signal.map(signalInfo => {
                         const arg: any[] = signalInfo.arg ? signalInfo.arg : []
@@ -120,13 +131,13 @@ export class DBusObject {
                                     name: signalArgInfo.$.name,
                                     type: signalArgInfo.$.type
                                 }
-                                return introspectSignalArgument
+                                return withAnnotations(introspectSignalArgument, signalArgInfo)
                             })
                         }
-                        return introspectSignal
+                        return withAnnotations(introspectSignal, signalInfo)
                     })
                 }
-                return introspectInterface
+                return withAnnotations(introspectInterface, interfaceInfo)
             })
         }
     }

@@ -14,6 +14,12 @@ export interface DefineMethodArgumentOpts {
      * This is a string representing the data type of the argument (e.g., 's' for string, 'i' for integer).
      */
     type: string
+
+    /**
+     * Annotations to publish in the introspection data, as name → value,
+     * e.g. {'org.freedesktop.DBus.Deprecated': 'true'}.
+     */
+    annotations?: Record<string, string>
 }
 
 /**
@@ -52,4 +58,10 @@ export interface DefineMethodOpts {
      * When the method is called directly through LocalInterface.callMethod, there is no call and the context is undefined.
      */
     withContext?: boolean
+
+    /**
+     * Annotations to publish in the introspection data, as name → value,
+     * e.g. {'org.freedesktop.DBus.Deprecated': 'true'}.
+     */
+    annotations?: Record<string, string>
 }

@@ -1,3 +1,4 @@
+import {IntrospectAnnotation} from './IntrospectAnnotation'
 import {DBusPropertyAccess} from '../lib/enums/DBusPropertyAccess'
 
 /**
@@ -23,4 +24,9 @@ export interface IntrospectProperty {
      * It uses the DBusPropertyAccess enum or type to define the access level.
      */
     access: DBusPropertyAccess
+
+    /**
+     * Annotations, if any.
+     */
+    annotation?: IntrospectAnnotation[]
 }

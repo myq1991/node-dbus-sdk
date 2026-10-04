@@ -1,3 +1,5 @@
+import {IntrospectAnnotation} from './IntrospectAnnotation'
+
 /**
  * Interface defining the structure of introspection data for a DBus method argument.
  * Used to describe an argument of a method on a DBus interface during introspection.
@@ -20,4 +22,9 @@ export interface IntrospectMethodArgument {
      * Indicates whether the argument is an input ('in') or output ('out') parameter for the method.
      */
     direction: string
+
+    /**
+     * Annotations, if any.
+     */
+    annotation?: IntrospectAnnotation[]
 }

@@ -7,6 +7,17 @@ import {IntrospectProperty} from '../../types/IntrospectProperty'
 import {IntrospectSignal} from '../../types/IntrospectSignal'
 import {IntrospectMethodArgument} from '../../types/IntrospectMethodArgument'
 import {IntrospectSignalArgument} from '../../types/IntrospectSignalArgument'
+import {IntrospectAnnotation} from '../../types/IntrospectAnnotation'
+
+/**
+ * Adds <annotation name="..." value="..."/> children to an element of the introspection XML.
+ */
+function withAnnotations<T extends Record<string, any>>(element: T, annotations?: IntrospectAnnotation[]): T {
+    if (annotations?.length) {
+        (element as Record<string, any>).annotation = annotations.map((annotation: IntrospectAnnotation): Record<string, any> => ({$: {name: annotation.name, value: annotation.value}}))
+    }
+    return element
+}
 
 /**
  * A class representing the DBus Introspectable interface.
@@ -95,15 +106,15 @@ export class IntrospectableInterface extends LocalInterface {
                             type: introspectMethodArgument.type           // DBus type signature (e.g., 's', 'i')
                         }
                         if (introspectMethodArgument.name) xmlMethodArgObject.name = introspectMethodArgument.name
-                        return {
+                        return withAnnotations({
                             $: xmlMethodArgObject // XML attributes for the argument
-                        }
+                        }, introspectMethodArgument.annotation)
                     })
                     const xmlMethodObject: Record<string, any> = {
                         $: {name: introspectMethod.name} // XML attribute for method name
                     }
                     if (args.length) xmlMethodObject.arg = args // Include arguments if any
-                    return xmlMethodObject
+                    return withAnnotations(xmlMethodObject, introspectMethod.annotation)
                 })
 
                 // Map properties of the interface to XML structure
@@ -115,7 +126,7 @@ export class IntrospectableInterface extends LocalInterface {
                             access: introspectProperty.access // Access mode ('read', 'write', 'readwrite')
                         }
                     }
-                    return xmlPropertyObject
+                    return withAnnotations(xmlPropertyObject, introspectProperty.annotation)
                 })
 
                 // Map signals of the interface to XML structure
@@ -125,15 +136,15 @@ export class IntrospectableInterface extends LocalInterface {
                             type: introspectSignalArgument.type // DBus type signature
                         }
                         if (introspectSignalArgument.name) xmlSignalArgObject.name = introspectSignalArgument.name
-                        return {
+                        return withAnnotations({
                             $: xmlSignalArgObject // XML attributes for the argument
-                        }
+                        }, introspectSignalArgument.annotation)
                     })
                     const xmlSignalObject: Record<string, any> = {
                         $: {name: introspectSignal.name} // XML attribute for signal name
                     }
                     if (args.length) xmlSignalObject.arg = args // Include arguments if any
-                    return xmlSignalObject
+                    return withAnnotations(xmlSignalObject, introspectSignal.annotation)
                 })
 
                 // Construct the interface XML object
@@ -143,7 +154,7 @@ export class IntrospectableInterface extends LocalInterface {
                 if (methods.length) xmlInterfaceObject.method = methods
                 if (properties.length) xmlInterfaceObject.property = properties
                 if (signals.length) xmlInterfaceObject.signal = signals
-                return xmlInterfaceObject
+                return withAnnotations(xmlInterfaceObject, introspectableInterface.annotation)
             })
             if (interfaces.length) xmlObject.interface = interfaces // Include interfaces if any
         }

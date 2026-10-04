@@ -359,6 +359,17 @@ export type {GetPropertyValueOpts} from './types/GetPropertyValueOpts'
 export type {HandshakeOpts} from './types/HandshakeOpts'
 
 /**
+ * Exports the IntrospectAnnotation type for annotations in introspection data.
+ * Annotations such as org.freedesktop.DBus.Deprecated attach metadata to interfaces, methods, arguments, properties and signals.
+ */
+export type {IntrospectAnnotation} from './types/IntrospectAnnotation'
+
+/**
+ * Exports the DefineSignalArgumentOpts type for the arguments of signals defined on local interfaces.
+ */
+export type {DefineSignalArgumentOpts} from './types/DefineSignalOpts'
+
+/**
  * Exports the IntrospectInterface type for introspection data of an interface.
  * Defines the structure for introspected interface data, including methods, properties, and signals.
  */

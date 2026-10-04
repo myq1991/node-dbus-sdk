@@ -4,6 +4,9 @@ import {execFile} from 'node:child_process'
 import {parseStringPromise} from 'xml2js'
 import {DBus} from '../../DBus'
 import {DBusService} from '../../DBusService'
+import {DBusObject} from '../../DBusObject'
+import {IntrospectInterface} from '../../types/IntrospectInterface'
+import EventEmitter from 'node:events'
 import {LocalService} from '../../LocalService'
 import {LocalObject} from '../../LocalObject'
 import {LocalInterface} from '../../LocalInterface'
@@ -114,5 +117,63 @@ describe('introspection of an object tree', {skip: !PrivateBus.available && 'dbu
         for (const objectPath of OBJECT_PATHS) {
             assert.ok(output.includes(`node ${objectPath} {`), `gdbus did not reach ${objectPath}:\n${output}`)
         }
+    })
+
+    describe('annotations', (): void => {
+        const ANNOTATED_SERVICE: string = 'org.example.Annotated'
+        const ANNOTATED_PATH: string = '/org/example/Annotated'
+        let annotated: LocalService
+
+        before(async (): Promise<void> => {
+            const iface: LocalInterface = new LocalInterface('org.example.Annotated')
+                .defineAnnotation('org.freedesktop.DBus.Deprecated', 'true')
+                .defineMethod({
+                    name: 'Fire',
+                    inputArgs: [{name: 'delay', type: 'u', annotations: {'org.example.Unit': 'ms'}}],
+                    annotations: {'org.freedesktop.DBus.Method.NoReply': 'true'},
+                    method: (): void => undefined
+                })
+                .defineProperty({name: 'Level', type: 'u', getter: (): number => 1, annotations: {'org.freedesktop.DBus.Property.EmitsChangedSignal': 'const'}})
+                .defineSignal({name: 'Changed', args: [{type: 's', annotations: {'org.example.Format': 'iso8601'}}], annotations: {'org.example.Rate': 'low'}, eventEmitter: new EventEmitter()})
+            const object: LocalObject = new LocalObject(ANNOTATED_PATH)
+            object.addInterface(iface)
+            annotated = new LocalService(ANNOTATED_SERVICE)
+            annotated.addObject(object)
+            await withTimeout(annotated.run({busAddress: bus.address}), 3000, 'start annotated service')
+        })
+
+        after(async (): Promise<void> => {
+            if (annotated?.dbus) await withTimeout(annotated.stop(), 2000, 'stop annotated service').catch((): void => undefined)
+        })
+
+        it('are read back by the client at every level', async (): Promise<void> => {
+            const object: DBusObject = await withTimeout(client.getObject(ANNOTATED_SERVICE, ANNOTATED_PATH), 2000, 'get object')
+            const iface: IntrospectInterface = (await withTimeout(object.introspect(), 2000, 'introspect')).interface.find((item: IntrospectInterface): boolean => item.name === 'org.example.Annotated')!
+            assert.deepEqual(iface.annotation, [{name: 'org.freedesktop.DBus.Deprecated', value: 'true'}])
+            assert.deepEqual(iface.method[0].annotation, [{name: 'org.freedesktop.DBus.Method.NoReply', value: 'true'}])
+            assert.deepEqual(iface.method[0].arg[0].annotation, [{name: 'org.example.Unit', value: 'ms'}])
+            assert.deepEqual(iface.property[0].annotation, [{name: 'org.freedesktop.DBus.Property.EmitsChangedSignal', value: 'const'}])
+            assert.deepEqual(iface.signal[0].annotation, [{name: 'org.example.Rate', value: 'low'}])
+            assert.deepEqual(iface.signal[0].arg[0].annotation, [{name: 'org.example.Format', value: 'iso8601'}])
+        })
+
+        it('leave elements without annotations unchanged', async (): Promise<void> => {
+            const object: DBusObject = await withTimeout(client.getObject(ANNOTATED_SERVICE, ANNOTATED_PATH), 2000, 'get object')
+            const peer: IntrospectInterface = (await withTimeout(object.introspect(), 2000, 'introspect')).interface.find((item: IntrospectInterface): boolean => item.name === 'org.freedesktop.DBus.Peer')!
+            assert.ok(!('annotation' in peer))
+            assert.ok(peer.method.every((method): boolean => !('annotation' in method)))
+        })
+
+        it('are understood by GDBus', {skip: !gdbusCliAvailable && 'gdbus not found'}, async (): Promise<void> => {
+            const output: string = await new Promise<string>((resolve, reject): void => {
+                execFile('gdbus', ['introspect', '--address', bus.address, '--dest', ANNOTATED_SERVICE, '--object-path', ANNOTATED_PATH], {timeout: 5000}, (error, stdout: string, stderr: string): void => {
+                    if (error) return reject(new Error(stderr || error.message))
+                    resolve(stdout)
+                })
+            })
+            for (const expected of ['@org.freedesktop.DBus.Deprecated("true")', '@org.freedesktop.DBus.Method.NoReply("true")', '@org.example.Unit("ms")', '@org.freedesktop.DBus.Property.EmitsChangedSignal("const")', '@org.example.Rate("low")', '@org.example.Format("iso8601")']) {
+                assert.ok(output.includes(expected), `missing ${expected} in:\n${output}`)
+            }
+        })
     })
 })

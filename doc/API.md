@@ -248,6 +248,27 @@ configured.
 - **`defineSignal(opts: DefineSignalOpts): this`**: Defines a custom signal with arguments and an associated
   `EventEmitter` for triggering.
 - **`removeSignal(name: string): this`**: Removes a defined signal by name.
+- **`defineAnnotation(name: string, value: string): this`** / **`removeAnnotation(name: string): this`**: Adds or
+  removes an annotation of the interface itself, published in the introspection data. Methods, method arguments,
+  properties, signals and signal arguments take theirs in their definitions, as name → value pairs:
+
+  ```typescript
+  iface.defineMethod({
+      name: 'Fire',
+      inputArgs: [{name: 'delay', type: 'u', annotations: {'org.example.Unit': 'ms'}}],
+      annotations: {'org.freedesktop.DBus.Method.NoReply': 'true'},
+      method: () => undefined
+  })
+  iface.defineProperty({
+      name: 'Level', type: 'u', getter: () => level,
+      // Tells clients that PropertiesChanged is never sent for this property
+      annotations: {'org.freedesktop.DBus.Property.EmitsChangedSignal': 'false'}
+  })
+  ```
+
+  Annotations are not added automatically. For example, declare `EmitsChangedSignal` yourself for properties that do
+  not emit `PropertiesChanged`. `DBusObject.introspect()` returns the annotations of remote objects in the same
+  `annotation` fields.
 - **
   `async callMethod(name: string, payloadSignature: string | undefined, ...args: any[]): Promise<{signature?: string, result: any}>`
   **: Calls a defined method with validated arguments and returns the result.

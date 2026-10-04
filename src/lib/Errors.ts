@@ -141,6 +141,11 @@ export class LocalInterfaceInvalidSignalNameError extends Error implements NodeJ
 }
 
 
+export class LocalInterfaceInvalidAnnotationError extends Error implements NodeJS.ErrnoException {
+    errno: number = 1029
+    code: string = 'E_INVALID_LOCAL_INTERFACE_ANNOTATION'
+}
+
 export class MessageDecodeError extends Error implements NodeJS.ErrnoException {
     errno: number = 1028
     code: string = 'E_MESSAGE_DECODE'

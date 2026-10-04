@@ -56,4 +56,10 @@ export interface DefinePropertyOpts {
      * to choose the error name). If not provided, the property is read-only.
      */
     setter?: (value: any) => unknown
+
+    /**
+     * Annotations to publish in the introspection data, as name → value,
+     * e.g. {'org.freedesktop.DBus.Deprecated': 'true'}.
+     */
+    annotations?: Record<string, string>
 }

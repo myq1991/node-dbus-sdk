@@ -1,3 +1,4 @@
+import {IntrospectAnnotation} from './IntrospectAnnotation'
 import {IntrospectMethodArgument} from './IntrospectMethodArgument'
 
 /**
@@ -16,4 +17,9 @@ export interface IntrospectMethod {
      * Each argument contains metadata such as its name, type, and direction (input or output) for introspection purposes.
      */
     arg: IntrospectMethodArgument[]
+
+    /**
+     * Annotations, if any.
+     */
+    annotation?: IntrospectAnnotation[]
 }

@@ -2,7 +2,8 @@ import {DBusPropertyAccess} from './lib/enums/DBusPropertyAccess'
 import {DefineMethodArgumentOpts, DefineMethodOpts} from './types/DefineMethodOpts'
 import {DefinePropertyOpts, emitPropertiesChangedOpts} from './types/DefinePropertyOpts'
 import {MethodCallContext} from './types/MethodCallContext'
-import {DefineSignalOpts} from './types/DefineSignalOpts'
+import {IntrospectAnnotation} from './types/IntrospectAnnotation'
+import {DefineSignalArgumentOpts, DefineSignalOpts} from './types/DefineSignalOpts'
 import {IntrospectMethod} from './types/IntrospectMethod'
 import {IntrospectProperty} from './types/IntrospectProperty'
 import {IntrospectSignal} from './types/IntrospectSignal'
@@ -15,7 +16,8 @@ import {
     LocalInterfaceInvalidSignalNameError,
     LocalInterfaceMethodDefinedError,
     LocalInterfacePropertyDefinedError,
-    LocalInterfaceSignalDefinedError
+    LocalInterfaceSignalDefinedError,
+    LocalInterfaceInvalidAnnotationError
 } from './lib/Errors'
 import {DBus} from './DBus'
 import {LocalObject} from './LocalObject'
@@ -360,12 +362,69 @@ export class LocalInterface {
      * @returns An IntrospectInterface object containing the name, methods, properties, and signals defined for this interface.
      */
     public get introspectInterface(): IntrospectInterface {
-        return {
+        const introspectInterface: IntrospectInterface = {
             name: this.#name,
             method: this.#introspectMethods,
             property: this.#introspectProperties,
             signal: this.#introspectSignals
         }
+        if (this.#annotations.length) introspectInterface.annotation = [...this.#annotations]
+        return introspectInterface
+    }
+
+    /**
+     * Annotations of the interface itself.
+     */
+    #annotations: IntrospectAnnotation[] = []
+
+    /**
+     * Adds an annotation to the interface itself (methods, properties and signals take theirs in their options),
+     * e.g. defineAnnotation('org.freedesktop.DBus.Deprecated', 'true'). Replaces an annotation with the same name.
+     *
+     * @param name - The annotation's name, in the form of an interface name.
+     * @param value - The annotation's value.
+     * @returns The instance of this LocalInterface for method chaining.
+     * @throws {LocalInterfaceInvalidAnnotationError} If the name or value is invalid.
+     */
+    public defineAnnotation(name: string, value: string): this {
+        const [annotation] = LocalInterface.toAnnotations({[name]: value})
+        this.#annotations = this.#annotations.filter((existing: IntrospectAnnotation): boolean => existing.name !== annotation.name).concat(annotation)
+        return this
+    }
+
+    /**
+     * Removes an annotation of the interface itself.
+     *
+     * @param name - The annotation's name.
+     * @returns The instance of this LocalInterface for method chaining.
+     */
+    public removeAnnotation(name: string): this {
+        this.#annotations = this.#annotations.filter((existing: IntrospectAnnotation): boolean => existing.name !== name)
+        return this
+    }
+
+    /**
+     * Validates annotations given as name → value and converts them to introspection data.
+     *
+     * @throws {LocalInterfaceInvalidAnnotationError} If a name is not in the form of an interface name or a value is not a string.
+     */
+    protected static toAnnotations(annotations: Record<string, string>): IntrospectAnnotation[] {
+        return Object.entries(annotations).map(([name, value]: [string, string]): IntrospectAnnotation => {
+            if (name.length > 255 || !/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$/.test(name)) {
+                throw new LocalInterfaceInvalidAnnotationError(`Invalid annotation name "${name}": it must have the form of an interface name, e.g. org.freedesktop.DBus.Deprecated`)
+            }
+            if (typeof value !== 'string') throw new LocalInterfaceInvalidAnnotationError(`The value of annotation ${name} must be a string, got ${typeof value}`)
+            return {name, value}
+        })
+    }
+
+    /**
+     * Adds the given annotations, if any, to an introspection entry.
+     */
+    protected static annotated<T extends { annotation?: IntrospectAnnotation[] }>(entry: T, annotations?: Record<string, string>): T {
+        const converted: IntrospectAnnotation[] = annotations ? LocalInterface.toAnnotations(annotations) : []
+        if (converted.length) entry.annotation = converted
+        return entry
     }
 
     /**
@@ -387,20 +446,17 @@ export class LocalInterface {
             method: opts.method,
             withContext: !!opts.withContext
         }
-        this.#introspectMethods.push({
+        const argument = (arg: DefineMethodArgumentOpts, direction: string): IntrospectMethodArgument => LocalInterface.annotated<IntrospectMethodArgument>({
+            name: arg.name,
+            type: arg.type,
+            direction: direction
+        }, arg.annotations)
+        this.#introspectMethods.push(LocalInterface.annotated<IntrospectMethod>({
             name: opts.name,
             arg: [
-                ...(opts.inputArgs ? opts.inputArgs.map((inputArg: DefineMethodArgumentOpts): IntrospectMethodArgument => ({
-                    name: inputArg.name,
-                    type: inputArg.type,
-                    direction: 'in'
-                })) : []),
-                ...(opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): IntrospectMethodArgument => ({
-                    name: outputArg.name,
-                    type: outputArg.type,
-                    direction: 'out'
-                })) : [])]
-        })
+                ...(opts.inputArgs ? opts.inputArgs.map((inputArg: DefineMethodArgumentOpts): IntrospectMethodArgument => argument(inputArg, 'in')) : []),
+                ...(opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): IntrospectMethodArgument => argument(outputArg, 'out')) : [])]
+        }, opts.annotations))
         return this
     }
 
@@ -459,11 +515,11 @@ export class LocalInterface {
             getter: getter,
             setter: setter
         }
-        this.#introspectProperties.push({
+        this.#introspectProperties.push(LocalInterface.annotated<IntrospectProperty>({
             name: opts.name,
             type: opts.type,
             access: access
-        })
+        }, opts.annotations))
         return this
     }
 
@@ -493,7 +549,7 @@ export class LocalInterface {
      */
     public defineSignal(opts: DefineSignalOpts): this {
         if (this.#definedSignals[opts.name]) throw new LocalInterfaceSignalDefinedError(`Signal ${opts.name} is already defined`)
-        const signature: string | undefined = opts.args?.map((arg: IntrospectSignalArgument): string => arg.type).join('')
+        const signature: string | undefined = opts.args?.map((arg: DefineSignalArgumentOpts): string => arg.type).join('')
         opts.name = this.validateDBusSignalName(opts.name)
         this.#definedSignals[opts.name] = {
             listener: (...args: any[]): void => {
@@ -508,10 +564,10 @@ export class LocalInterface {
             },
             eventEmitter: opts.eventEmitter
         }
-        this.#introspectSignals.push({
+        this.#introspectSignals.push(LocalInterface.annotated<IntrospectSignal>({
             name: opts.name,
-            arg: opts.args ? opts.args : []
-        })
+            arg: (opts.args || []).map((arg: DefineSignalArgumentOpts): IntrospectSignalArgument => LocalInterface.annotated<IntrospectSignalArgument>({name: arg.name, type: arg.type}, arg.annotations))
+        }, opts.annotations))
         // Register the listener with the event emitter to handle signal emissions
         this.#definedSignals[opts.name].eventEmitter.on(opts.name, this.#definedSignals[opts.name].listener)
         return this

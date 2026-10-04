@@ -6,7 +6,8 @@ import {DBusPropertyAccess} from '../../lib/enums/DBusPropertyAccess'
 import {
     LocalInterfaceInvalidMethodNameError,
     LocalInterfaceInvalidNameError,
-    LocalInterfaceMethodDefinedError
+    LocalInterfaceMethodDefinedError,
+    LocalInterfaceInvalidAnnotationError
 } from '../../lib/Errors'
 import {knownBug} from '../helpers/KnownBug'
 import {catchUnhandledRejections} from '../helpers/Async'
@@ -173,6 +174,26 @@ describe('LocalInterface', (): void => {
         it('can be added to an object', (): void => {
             const iface: LocalInterface = new LocalInterface('org.example.WriteOnly').defineProperty({name: 'Secret', type: 's', setter: (): void => undefined})
             assert.doesNotThrow((): boolean => new LocalObject('/org/example/WriteOnly').addInterface(iface))
+        })
+    })
+
+    describe('annotations', (): void => {
+        it('replaces an interface annotation of the same name and removes it on request', (): void => {
+            const iface: LocalInterface = new LocalInterface('org.example.Annotations')
+                .defineAnnotation('org.freedesktop.DBus.Deprecated', 'false')
+                .defineAnnotation('org.freedesktop.DBus.Deprecated', 'true')
+            assert.deepEqual(iface.introspectInterface.annotation, [{name: 'org.freedesktop.DBus.Deprecated', value: 'true'}])
+            iface.removeAnnotation('org.freedesktop.DBus.Deprecated')
+            assert.ok(!('annotation' in iface.introspectInterface))
+        })
+
+        it('rejects an annotation name that is not in the form of an interface name', (): void => {
+            assert.throws((): LocalInterface => new LocalInterface('org.example.Annotations').defineAnnotation('Deprecated', 'true'), LocalInterfaceInvalidAnnotationError)
+            assert.throws((): LocalInterface => new LocalInterface('org.example.Annotations').defineMethod({name: 'M', annotations: {'not valid': 'x'}, method: (): void => undefined}), LocalInterfaceInvalidAnnotationError)
+        })
+
+        it('rejects an annotation value that is not a string', (): void => {
+            assert.throws((): LocalInterface => new LocalInterface('org.example.Annotations').defineProperty({name: 'P', type: 'u', getter: (): number => 1, annotations: {'org.example.Flag': true as any}}), LocalInterfaceInvalidAnnotationError)
         })
     })
 
