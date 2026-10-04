@@ -1,3 +1,5 @@
+import {DecodeOpts} from './DecodeOpts'
+
 /**
  * Interface defining options for creating a DBus signal emitter.
  * These options specify the scope of the signals to be emitted or listened to on the DBus.
@@ -26,4 +28,9 @@ export interface CreateSignalEmitterOpts {
      * This can be a specific interface (e.g., 'org.freedesktop.DBus') or '*' to match any interface.
      */
     interface: string | '*'
+
+    /**
+     * How to give the signals' arguments to this emitter's listeners, overriding the connection's DecodeOpts.
+     */
+    decode?: DecodeOpts
 }

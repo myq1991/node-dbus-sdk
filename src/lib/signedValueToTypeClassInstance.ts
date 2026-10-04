@@ -20,16 +20,6 @@ import {DBusVariant} from './datatypes/DBusVariant'
 import {SignatureError} from './Errors'
 
 /**
- * An array of DBus type class constructors used for mapping DBus type signatures to their corresponding class implementations.
- * This array includes constructors for all supported DBus data types, both basic and container types, to facilitate type conversion and instantiation.
- */
-const typeClassConstructors: (typeof DBusTypeClass)[] = [
-    DBusByte, DBusBoolean, DBusInt16, DBusUInt16, DBusUInt32, DBusInt32,
-    DBusSignature, DBusString, DBusObjectPath, DBusInt64, DBusUInt64,
-    DBusDouble, DBusUnixFD, DBusArray, DBusStruct, DBusDictEntry, DBusVariant
-] as (typeof DBusTypeClass)[]
-
-/**
  * Converts a DBusSignedValue instance to a corresponding DBusTypeClass instance based on its type signature.
  * This function maps the signature of the input value to the appropriate DBus data type class (e.g., DBusByte, DBusString)
  * and recursively processes container types (e.g., arrays, structs) to build nested structures.
@@ -39,10 +29,7 @@ const typeClassConstructors: (typeof DBusTypeClass)[] = [
  * @throws {SignatureError} If the type signature of the input value is unknown or unsupported.
  */
 export function signedValueToTypeClassInstance(value: DBusSignedValue): DBusTypeClass {
-    const instance: DBusTypeClass = toTypeClassInstance(value)
-    // Keep the complete type of an empty array (e.g. 'a{sv}'), which the type classes cannot express themselves
-    if (value.$signature === 'a') DBusSignedValue.setDataType(instance, DBusSignedValue.dataTypeOf(value))
-    return instance
+    return toTypeClassInstance(value)
 }
 
 function toTypeClassInstance(value: DBusSignedValue): DBusTypeClass {
@@ -77,22 +64,24 @@ function toTypeClassInstance(value: DBusSignedValue): DBusTypeClass {
         case 'h':
             return new DBusUnixFD(value.$value)
         // Container data types
-        case 'a':
+        case 'a': {
             if (Buffer.isBuffer(value.$value)) {
-                // Typed results keep one DBusByte per byte, as before byte arrays were held as one Buffer
-                return new DBusArray(Array.from(value.$value, (byte: number): DBusTypeClass => new DBusByte(byte)), DBusByte as unknown as typeof DBusTypeClass)
+                // Typed results hold one DBusByte per byte
+                return new DBusArray(Array.from(value.$value, (byte: number): DBusTypeClass => new DBusByte(byte)), DBusByte)
             }
-            const arrayItemSignature: string = value.$arrayItemSignature!
-            const arrayValues: DBusTypeClass[] = (value.$value as DBusSignedValue[]).map((item: DBusSignedValue): DBusTypeClass => signedValueToTypeClassInstance(item))
-            return new DBusArray(arrayValues, typeClassConstructors.find(typeClassConstructor => typeClassConstructor.type === arrayItemSignature))
+            const items: DBusSignedValue[] = value.$value as DBusSignedValue[]
+            if (items.length) return new DBusArray(items.map((item: DBusSignedValue): DBusTypeClass => toTypeClassInstance(item)))
+            // An empty array keeps its complete element type, e.g. 'a{sv}' for an empty 'aa{sv}'
+            return new DBusArray([], DBusSignedValue.completeSignature(value).substring(1))
+        }
         case '(':
-            const structValues: DBusTypeClass[] = (value.$value as DBusSignedValue[]).map((item: DBusSignedValue): DBusTypeClass => signedValueToTypeClassInstance(item))
+            const structValues: DBusTypeClass[] = (value.$value as DBusSignedValue[]).map((item: DBusSignedValue): DBusTypeClass => toTypeClassInstance(item))
             return new DBusStruct(structValues)
         case '{':
-            const dictValues: [DBusTypeClass, DBusTypeClass] = (value.$value as DBusSignedValue[]).map((item: DBusSignedValue): DBusTypeClass => signedValueToTypeClassInstance(item)) as [DBusTypeClass, DBusTypeClass]
+            const dictValues: [DBusTypeClass, DBusTypeClass] = (value.$value as DBusSignedValue[]).map((item: DBusSignedValue): DBusTypeClass => toTypeClassInstance(item)) as [DBusTypeClass, DBusTypeClass]
             return new DBusDictEntry(dictValues)
         case 'v':
-            const nestedValue: DBusTypeClass = signedValueToTypeClassInstance(value.$value as DBusSignedValue)
+            const nestedValue: DBusTypeClass = toTypeClassInstance(value.$value as DBusSignedValue)
             return new DBusVariant(nestedValue)
         default:
             throw new SignatureError(`Unknown DBus type: ${signature}`)

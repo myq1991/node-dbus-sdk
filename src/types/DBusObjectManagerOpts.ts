@@ -1,4 +1,5 @@
 import {DBus} from '../DBus'
+import {DecodeOpts} from './DecodeOpts'
 
 /**
  * What a DBusObjectManager is created with, by DBus.getObjectManager.
@@ -23,4 +24,9 @@ export interface DBusObjectManagerOpts {
      * Path of the object implementing org.freedesktop.DBus.ObjectManager.
      */
     objectPath: string
+
+    /**
+     * How property values are given, overriding the connection's DecodeOpts.
+     */
+    decode?: DecodeOpts
 }

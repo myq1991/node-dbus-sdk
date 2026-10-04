@@ -1,11 +1,14 @@
 import {DBusMessageHeader} from '../types/DBusMessageHeader'
 import {DBusMessageType} from './enums/DBusMessageType'
 import {DBusMessageFlags} from './enums/DBusMessageFlags'
-import {MessageDecodeError, SerialError} from './Errors'
+import {MessageDecodeError, SerialError, SignatureError} from './Errors'
 import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 import {DBusBufferEncoder} from './DBusBufferEncoder'
 import {DBusSignedValue} from './DBusSignedValue'
 import {DBusBufferDecoder} from './DBusBufferDecoder'
+import {DecodeOpts} from '../types/DecodeOpts'
+import {DEFAULT_DECODE, resolveDecode, ResolvedDecodeOpts} from './resolveDecode'
+import {signedValueToTypeClassInstance} from './signedValueToTypeClassInstance'
 
 /**
  * A class representing a DBus message.
@@ -31,11 +34,74 @@ export class DBusMessage {
     public readonly header: DBusMessageHeader
 
     /**
-     * The body of the DBus message.
-     * Contains the payload or arguments of the message, such as method parameters or signal data.
-     * This is an array that can hold various data types as per the DBus specification.
+     * The values of a received message, as decoded, kept so that they can be given in the form each receiver asks
+     * for (see getBody).
      */
-    public readonly body: any[] = []
+    #signedBody: DBusSignedValue[] | undefined
+
+    /**
+     * The connection's decoding choices, for `body`.
+     */
+    #decode: ResolvedDecodeOpts = DEFAULT_DECODE
+
+    #body: any[] | undefined
+
+    /**
+     * The arguments of the message. For a message to send, the values it was created with; for a received
+     * message, its values decoded with the connection's DecodeOpts (plain values by default). getBody gives them
+     * with other choices.
+     */
+    public get body(): any[] {
+        if (!this.#body) this.#body = this.#signedBody ? DBusSignedValue.convert(this.#signedBody, this.#decode, signedValueToTypeClassInstance) : []
+        return this.#body
+    }
+
+    /**
+     * The arguments of a received message, decoded with the given choices; those not given are the connection's.
+     * For a message to send, the values it was created with.
+     *
+     * @example
+     * dbus.on('methodCall', (message) => console.log(message.getBody({types: 'all'})))
+     *
+     * @param decode - How to give the values (see DecodeOpts).
+     * @returns The arguments.
+     */
+    public getBody(decode?: DecodeOpts): any[] {
+        if (!this.#signedBody || !decode) return this.body
+        return DBusSignedValue.convert(this.#signedBody, resolveDecode(decode, this.#decode), signedValueToTypeClassInstance)
+    }
+
+    /**
+     * @internal
+     * Creates a message to send with the given arguments, keeping the signatures recorded on the arguments list
+     * (see DBusSignedValue), which spreading them into the constructor would lose.
+     *
+     * @param header - The header.
+     * @param args - The arguments.
+     * @returns The message.
+     */
+    public static withArguments(header: Partial<DBusMessageHeader>, args: any[] = []): DBusMessage {
+        const message: DBusMessage = new DBusMessage(header, ...args)
+        DBusSignedValue.copyVariantTypes(args, message.body)
+        return message
+    }
+
+    /**
+     * @internal
+     * Creates a received message from its header and decoded values.
+     *
+     * @param header - The decoded header.
+     * @param signedBody - The decoded values.
+     * @param decode - The connection's decoding choices.
+     * @returns The message.
+     */
+    public static received(header: Partial<DBusMessageHeader>, signedBody: DBusSignedValue[], decode: ResolvedDecodeOpts): DBusMessage {
+        const message: DBusMessage = new DBusMessage(header)
+        message.#signedBody = signedBody
+        message.#body = undefined
+        message.#decode = decode
+        return message
+    }
 
     /**
      * Constructor for creating a DBusMessage instance.
@@ -59,7 +125,7 @@ export class DBusMessage {
             sender: '', // Sender bus name, empty by default
             ...header // Override defaults with provided values
         }
-        this.body = [...body] // Copy provided body arguments into the message
+        this.#body = [...body] // Copy provided body arguments into the message
     }
 
     /**
@@ -77,11 +143,18 @@ export class DBusMessage {
         const type: DBusMessageType = this.header.type || DBusMessageType.METHOD_CALL
         let bodyLength: number = 0
         let bodyBuff: Buffer = Buffer.alloc(0)
+        if (!this.header.signature && this.body.length) {
+            // Without a signature the body would not be sent at all: take it from typed values, or refuse
+            if (!this.body.every((value: any): boolean => value instanceof DBusSignedValue)) {
+                throw new SignatureError('A message with arguments needs a signature: give one, or give every argument a type (DBusSignedValue or a type class such as DBusUInt32)')
+            }
+            this.header.signature = this.body.map((value: DBusSignedValue): string => value.signature).join('')
+        }
         if (this.header.signature && this.body.length > 0) {
             const bodyEncoder: DBusBufferEncoder = new DBusBufferEncoder(this.endianness)
             bodyEncoder.allowUnixFd = false // No file descriptors can be attached to the message
             // Encode the body based on the signature; handle single vs. multiple arguments
-            bodyBuff = bodyEncoder.encode(this.header.signature, this.body.length > 1 ? this.body : this.body[0])
+            bodyBuff = bodyEncoder.encode(this.header.signature, DBusSignedValue.bodyValue(this.header.signature, this.body))
             bodyLength = bodyBuff.length
         }
         // Create header fields array for encoding additional metadata
@@ -205,15 +278,15 @@ export class DBusMessage {
      * @param fieldsAndBody - A Buffer containing the header fields and body data.
      * @param fieldsLength - The length of the header fields section in bytes.
      * @param bodyLength - The length of the body section in bytes.
-     * @param advancedResponse - Boolean flag to enable advanced response handling, where DBus return messages are organized using DBusTypeClass instances.
-     * @param convertBigIntToNumber - Boolean flag to enable auto convert bigint to javascript number.
+     * @param decode - The connection's choices for giving the values (see DecodeOpts); `body` uses them.
      * @returns A DBusMessage instance with parsed header and body content.
      * @throws {MessageDecodeError} If the body cannot be decoded; the error carries the decoded header.
      */
-    public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number, advancedResponse: boolean = false, convertBigIntToNumber: boolean = false): DBusMessage {
+    public static decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number, decode?: DecodeOpts): DBusMessage {
+        const decodeOpts: ResolvedDecodeOpts = resolveDecode(decode)
         // Determine the endianness from the first byte of the header
         const endianness: DBusMessageEndianness = header[0] === DBusMessageEndianness.LE ? DBusMessageEndianness.LE : DBusMessageEndianness.BE
-        const headerDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, header, 0, convertBigIntToNumber)
+        const headerDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, header, 0)
         const headers: number[] = headerDecoder.decode('yyyyuuu')
         const type: number = headers[1] // Message type (e.g., METHOD_CALL, SIGNAL)
         const flags: number = headers[2] // Message flags (e.g., REPLY_EXPECTED)
@@ -221,37 +294,37 @@ export class DBusMessage {
         const serial: number = headers[5] // Serial number for message tracking
         // Concatenate remaining header bytes with fields data for full field parsing
         const headerWithFieldsBuffer: Buffer = Buffer.concat([header, fieldsAndBody.subarray(0, fieldsLength)])
-        const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, headerWithFieldsBuffer, 12, convertBigIntToNumber)
-        const [fields] = fieldsDecoder.decode('a(yv)') // Decode array of (type ID, value) pairs for header fields
+        const fieldsDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, headerWithFieldsBuffer, 12)
+        // Header fields are (code, variant) pairs of basic values: read them directly from the decoded values
+        const [fields] = fieldsDecoder.readSignedValues('a(yv)')
         const messageHeader: Partial<DBusMessageHeader> = {
             type: type,
             flags: flags,
             protocolVersion: protocolVersion,
             serial: serial
         }
-        // Map decoded field type IDs to header field names and assign values
-        for (const field of (fields as [number, string | number][])) {
-            const [typeId, fieldValue] = field
-            const headerTypeName: string | null = this.headerTypeName[typeId]
+        for (const field of fields.$value as DBusSignedValue[]) {
+            const [code, variant] = field.$value as DBusSignedValue[]
+            const headerTypeName: string | null = this.headerTypeName[code.$value]
             if (!headerTypeName) continue
-            messageHeader[headerTypeName] = fieldValue
+            messageHeader[headerTypeName] = (variant.$value as DBusSignedValue).$value
         }
         // If there is no body or no signature, return message with only header
-        if (!bodyLength || !messageHeader.signature) return new DBusMessage(messageHeader)
+        if (!bodyLength || !messageHeader.signature) return DBusMessage.received(messageHeader, [], decodeOpts)
         // Calculate aligned offset before body to account for padding (must align to 8-byte boundary)
         let paddingLength: number = 8 - (header.length + fieldsLength) % 8
         paddingLength = paddingLength === 8 ? 0 : paddingLength
         const bodyOffset: number = fieldsLength + paddingLength
         const bodyBuffer: Buffer = fieldsAndBody.subarray(bodyOffset)
-        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, bodyBuffer, 0, convertBigIntToNumber)
+        const bodyDecoder: DBusBufferDecoder = new DBusBufferDecoder(endianness, bodyBuffer, 0)
         // Decode the body based on the signature provided in the header
-        let body: any[]
+        let body: DBusSignedValue[]
         try {
-            body = bodyDecoder.decode(messageHeader.signature, advancedResponse)
+            body = bodyDecoder.readSignedValues(messageHeader.signature)
         } catch (error: any) {
             // Keep the decoded header, so the receiver can tell which message (e.g. which call's reply) was unreadable
             throw new MessageDecodeError(`Cannot decode the body of a message with signature '${messageHeader.signature}': ${error?.message}`, messageHeader, {cause: error})
         }
-        return new DBusMessage(messageHeader, ...body)
+        return DBusMessage.received(messageHeader, body, decodeOpts)
     }
 }

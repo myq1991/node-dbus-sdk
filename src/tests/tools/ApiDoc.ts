@@ -116,6 +116,9 @@ export function generateApiDoc(): string {
             if (member.name && ts.isPrivateIdentifier(member.name)) continue
             if (ts.isIndexSignatureDeclaration(member)) continue
             if (ts.isConstructorDeclaration(member)) {
+                // With overloads only the overload signatures are published, and @internal ones are stripped
+                const overloaded: boolean = declaration.members.filter(ts.isConstructorDeclaration).length > 1
+                if ((overloaded && member.body) || ts.getJSDocTags(member).some((tag: ts.JSDocTag): boolean => tag.tagName.text === 'internal')) continue
                 const signature: ts.Signature = checker.getSignatureFromDeclaration(member)!
                 out.push(`#### \`new ${owner.name}${checker.signatureToString(signature, member, ts.TypeFormatFlags.NoTruncation)}\`\n\n${docOf(signature)}`.trim())
                 continue

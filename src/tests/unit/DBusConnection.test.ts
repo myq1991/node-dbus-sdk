@@ -106,10 +106,10 @@ describe('DBusConnection framing', (): void => {
         assert.deepEqual(received.map((message: DBusMessage): string => message.header.member), ['Basic'])
     })
 
-    it('decodes bodies into DBusTypeClass instances with advancedResponse', async (): Promise<void> => {
+    it('decodes bodies into type class instances with decode types all', async (): Promise<void> => {
         const stream: MockBusStream = new MockBusStream()
         const received: DBusMessage[] = []
-        new DBusConnection(stream, 'EXTERNAL', '0', 'guid', true).on('message', (message: DBusMessage): number => received.push(message))
+        new DBusConnection(stream, 'EXTERNAL', '0', 'guid', {types: 'all'}).on('message', (message: DBusMessage): number => received.push(message))
         stream.deliver(dict)
         await flush()
         const [byte, dictionary, variant] = received[0].body
@@ -119,10 +119,10 @@ describe('DBusConnection framing', (): void => {
         assert.deepEqual([byte.value, dictionary.value, variant.value], LibdbusMessages[2].body)
     })
 
-    it('converts 64-bit integers to numbers with convertBigIntToNumber', async (): Promise<void> => {
+    it('converts 64-bit integers to numbers with decode int64 number', async (): Promise<void> => {
         const stream: MockBusStream = new MockBusStream()
         const received: DBusMessage[] = []
-        new DBusConnection(stream, 'EXTERNAL', '0', 'guid', false, true).on('message', (message: DBusMessage): number => received.push(message))
+        new DBusConnection(stream, 'EXTERNAL', '0', 'guid', {int64: 'number'}).on('message', (message: DBusMessage): number => received.push(message))
         stream.deliver(basic)
         await flush()
         assert.deepEqual(received[0].body, [1, true, -2, 3, -4, 5, -6, 7, 1.5, 'hello', '/a/b'])

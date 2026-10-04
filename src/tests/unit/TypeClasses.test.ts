@@ -115,7 +115,7 @@ describe('DBusTypeClass subclasses', (): void => {
             })
 
             it('is produced by the typed decoder', (): void => {
-                const [decoded] = new DBusBufferDecoder(DBusMessageEndianness.LE, Buffer.from(reference.le, 'hex')).decode(reference.signature, true)
+                const [decoded] = new DBusBufferDecoder(DBusMessageEndianness.LE, Buffer.from(reference.le, 'hex')).decode(reference.signature, {types: 'all'})
                 assert.ok(decoded instanceof typeClassCase.decodedClass, `expected ${typeClassCase.decodedClass.name}, got ${decoded?.constructor?.name}`)
                 for (const [child, childClass] of typeClassCase.children ? typeClassCase.children(decoded) : []) {
                     assert.ok(child instanceof childClass, `expected ${childClass.name}, got ${(child as any)?.constructor?.name}`)

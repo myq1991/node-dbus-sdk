@@ -1,9 +1,10 @@
 import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 import {DBusSignedValue} from './DBusSignedValue'
+import {DecodeOpts} from '../types/DecodeOpts'
+import {resolveDecode} from './resolveDecode'
 import {Signature} from './Signature'
 import {DataType} from '../types/DataType'
 import {AlignmentError, InvalidValueError, ReadBufferError, SignatureError} from './Errors'
-import {DBusTypeClass} from './DBusTypeClass'
 import {signedValueToTypeClassInstance} from './signedValueToTypeClassInstance'
 import * as nodeBuffer from 'node:buffer'
 import {TextDecoder} from 'node:util'
@@ -52,12 +53,6 @@ export class DBusBufferDecoder {
     public readonly endianness: DBusMessageEndianness = DBusMessageEndianness.LE
 
     /**
-     * Auto convert BigInt type to Number type
-     * @protected
-     */
-    protected readonly convertBigIntToNumber: boolean = false
-
-    /**
      * The binary buffer containing the DBus data to be decoded.
      * This holds the raw bytes that the decoder reads from during operation.
      */
@@ -77,11 +72,9 @@ export class DBusBufferDecoder {
      * @param endianness - The endianness to use for reading multi-byte values (default: Little Endian).
      * @param buffer - The binary buffer containing the DBus data to decode.
      * @param offset - The initial offset to start reading from (default: 0).
-     * @param convertBigIntToNumber - Convert bigint value to number (default: false)
      */
-    constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, buffer: Buffer, offset: number = 0, convertBigIntToNumber: boolean = false) {
+    constructor(endianness: DBusMessageEndianness = DBusMessageEndianness.LE, buffer: Buffer, offset: number = 0) {
         this.endianness = endianness
-        this.convertBigIntToNumber = convertBigIntToNumber
         this.buffer = buffer
         // Set the initial offset for reading from the buffer
         this.offset = offset
@@ -283,8 +276,7 @@ export class DBusBufferDecoder {
             value = this.buffer.readBigInt64BE(this.offset) // Read as big-endian
         }
         this.offset += 8 // Increment offset by 8 bytes
-        // return new DBusSignedValue('x', value)
-        return new DBusSignedValue('x', this.convertBigIntToNumber ? parseInt(value.toString()) : value)
+        return new DBusSignedValue('x', value)
     }
 
     /**
@@ -308,8 +300,7 @@ export class DBusBufferDecoder {
             value = this.buffer.readBigUInt64BE(this.offset) // Read as big-endian
         }
         this.offset += 8 // Increment offset by 8 bytes
-        // return new DBusSignedValue('t', value)
-        return new DBusSignedValue('t', this.convertBigIntToNumber ? parseInt(value.toString()) : value)
+        return new DBusSignedValue('t', value)
     }
 
     /**
@@ -703,25 +694,14 @@ export class DBusBufferDecoder {
     }
 
     /**
-     * Reads multiple values from the buffer based on the provided signature string.
-     * The signature is parsed into DataType(s), and values are read accordingly, then converted to DBusTypeClass instances.
-     *
-     * @param signature - The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
-     * @returns An array of DBusTypeClass instances representing the read values.
-     * @throws {SignatureError} If the signature is empty or invalid.
-     */
-    public toSignedValues(signature: string): DBusTypeClass[] {
-        return this.readValues(signature).map((value: DBusSignedValue): DBusTypeClass => signedValueToTypeClassInstance(value))
-    }
-
-    /**
-     * Reads one value per complete type of the signature.
+     * @internal
+     * Reads one value per complete type of the signature, in the form the library works with.
      *
      * @param signature - The signature of the values to read.
      * @returns The values read.
      * @throws {SignatureError} If the signature is empty or invalid.
      */
-    protected readValues(signature: string): DBusSignedValue[] {
+    public readSignedValues(signature: string): DBusSignedValue[] {
         const dataTypes: DataType[] = Signature.parse(signature)
         if (dataTypes.length === 0) {
             throw new SignatureError('Empty signature provided')
@@ -730,17 +710,20 @@ export class DBusBufferDecoder {
     }
 
     /**
-     * Decodes values from the buffer based on the provided signature and optionally converts them to plain JavaScript values or typed DBusTypeClass instances.
-     * This method can unwrap DBusSignedValue instances into raw values for easier use or return typed instances for further processing.
+     * Decodes the values of a signature into JavaScript values, as DecodeOpts asks: plain values by default, or type
+     * class instances where `types` asks for them.
      *
-     * @param signature - The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
-     * @param typed - If true, returns an array of DBusTypeClass instances; if false, returns plain JavaScript values (default: false).
-     * @returns An array of either plain JavaScript values or DBusTypeClass instances, based on the typed parameter.
+     * @example
+     * new DBusBufferDecoder(DBusMessageEndianness.LE, body).decode('a{sv}')                       // [{mtu: 1500}]
+     * new DBusBufferDecoder(DBusMessageEndianness.LE, body).decode('a{sv}', {types: 'variants'})  // [{mtu: DBusUInt32}]
+     *
+     * @param signature - The signature of the values, e.g. 'sa{sv}'.
+     * @param opts - How to give the values (see DecodeOpts).
+     * @returns One value per complete type of the signature.
      * @throws {SignatureError} If the signature is empty or invalid.
+     * @throws {InvalidValueError | ReadBufferError | AlignmentError} If the data is malformed.
      */
-    public decode(signature: string, typed: boolean = false): any[] {
-        // Read values as DBusSignedValue instances and convert them based on the typed parameter
-        // Plain values come straight from the decoded values; only typed results need DBusTypeClass instances
-        return typed ? this.toSignedValues(signature) : DBusSignedValue.toPlain(this.readValues(signature))
+    public decode(signature: string, opts?: DecodeOpts): any[] {
+        return DBusSignedValue.convert(this.readSignedValues(signature), resolveDecode(opts), signedValueToTypeClassInstance)
     }
 }

@@ -11,7 +11,7 @@ complete programs see [examples](../examples/README.md).
 - [Type classes](#type-classes): `DBusArray`, `DBusBoolean`, `DBusByte`, `DBusDictEntry`, `DBusDouble`, `DBusInt16`, `DBusInt32`, `DBusInt64`, `DBusObjectPath`, `DBusSignature`, `DBusString`, `DBusStruct`, `DBusUInt16`, `DBusUInt32`, `DBusUInt64`, `DBusUnixFD`, `DBusVariant`
 - [Errors](#errors): `AccessPropertyForbiddenError`, `AlignmentError`, `AuthError`, `CreateStreamFailedError`, `InterfaceNotFoundError`, `InvalidValueError`, `LocalInterfaceExistsError`, `LocalInterfaceInvalidAnnotationError`, `LocalInterfaceInvalidMethodNameError`, `LocalInterfaceInvalidNameError`, `LocalInterfaceInvalidPropertyNameError`, `LocalInterfaceInvalidSignalNameError`, `LocalInterfaceMethodDefinedError`, `LocalInterfacePropertyDefinedError`, `LocalInterfaceSignalDefinedError`, `LocalObjectInvalidNameError`, `LocalObjectPathExistsError`, `LocalServiceInvalidNameError`, `MessageDecodeError`, `NotEnoughParamsError`, `ObjectPathError`, `ReadBufferError`, `SerialError`, `ServiceNotFoundError`, `SignatureError`, `TimeoutError`, `UnknownBusAddressError`, `UnknownBusTypeError`, `UserPermissionError`
 - [Low level](#low-level): `DBusConnection`, `DBusMessage`, `DBusBufferEncoder`, `DBusBufferDecoder`
-- [Option and data types](#option-and-data-types): `BusAddressConnectOpts`, `BusNameBasicInfo`, `ConnectOpts`, `CreateConnectOpts`, `CreateSignalEmitterOpts`, `DataType`, `DBusInterfaceOpts`, `DBusMessageHeader`, `DBusObjectManagerOpts`, `DBusObjectOpts`, `DBusServiceOpts`, `DBusTypeCode`, `DefineMethodArgumentOpts`, `DefineMethodOpts`, `DefinePropertyOpts`, `DefineSignalArgumentOpts`, `DefineSignalOpts`, `EmitPropertiesChangedOpts`, `EmitSignalOpts`, `GetPropertyValueOpts`, `HandshakeOpts`, `IntrospectAnnotation`, `IntrospectInterface`, `IntrospectMethod`, `IntrospectMethodArgument`, `IntrospectNode`, `IntrospectProperty`, `IntrospectSignal`, `IntrospectSignalArgument`, `InvokeOpts`, `LocalServiceOpts`, `MethodCall`, `MethodCallContext`, `NamedMethodCall`, `NamedNoReplyMethodCall`, `NoReplyMethodCall`, `PropertyOperation`, `ReceivedSignal`, `ReplyOpts`, `SetPropertyValueOpts`, `SocketConnectOpts`, `StopServiceOpts`, `StreamConnectOpts`, `TCPConnectOpts`
+- [Option and data types](#option-and-data-types): `BusAddressConnectOpts`, `BusNameBasicInfo`, `ConnectOpts`, `CreateConnectOpts`, `CreateSignalEmitterOpts`, `DataType`, `DBusInterfaceOpts`, `DBusMessageHeader`, `DBusObjectManagerOpts`, `DBusObjectOpts`, `DBusServiceOpts`, `DBusTypeCode`, `DecodeOpts`, `DefineMethodArgumentOpts`, `DefineMethodOpts`, `DefinePropertyOpts`, `DefineSignalArgumentOpts`, `DefineSignalOpts`, `EmitPropertiesChangedOpts`, `EmitSignalOpts`, `GetPropertyValueOpts`, `HandshakeOpts`, `IntrospectAnnotation`, `IntrospectInterface`, `IntrospectMethod`, `IntrospectMethodArgument`, `IntrospectNode`, `IntrospectProperty`, `IntrospectSignal`, `IntrospectSignalArgument`, `InvokeOpts`, `LocalServiceOpts`, `MethodCall`, `MethodCallContext`, `NamedMethodCall`, `NamedNoReplyMethodCall`, `NoReplyMethodCall`, `PropertyOperation`, `ProxyOpts`, `ReceivedSignal`, `ReplyOpts`, `SetPropertyValueOpts`, `SocketConnectOpts`, `StopServiceOpts`, `StreamConnectOpts`, `TCPConnectOpts`
 
 ## Client
 
@@ -350,13 +350,14 @@ Returns: The object proxy.
 
 Throws: {ServiceNotFoundError} As getService.
 
-#### `getObjectManager(service: string, objectPath?: string): Promise<DBusObjectManager>`
+#### `getObjectManager(service: string, objectPath?: string, opts?: ProxyOpts): Promise<DBusObjectManager>`
 
 A client for a service's org.freedesktop.DBus.ObjectManager, holding an up-to-date copy of the objects it
 manages with their interfaces and properties. A service that is not running but activatable is started.
 
 - `service`: The service's well-known name.
 - `objectPath`: Path of the service's object manager (default '/'). Services document it; BlueZ uses '/', UDisks2 '/org/freedesktop/UDisks2'.
+- `opts`: decode: how property values are given (see DecodeOpts).
 
 ```typescript
 const manager = await bus.getObjectManager('org.freedesktop.UDisks2', '/org/freedesktop/UDisks2')
@@ -370,7 +371,7 @@ Throws: {ServiceNotFoundError} As getService.
 Throws: {Error} The DBus error GetManagedObjects failed with, e.g. 'org.freedesktop.DBus.Error.UnknownMethod'
 when the path has no object manager.
 
-#### `getInterface(service: string, objectPath: string, iface: string): Promise<DBusInterface>`
+#### `getInterface(service: string, objectPath: string, iface: string, opts?: ProxyOpts): Promise<DBusInterface>`
 
 A proxy for an interface of an object, built by introspecting the object. This is the usual way to call
 methods, use properties and receive signals of a service.
@@ -378,6 +379,7 @@ methods, use properties and receive signals of a service.
 - `service`: The service's well-known name.
 - `objectPath`: The object path.
 - `iface`: The interface name.
+- `opts`: decode: how the proxy gives the values it receives, e.g. {types: 'variants'} to read values that will be sent back (see DecodeOpts).
 
 ```typescript
 const iface = await bus.getInterface('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus')
@@ -481,15 +483,16 @@ Uses shared introspection data to efficiently create DBusInterface instances for
 
 Returns: A Promise resolving to an array of DBusInterface instances for all interfaces on this object.
 
-#### `getInterface(iface: string): Promise<DBusInterface>`
+#### `getInterface(iface: string, opts?: ProxyOpts): Promise<DBusInterface>`
 
-Retrieves a specific DBus interface by name from this object.
+A proxy for one of this object's interfaces, built by introspecting the object.
 
-- `iface`: The name of the interface to retrieve.
+- `iface`: The interface name.
+- `opts`: decode: how the proxy gives the values it receives (see DecodeOpts).
 
-Returns: A Promise resolving to a DBusInterface instance for the specified interface.
+Returns: The interface proxy.
 
-Throws: InterfaceNotFoundError if the specified interface is not found.
+Throws: {InterfaceNotFoundError} When the object's introspection data does not list the interface.
 
 ### class `DBusInterface`
 
@@ -596,6 +599,10 @@ Supports wildcard '*' for unique name, object path, and interface to handle mult
 
 Each signal name with listeners holds one match rule on the bus: it is added with the first listener and
 removed with the last one (including once listeners after they fired).
+
+#### `readonly decode: DecodeOpts | undefined`
+
+How this emitter's listeners get the signals' arguments, if it overrides the connection's DecodeOpts.
 
 #### `readonly service: string`
 
@@ -1511,41 +1518,28 @@ Typed values, signatures, and the enums used by the API.
 
 ### class `DBusSignedValue`
 
-A class representing a DBus signed value with a specific signature and associated data.
-This class wraps a value with its corresponding DBus type signature, enabling proper
-encoding and decoding of DBus messages. It supports both basic types (e.g., integers, strings)
-and container types (e.g., arrays, structs, dictionaries) as defined by the DBus specification.
+A value with an explicit DBus type: use it wherever a value is sent to give it a type other than the one it would
+get otherwise, typically inside variants (`v`) and `a{sv}` dictionaries. Containers may hold plain values, which
+take their types from the signature, and typed values, which keep theirs. The type classes (DBusUInt32,
+DBusObjectPath, DBusArray, …) are DBusSignedValue too.
 
-#### `readonly $signature: string`
+Received values come back as type class instances where DecodeOpts.types asks for them.
 
-The signature of the DBus value (e.g., 's' for string, 'i' for integer, 'a' for array).
-This identifies the type of data stored in the value according to the DBus type system.
+```typescript
+new DBusSignedValue('u', 7)                                            // the same as new DBusUInt32(7)
+new DBusSignedValue('a{sv}', {mtu: new DBusUInt32(1500), name: 'eth0'})
+new DBusSignedValue('as', [])                                          // an empty array of strings
+new DBusSignedValue('(uu)', [1, 2])
+```
 
-#### `readonly $arrayItemSignature?: string | undefined`
+#### `readonly signature: string`
 
-The signature of the array item (for 'a' type), if applicable.
-This is used to specify the type of elements within an array, particularly useful
-for distinguishing different array contents (e.g., 'ay' for byte array).
+The complete signature of this value, e.g. 'u', 'as' or 'a{sv}'.
 
-#### `readonly $value: any`
+#### `readonly value: any`
 
-The value associated with the signature.
-Can be a primitive (e.g., number, string), a single DBusSignedValue (for nested types like variants),
-or an array of DBusSignedValue instances (for containers like arrays or structs).
-
-#### `DBusSignedValue.parse(signature: string, value: any | DBusSignedValue | DBusSignedValue[]): DBusSignedValue[]`
-
-Static method to parse a DBus signature and value into an array of DBusSignedValue objects.
-Distinguishes between independent parameter sequences (e.g., 'si' for string and integer)
-and structs (e.g., '(si)' for a struct containing string and integer).
-This method is useful for creating properly typed DBus values from raw data.
-
-- `signature`: The DBus signature string (e.g., 's', 'si', '(si)', 'as') defining the type structure.
-- `value`: The value or values corresponding to the signature, can be raw data or already DBusSignedValue.
-
-Returns: An array of DBusSignedValue objects representing the parsed signature and value.
-
-Throws: {SignatureError} If the value structure does not match the signature or is invalid.
+This value as a plain JavaScript value, the way it is decoded by default: numbers, bigints for 64-bit
+integers, strings, booleans, Buffers for byte arrays, arrays, and objects for dictionaries.
 
 #### `DBusSignedValue.toPlain(values: DBusSignedValue[]): any[]`
 
@@ -1557,16 +1551,15 @@ signature metadata to return raw values suitable for general use.
 
 Returns: An array of plain JavaScript values representing the data without DBus signatures.
 
-#### `new DBusSignedValue(signature: string | DataType | DataType[], value: any | DBusSignedValue | DBusSignedValue[]): DBusSignedValue`
+#### `new DBusSignedValue(signature: string, value: any): DBusSignedValue`
 
-Constructor for creating a DBusSignedValue object from a signature and value.
-Processes the signature (string, DataType, or array of DataType) and associates it with the provided value,
-handling basic types, structs, arrays, dictionaries, and variants appropriately.
+Gives a value a DBus type.
 
-- `signature`: The DBus signature, as a string (e.g., 's'), a single DataType, or an array of DataType for structs.
-- `value`: The value associated with the signature, can be raw data, DBusSignedValue, or array of values.
+- `signature`: The complete signature of one type, e.g. 'u', 'as', 'a{sv}' or '(si)'.
+- `value`: The value: plain values take their types from the signature, DBusSignedValue values (and type class instances) inside containers keep theirs. A variant ('v') holds a typed value, or a plain one whose type is inferred (see inferSignature).
 
-Throws: {SignatureError} If the value structure does not match the signature or if the type is unsupported.
+Throws: {SignatureError} If the signature is invalid or the value's shape does not match it (e.g. a string for
+an array). Values out of range for their type are rejected when encoded.
 
 #### `DBusSignedValue.inferSignature(value: any): string`
 
@@ -1703,23 +1696,31 @@ One class per DBus type, to give a value an explicit type, e.g. inside a variant
 
 ### class `DBusArray` (extends DBusTypeClass)
 
-A DBus ARRAY ('a') of type class instances, all of the same type.
+A DBus ARRAY ('a') built from typed values, all of the same type. For plain values give the signature instead:
+new DBusSignedValue('au', [1, 2]).
 
 ```typescript
 new DBusArray([new DBusUInt32(1), new DBusUInt32(2)])   // 'au'
 new DBusArray([], DBusString)                           // an empty 'as'
+new DBusArray([], 'a{sv}')                              // an empty 'aa{sv}'
 ```
 
 #### `DBusArray.type: string`
 
 The DBus type code, 'a'.
 
-#### `new DBusArray<T extends DBusTypeClass = DBusTypeClass>(items: T[], typeClass?: typeof DBusTypeClass): DBusArray<T>`
+#### `readonly items: T[]`
 
-- `items`: The elements, all instances of the same type class.
-- `typeClass`: The element type of an empty array (by default variant, 'av'); ignored when there are items.
+The elements, as typed values (type class instances when decoded with DecodeOpts.types 'variants' or 'all').
 
-Throws: {SignatureError} When the items are of different types.
+#### `new DBusArray<T extends DBusSignedValue = DBusSignedValue>(items: T[], elementType?: string | { type: string; }): DBusArray<T>`
+
+- `items`: The elements: typed values (DBusSignedValue or type class instances), all of the same type.
+- `elementType`: The element type of an empty array, as a basic type class (e.g. DBusString) or a complete signature (e.g. 'a{sv}'); by default variant ('av'). Ignored when there are items.
+
+Throws: {InvalidValueError} When an item is a plain value.
+
+Throws: {SignatureError} When the items are of different types, or elementType is not one complete type.
 
 ### class `DBusBoolean` (extends DBusTypeClass)
 
@@ -1757,19 +1758,32 @@ The DBus type code, 'y'.
 
 ### class `DBusDictEntry` (extends DBusTypeClass)
 
-A DBus DICT_ENTRY ('{..}'): one key/value pair of a dictionary; dictionaries are arrays of them.
+A DBus DICT_ENTRY ('{..}'): one key/value pair, built from typed values; a dictionary is a DBusArray of them. For
+plain values give the dictionary's signature instead: new DBusSignedValue('a{su}', {count: 7}).
 
 ```typescript
-new DBusArray([new DBusDictEntry([new DBusString('count'), new DBusVariant(new DBusUInt32(7))])])   // 'a{sv}'
+new DBusArray([new DBusDictEntry([new DBusString('count'), new DBusUInt32(7)])])   // 'a{su}'
 ```
 
 #### `DBusDictEntry.type: string`
 
 The DBus type code, '{'.
 
-#### `new DBusDictEntry<T extends DBusTypeClass = DBusTypeClass>(value: [T, T]): DBusDictEntry<T>`
+#### `readonly key: T`
 
-- `value`: The key, which must be of a basic type, and the value.
+The key, as a typed value.
+
+#### `readonly content: T`
+
+The value of the entry, as a typed value (`value` gives the whole entry as a plain value).
+
+#### `new DBusDictEntry<T extends DBusSignedValue = DBusSignedValue>(value: [T, T]): DBusDictEntry<T>`
+
+- `value`: The key, a typed value of a basic type (e.g. DBusString), and the value, any typed value.
+
+Throws: {InvalidValueError} When the key or the value is a plain value.
+
+Throws: {SignatureError} When the key is not of a basic type.
 
 ### class `DBusDouble` (extends DBusTypeClass)
 
@@ -1892,7 +1906,8 @@ The DBus type code, 's'.
 
 ### class `DBusStruct` (extends DBusTypeClass)
 
-A DBus STRUCT ('(...)'): a fixed sequence of fields of any types.
+A DBus STRUCT ('(...)') built from typed values, one per field. For plain values give the signature instead:
+new DBusSignedValue('(si)', ['answer', 42]).
 
 ```typescript
 new DBusStruct([new DBusString('answer'), new DBusInt32(42)])   // '(si)'
@@ -1902,9 +1917,18 @@ new DBusStruct([new DBusString('answer'), new DBusInt32(42)])   // '(si)'
 
 The DBus type code, '('.
 
-#### `new DBusStruct<T extends DBusTypeClass = DBusTypeClass>(value: T[]): DBusStruct<T>`
+#### `readonly fields: T[]`
 
-- `value`: The fields, in order.
+The fields in order, as typed values (type class instances when decoded with DecodeOpts.types 'variants' or
+'all').
+
+#### `new DBusStruct<T extends DBusSignedValue = DBusSignedValue>(value: T[]): DBusStruct<T>`
+
+- `value`: The fields in order: typed values (DBusSignedValue or type class instances), at least one.
+
+Throws: {InvalidValueError} When a field is a plain value.
+
+Throws: {SignatureError} When there are no fields: DBus has no empty structs.
 
 ### class `DBusUInt16` (extends DBusTypeClass)
 
@@ -1972,19 +1996,28 @@ The DBus type code, 'h'.
 
 ### class `DBusVariant` (extends DBusTypeClass)
 
-A DBus VARIANT ('v'): a value that carries its own type.
+A DBus VARIANT ('v'): a value that carries its own type. A typed value placed where a variant is expected already
+becomes the variant's content, so this class is needed only to put a variant inside a variant, or to state it.
 
 ```typescript
 new DBusVariant(new DBusUInt32(7))   // a variant holding a 'u'
+new DBusVariant('text')              // a variant holding an 's', inferred
 ```
 
 #### `DBusVariant.type: string`
 
 The DBus type code, 'v'.
 
-#### `new DBusVariant<T extends DBusTypeClass = DBusTypeClass>(value: T): DBusVariant<T>`
+#### `readonly content: DBusSignedValue`
 
-- `value`: The content, whose type class is the variant's inner type.
+The content, as a typed value whose `signature` is the variant's inner type (a type class instance when decoded
+with DecodeOpts.types 'variants' or 'all').
+
+#### `new DBusVariant<T = any>(value: T): DBusVariant<T>`
+
+- `value`: The content: a typed value, or a plain value whose type is inferred (see DBusSignedValue.inferSignature).
+
+Throws: {InvalidValueError} When the type of a plain value cannot be inferred (null, undefined, …).
 
 ## Errors
 
@@ -2070,7 +2103,7 @@ Determines the connection status by checking if the stream is not closed.
 
 Returns: True if the stream is not closed (connection is active), false otherwise.
 
-#### `new DBusConnection(stream: Duplex, authMethod: string, uid: string, guid: string, advancedResponse?: boolean, convertBigIntToNumber?: boolean): DBusConnection`
+#### `new DBusConnection(stream: Duplex, authMethod: string, uid: string, guid: string, decode?: DecodeOpts): DBusConnection`
 
 Constructor for DBusConnection.
 Initializes the connection with the provided stream and authentication details,
@@ -2081,8 +2114,7 @@ Implements a state machine to parse incoming DBus messages by reading headers an
 - `authMethod`: The authentication method that succeeded during handshake.
 - `uid`: The user ID used during authentication, as a string (later parsed to number).
 - `guid`: The GUID provided by the server after successful authentication.
-- `advancedResponse`: Boolean flag to enable advanced response handling, where DBus return messages are organized using DBusTypeClass instances.
-- `convertBigIntToNumber`: Boolean flag to enable auto convert bigint to javascript number.
+- `decode`: How received values are given by default (see DecodeOpts); each message's body uses it.
 
 #### `write(data: Buffer): boolean`
 
@@ -2138,9 +2170,22 @@ This is essential for routing and processing the message on the DBus.
 
 #### `readonly body: any[]`
 
-The body of the DBus message.
-Contains the payload or arguments of the message, such as method parameters or signal data.
-This is an array that can hold various data types as per the DBus specification.
+The arguments of the message. For a message to send, the values it was created with; for a received
+message, its values decoded with the connection's DecodeOpts (plain values by default). getBody gives them
+with other choices.
+
+#### `getBody(decode?: DecodeOpts): any[]`
+
+The arguments of a received message, decoded with the given choices; those not given are the connection's.
+For a message to send, the values it was created with.
+
+- `decode`: How to give the values (see DecodeOpts).
+
+```typescript
+dbus.on('methodCall', (message) => console.log(message.getBody({types: 'all'})))
+```
+
+Returns: The arguments.
 
 #### `new DBusMessage(header: DBusMessageHeader | Partial<DBusMessageHeader>, ...body: any[]): DBusMessage`
 
@@ -2180,7 +2225,7 @@ Provides a convenient way to build a message with defaults and serialize it dire
 
 Returns: A Buffer containing the encoded DBus message ready for transmission.
 
-#### `DBusMessage.decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number, advancedResponse?: boolean, convertBigIntToNumber?: boolean): DBusMessage`
+#### `DBusMessage.decode(header: Buffer, fieldsAndBody: Buffer, fieldsLength: number, bodyLength: number, decode?: DecodeOpts): DBusMessage`
 
 Decodes a DBus message from raw buffers into a DBusMessage instance.
 Parses the header and body from binary data following the DBus wire protocol.
@@ -2190,8 +2235,7 @@ Handles endianness, header fields, padding, and body decoding based on the signa
 - `fieldsAndBody`: A Buffer containing the header fields and body data.
 - `fieldsLength`: The length of the header fields section in bytes.
 - `bodyLength`: The length of the body section in bytes.
-- `advancedResponse`: Boolean flag to enable advanced response handling, where DBus return messages are organized using DBusTypeClass instances.
-- `convertBigIntToNumber`: Boolean flag to enable auto convert bigint to javascript number.
+- `decode`: The connection's choices for giving the values (see DecodeOpts); `body` uses them.
 
 Returns: A DBusMessage instance with parsed header and body content.
 
@@ -2434,7 +2478,7 @@ The endianness of the buffer data (Little Endian or Big Endian).
 Default is Little Endian (LE) as specified by DBusMessageEndianness.LE,
 which determines how multi-byte values are read from the buffer.
 
-#### `new DBusBufferDecoder(endianness: DBusMessageEndianness | undefined, buffer: Buffer, offset?: number, convertBigIntToNumber?: boolean): DBusBufferDecoder`
+#### `new DBusBufferDecoder(endianness: DBusMessageEndianness | undefined, buffer: Buffer, offset?: number): DBusBufferDecoder`
 
 Creates a new DBusBufferDecoder instance.
 Initializes the decoder with the specified endianness and buffer,
@@ -2443,7 +2487,6 @@ optionally setting the initial offset for reading.
 - `endianness`: The endianness to use for reading multi-byte values (default: Little Endian).
 - `buffer`: The binary buffer containing the DBus data to decode.
 - `offset`: The initial offset to start reading from (default: 0).
-- `convertBigIntToNumber`: Convert bigint value to number (default: false)
 
 #### `readByte(): DBusSignedValue`
 
@@ -2634,28 +2677,24 @@ Returns: The value wrapped in a DBusSignedValue instance with the appropriate si
 
 Throws: {SignatureError} If the type is unsupported or has invalid child types for containers.
 
-#### `toSignedValues(signature: string): DBusTypeClass[]`
+#### `decode(signature: string, opts?: DecodeOpts): any[]`
 
-Reads multiple values from the buffer based on the provided signature string.
-The signature is parsed into DataType(s), and values are read accordingly, then converted to DBusTypeClass instances.
+Decodes the values of a signature into JavaScript values, as DecodeOpts asks: plain values by default, or type
+class instances where `types` asks for them.
 
-- `signature`: The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
+- `signature`: The signature of the values, e.g. 'sa{sv}'.
+- `opts`: How to give the values (see DecodeOpts).
 
-Returns: An array of DBusTypeClass instances representing the read values.
+```typescript
+new DBusBufferDecoder(DBusMessageEndianness.LE, body).decode('a{sv}')                       // [{mtu: 1500}]
+new DBusBufferDecoder(DBusMessageEndianness.LE, body).decode('a{sv}', {types: 'variants'})  // [{mtu: DBusUInt32}]
+```
 
-Throws: {SignatureError} If the signature is empty or invalid.
-
-#### `decode(signature: string, typed?: boolean): any[]`
-
-Decodes values from the buffer based on the provided signature and optionally converts them to plain JavaScript values or typed DBusTypeClass instances.
-This method can unwrap DBusSignedValue instances into raw values for easier use or return typed instances for further processing.
-
-- `signature`: The DBus signature string describing the type(s) to read (e.g., 'is' for integer and string).
-- `typed`: If true, returns an array of DBusTypeClass instances; if false, returns plain JavaScript values (default: false).
-
-Returns: An array of either plain JavaScript values or DBusTypeClass instances, based on the typed parameter.
+Returns: One value per complete type of the signature.
 
 Throws: {SignatureError} If the signature is empty or invalid.
+
+Throws: {InvalidValueError | ReadBufferError | AlignmentError} If the data is malformed.
 
 ## Option and data types
 
@@ -2760,6 +2799,10 @@ This can be a specific path (e.g., '/org/freedesktop/DBus') or '*' to match any 
 The interface name to associate with the signal emitter.
 This can be a specific interface (e.g., 'org.freedesktop.DBus') or '*' to match any interface.
 
+#### `decode?: DecodeOpts | undefined`
+
+How to give the signals' arguments to this emitter's listeners, overriding the connection's DecodeOpts.
+
 ### interface `DataType`
 
 Interface representing a DBus data type with its structure.
@@ -2795,6 +2838,10 @@ This links the interface to a specific object on the bus.
 
 The introspection data for this interface.
 Contains metadata about the interface's methods, properties, and signals as per the DBus introspection format.
+
+#### `readonly decode?: DecodeOpts | undefined`
+
+How the proxy gives the values it receives, overriding the connection's DecodeOpts.
 
 ### interface `DBusMessageHeader`
 
@@ -2880,6 +2927,10 @@ The unique name of the service's current owner.
 #### `objectPath: string`
 
 Path of the object implementing org.freedesktop.DBus.ObjectManager.
+
+#### `decode?: DecodeOpts | undefined`
+
+How property values are given, overriding the connection's DecodeOpts.
 
 ### interface `DBusObjectOpts`
 
@@ -2974,6 +3025,36 @@ Each character corresponds to a specific data type or structural element as per 
 - '@' : Reference to a type (used in some contexts).
 - '&' : Pointer or reference type (used in some contexts).
 - '^' : Escaped or special type (used in some contexts).
+
+### interface `DecodeOpts`
+
+How received values are given to you. Set defaults for a connection with DBus.connect({decode}) (or
+LocalService.run({decode}) for the arguments a service's methods receive), and override them per call, proxy or
+signal emitter.
+
+```typescript
+// Read a{sv} settings with the type of every variant kept, to change and send them back unchanged
+const [settings] = await bus.invoke({..., method: 'GetSettings', decode: {types: 'variants'}})
+```
+
+#### `types?: "none" | "variants" | "all" | undefined`
+
+Where values keep their DBus type, as type class instances (DBusUInt32, DBusArray, …) whose `signature` and
+`value` tell the type and the plain value:
+- 'none' (default): nowhere; everything is a plain value. Variants give their content. Values that came in
+  variants are still sent back with their original type when the object holding them is sent again.
+- 'variants': the content of each variant is a type class instance; everything else is plain.
+- 'all': every value is a type class instance.
+
+#### `dictionaries?: "object" | "map" | undefined`
+
+What dictionaries (a{…}) become: 'object' (default), whose keys are strings, or 'map', a Map whose keys keep
+their type (numbers, booleans, bigints).
+
+#### `int64?: "number" | "bigint" | undefined`
+
+What 64-bit integers (x, t) become: 'bigint' (default), or 'number' when the value is a safe integer
+(within ±2^53 - 1); larger values stay bigint rather than losing precision.
 
 ### interface `DefineMethodArgumentOpts`
 
@@ -3193,6 +3274,10 @@ This identifies the interface containing the property (e.g., 'org.freedesktop.DB
 
 The name of the property to retrieve.
 This is the specific property identifier (e.g., 'Names').
+
+#### `decode?: DecodeOpts | undefined`
+
+How to give the value, overriding the connection's DecodeOpts for this call.
 
 ### interface `HandshakeOpts`
 
@@ -3421,6 +3506,10 @@ connection closes.
 
 Send the call without waiting for a reply (NO_REPLY_EXPECTED); invoke then returns nothing.
 
+#### `decode?: DecodeOpts | undefined`
+
+How to give the reply's values, overriding the connection's DecodeOpts for this call.
+
 ### interface `LocalServiceOpts`
 
 Options for creating a LocalService.
@@ -3517,6 +3606,20 @@ Retrieves the current value of the property.
 This method queries the DBus object to get the current value of the property.
 
 Returns: A Promise that resolves with the current value of the property.
+
+### interface `ProxyOpts`
+
+Options for proxies: interfaces (DBus.getInterface, DBusObject.getInterface) and object managers
+(DBus.getObjectManager).
+
+#### `decode?: DecodeOpts | undefined`
+
+How to give the values the proxy receives (method results, property values, signal arguments), overriding
+the connection's DecodeOpts.
+
+```typescript
+const connection = await bus.getInterface('org.freedesktop.NetworkManager', path, 'org.freedesktop.NetworkManager.Settings.Connection', {decode: {types: 'variants'}})
+```
 
 ### interface `ReceivedSignal`
 

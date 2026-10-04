@@ -1,6 +1,7 @@
 import {DBusObjectOpts} from './DBusObjectOpts'
 import {DBusObject} from '../DBusObject'
 import {IntrospectInterface} from './IntrospectInterface'
+import {DecodeOpts} from './DecodeOpts'
 
 /**
  * Interface defining options for a DBus interface.
@@ -24,4 +25,9 @@ export interface DBusInterfaceOpts extends DBusObjectOpts {
      * Contains metadata about the interface's methods, properties, and signals as per the DBus introspection format.
      */
     readonly introspectInterface: IntrospectInterface
+
+    /**
+     * How the proxy gives the values it receives, overriding the connection's DecodeOpts.
+     */
+    readonly decode?: DecodeOpts
 }

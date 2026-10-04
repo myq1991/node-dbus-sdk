@@ -6,11 +6,29 @@ import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 import {ReceivedSignal} from './types/ReceivedSignal'
 import {DBusObjectManagerOpts} from './types/DBusObjectManagerOpts'
 import {DBusMessage} from './lib/DBusMessage'
+import {DBusSignedValue} from './lib/DBusSignedValue'
+import {DecodeOpts} from './types/DecodeOpts'
 
 /**
  * Interfaces of a managed object with their properties: {interface: {property: value}}.
  */
 type InterfacesAndProperties = Record<string, Record<string, any>>
+
+/**
+ * The entries of a dictionary decoded as an object or, with DecodeOpts.dictionaries 'map', as a Map.
+ */
+function entriesOf(dictionary: any): [any, any][] {
+    return dictionary instanceof Map ? [...dictionary.entries()] : Object.entries(dictionary ?? {})
+}
+
+/**
+ * A plain-object copy of a property dictionary that keeps the types its values were received with.
+ */
+function copyProperties(properties: any): Record<string, any> {
+    const copy: Record<string, any> = Object.fromEntries(entriesOf(properties))
+    DBusSignedValue.copyVariantTypes(properties, copy)
+    return copy
+}
 
 /**
  * A client for a service's org.freedesktop.DBus.ObjectManager: keeps a local copy of the objects it manages, their
@@ -32,6 +50,8 @@ type InterfacesAndProperties = Record<string, Record<string, any>>
 export class DBusObjectManager extends EventEmitter {
 
     readonly #dbus: DBus
+
+    readonly #decode: DecodeOpts | undefined
 
     /**
      * The managed objects: object path → interface → property → value.
@@ -93,13 +113,16 @@ export class DBusObjectManager extends EventEmitter {
     constructor(opts: DBusObjectManagerOpts) {
         super()
         this.#dbus = opts.dbus
+        // Property values all come in variants, so 'all' amounts to 'variants'; the structure around them is read here
+        this.#decode = opts.decode?.types === 'all' ? {...opts.decode, types: 'variants'} : opts.decode
         this.service = opts.service
         this.objectPath = opts.objectPath
         this.#managerSignals = this.#dbus.createSignalEmitter({
             service: opts.service,
             uniqueName: opts.uniqueName,
             objectPath: opts.objectPath,
-            interface: 'org.freedesktop.DBus.ObjectManager'
+            interface: 'org.freedesktop.DBus.ObjectManager',
+            decode: this.#decode
         })
         this.#managerSignals.onAny(this.#onSignal)
         // One match rule for the properties of every object of the service, rather than one per object
@@ -107,7 +130,8 @@ export class DBusObjectManager extends EventEmitter {
             service: opts.service,
             uniqueName: opts.uniqueName,
             objectPath: '*',
-            interface: 'org.freedesktop.DBus.Properties'
+            interface: 'org.freedesktop.DBus.Properties',
+            decode: this.#decode
         })
         this.#propertySignals.onAny(this.#onSignal)
         this.#dbus.on('nameOwnerChanged', this.#onNameOwnerChanged)
@@ -139,13 +163,15 @@ export class DBusObjectManager extends EventEmitter {
         }
         if (generation !== this.#generation || this.#closed) return
         this.#buffer = undefined
-        const objects: Record<string, InterfacesAndProperties> = reply.body[0] ?? {}
+        const objects: [string, any][] = entriesOf(reply.getBody(this.#decode)[0])
+        const paths: Set<string> = new Set(objects.map(([objectPath]): string => objectPath))
         for (const objectPath of [...this.#objects.keys()]) {
-            if (!objects[objectPath]) this.#removeInterfaces(objectPath, [...this.#objects.get(objectPath)!.keys()])
+            if (!paths.has(objectPath)) this.#removeInterfaces(objectPath, [...this.#objects.get(objectPath)!.keys()])
         }
-        for (const [objectPath, interfaces] of Object.entries(objects)) {
+        for (const [objectPath, interfaces] of objects) {
             const known: Map<string, Record<string, any>> | undefined = this.#objects.get(objectPath)
-            const gone: string[] = known ? [...known.keys()].filter((name: string): boolean => !interfaces[name]) : []
+            const names: Set<string> = new Set(entriesOf(interfaces).map(([name]): string => name))
+            const gone: string[] = known ? [...known.keys()].filter((name: string): boolean => !names.has(name)) : []
             if (gone.length) this.#removeInterfaces(objectPath, gone)
             this.#addInterfaces(objectPath, interfaces)
         }
@@ -182,7 +208,7 @@ export class DBusObjectManager extends EventEmitter {
      */
     public getProperties(objectPath: string, interfaceName: string): Record<string, any> | undefined {
         const properties: Record<string, any> | undefined = this.#objects.get(objectPath)?.get(interfaceName)
-        return properties ? {...properties} : undefined
+        return properties ? copyProperties(properties) : undefined
     }
 
     /**
@@ -194,7 +220,7 @@ export class DBusObjectManager extends EventEmitter {
         const objects: Record<string, InterfacesAndProperties> = {}
         for (const [objectPath, interfaces] of this.#objects) {
             objects[objectPath] = {}
-            for (const [interfaceName, properties] of interfaces) objects[objectPath][interfaceName] = {...properties}
+            for (const [interfaceName, properties] of interfaces) objects[objectPath][interfaceName] = copyProperties(properties)
         }
         return objects
     }
@@ -306,12 +332,14 @@ export class DBusObjectManager extends EventEmitter {
             return
         }
         if (signal.name !== 'PropertiesChanged') return
-        const [interfaceName, changed, invalidated] = signal.args as [string, Record<string, any>, string[]]
+        const [interfaceName, changedDictionary, invalidated] = signal.args as [string, any, string[]]
         const properties: Record<string, any> | undefined = this.#objects.get(signal.objectPath)?.get(interfaceName)
         if (!properties) return // Not a managed object, or an interface it does not report
+        const changed: Record<string, any> = copyProperties(changedDictionary)
         Object.assign(properties, changed)
+        DBusSignedValue.copyVariantTypes(changed, properties)
         for (const name of invalidated) delete properties[name]
-        this.emit('propertiesChanged', signal.objectPath, interfaceName, {...changed}, [...invalidated])
+        this.emit('propertiesChanged', signal.objectPath, interfaceName, changed, [...invalidated])
     }
 
     #addInterfaces(objectPath: string, interfaces: InterfacesAndProperties): void {
@@ -322,10 +350,10 @@ export class DBusObjectManager extends EventEmitter {
             this.#objects.set(objectPath, object)
         }
         const added: InterfacesAndProperties = {}
-        for (const [interfaceName, properties] of Object.entries(interfaces)) {
+        for (const [interfaceName, properties] of entriesOf(interfaces)) {
             const known: boolean = object.has(interfaceName)
-            object.set(interfaceName, {...properties})
-            if (!known) added[interfaceName] = {...properties}
+            object.set(interfaceName, copyProperties(properties))
+            if (!known) added[interfaceName] = copyProperties(properties)
         }
         if (isNew) return void this.emit('objectAdded', objectPath, added)
         if (Object.keys(added).length) this.emit('interfacesAdded', objectPath, added)

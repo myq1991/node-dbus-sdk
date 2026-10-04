@@ -119,7 +119,8 @@ export class DBusInterface {
                     interface: this.name,
                     method: methodInfo.name,
                     signature: signature,
-                    args: inputArguments
+                    args: inputArguments,
+                    decode: this.opts.decode
                 })
                 if (result.length > 1) return result
                 return result[0]
@@ -215,7 +216,8 @@ export class DBusInterface {
                         service: this.service.name,
                         objectPath: this.object.name,
                         interface: this.name,
-                        property: propertyInfo.name
+                        property: propertyInfo.name,
+                        decode: this.opts.decode
                     })
                 }
             }
@@ -237,7 +239,8 @@ export class DBusInterface {
             service: this.service.name,
             uniqueName: this.service.uniqueName,
             objectPath: this.object.name,
-            interface: this.name
+            interface: this.name,
+            decode: this.opts.decode
         })
         return this.#signalEmitter
     }

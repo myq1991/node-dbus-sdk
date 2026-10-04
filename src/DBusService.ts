@@ -2,7 +2,6 @@ import {DBusServiceOpts} from './types/DBusServiceOpts'
 import {DBusObject} from './DBusObject'
 import {DBus} from './DBus'
 import {parseStringPromise as parseXMLString} from 'xml2js'
-import {DBusTypeClass} from './lib/DBusTypeClass'
 
 /**
  * A proxy for a service on the bus, by its well-known name (e.g. 'org.freedesktop.NetworkManager').
@@ -70,10 +69,11 @@ export class DBusService {
                 service: this.name,
                 objectPath: objectPath,
                 interface: 'org.freedesktop.DBus.Introspectable',
-                method: 'Introspect'
+                method: 'Introspect',
+                decode: {types: 'none'}
             })
             if (!xmlResponse) return []
-            const parsedObject: any = await parseXMLString(xmlResponse instanceof DBusTypeClass ? xmlResponse.value : xmlResponse)
+            const parsedObject: any = await parseXMLString(xmlResponse)
             if (!parsedObject?.node?.interface) emptyObjectPaths.push(objectPath)
             if (!parsedObject?.node?.node) return []
             const nodeNames: string[] = (parsedObject.node.node as { $: { name: string } }[]).map((node: {

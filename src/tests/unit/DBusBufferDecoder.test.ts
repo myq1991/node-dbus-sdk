@@ -77,12 +77,17 @@ describe('DBusBufferDecoder', (): void => {
 
         it('converts 64-bit integers to number when requested', (): void => {
             const wire: Buffer = new DBusBufferEncoder().encode('xt', [-5n, 6n])
-            assert.deepEqual(new DBusBufferDecoder(DBusMessageEndianness.LE, wire, 0, true).decode('xt'), [-5, 6])
+            assert.deepEqual(new DBusBufferDecoder(DBusMessageEndianness.LE, wire).decode('xt', {int64: 'number'}), [-5, 6])
         })
 
-        it('returns DBusTypeClass instances in typed mode', (): void => {
+        it('keeps 64-bit integers beyond the safe range as bigint even with int64 number', (): void => {
+            const wire: Buffer = new DBusBufferEncoder().encode('xt', [-(2n ** 60n), 2n ** 63n])
+            assert.deepEqual(new DBusBufferDecoder(DBusMessageEndianness.LE, wire).decode('xt', {int64: 'number'}), [-(2n ** 60n), 2n ** 63n])
+        })
+
+        it('returns type class instances with types all', (): void => {
             const wire: Buffer = new DBusBufferEncoder().encode('xax', [5n, [1n, 2n]])
-            const [int64, array] = new DBusBufferDecoder(DBusMessageEndianness.LE, wire).decode('xax', true)
+            const [int64, array] = new DBusBufferDecoder(DBusMessageEndianness.LE, wire).decode('xax', {types: 'all'})
             assert.ok(int64 instanceof DBusInt64)
             assert.equal(int64.value, 5n)
             assert.ok(array instanceof DBusArray)
@@ -98,10 +103,10 @@ describe('DBusBufferDecoder', (): void => {
             assert.deepEqual(bytes, Buffer.from([1, 2, 3]))
         })
 
-        it('returns DBusArray of DBusByte in typed mode', (): void => {
-            const [array] = new DBusBufferDecoder(DBusMessageEndianness.LE, hex('03000000 010203')).decode('ay', true)
+        it('returns DBusArray of DBusByte with types all', (): void => {
+            const [array] = new DBusBufferDecoder(DBusMessageEndianness.LE, hex('03000000 010203')).decode('ay', {types: 'all'})
             assert.ok(array instanceof DBusArray)
-            assert.ok(array.$value.every((item: any): boolean => item instanceof DBusByte))
+            assert.ok(array.items.every((item: any): boolean => item instanceof DBusByte))
             assert.deepEqual(array.value, Buffer.from([1, 2, 3]))
         })
     })

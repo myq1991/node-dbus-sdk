@@ -1,3 +1,5 @@
+import {DecodeOpts} from './DecodeOpts'
+
 /**
  * Interface defining options for retrieving a property value from a DBus object.
  * Used to specify the target service, object, interface, and property to query.
@@ -26,4 +28,9 @@ export interface GetPropertyValueOpts {
      * This is the specific property identifier (e.g., 'Names').
      */
     property: string
+
+    /**
+     * How to give the value, overriding the connection's DecodeOpts for this call.
+     */
+    decode?: DecodeOpts
 }

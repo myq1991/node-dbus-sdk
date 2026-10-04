@@ -12,7 +12,7 @@ import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
 import {IntrospectAnnotation} from './types/IntrospectAnnotation'
 import {InterfaceNotFoundError} from './lib/Errors'
-import {DBusTypeClass} from './lib/DBusTypeClass'
+import {ProxyOpts} from './types/ProxyOpts'
 
 /**
  * Copies the <annotation> children of a parsed introspection XML element, if any, onto its introspection entry.
@@ -70,7 +70,7 @@ export class DBusObject {
      * @returns A Promise resolving to a DBusInterface instance for the specified interface.
      * @throws InterfaceNotFoundError if the specified interface is not found.
      */
-    protected async internalGetInterface(iface: string, shareIntrospect: boolean = false): Promise<DBusInterface> {
+    protected async internalGetInterface(iface: string, shareIntrospect: boolean = false, opts: ProxyOpts = {}): Promise<DBusInterface> {
         let introspectInterfaces: IntrospectInterface[]
         if (shareIntrospect) {
             introspectInterfaces = this.#shareIntrospectInterfaces
@@ -83,7 +83,8 @@ export class DBusObject {
             ...this.opts,
             iface: iface,
             dbusObject: this,
-            introspectInterface: introspectInterface
+            introspectInterface: introspectInterface,
+            decode: opts.decode
         })
     }
 
@@ -98,9 +99,10 @@ export class DBusObject {
             service: this.service.name,
             objectPath: this.name,
             interface: 'org.freedesktop.DBus.Introspectable',
-            method: 'Introspect'
+            method: 'Introspect',
+            decode: {types: 'none'}
         })
-        const introspectObject: any = await parseXMLString(introspectXML instanceof DBusTypeClass ? introspectXML.value : introspectXML)
+        const introspectObject: any = await parseXMLString(introspectXML)
         const node: any = introspectObject.node
         const interfaces: any[] = node.interface ? node.interface : []
         return {
@@ -179,12 +181,14 @@ export class DBusObject {
     }
 
     /**
-     * Retrieves a specific DBus interface by name from this object.
-     * @param iface - The name of the interface to retrieve.
-     * @returns A Promise resolving to a DBusInterface instance for the specified interface.
-     * @throws InterfaceNotFoundError if the specified interface is not found.
+     * A proxy for one of this object's interfaces, built by introspecting the object.
+     *
+     * @param iface - The interface name.
+     * @param opts - decode: how the proxy gives the values it receives (see DecodeOpts).
+     * @returns The interface proxy.
+     * @throws {InterfaceNotFoundError} When the object's introspection data does not list the interface.
      */
-    public async getInterface(iface: string): Promise<DBusInterface> {
-        return await this.internalGetInterface(iface, false)
+    public async getInterface(iface: string, opts?: ProxyOpts): Promise<DBusInterface> {
+        return await this.internalGetInterface(iface, false, opts)
     }
 }

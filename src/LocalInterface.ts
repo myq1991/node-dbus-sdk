@@ -736,10 +736,11 @@ export class LocalInterface {
     public async setProperty(name: string, value: any): Promise<void> {
         if (!this.#definedProperties[name]) throw createDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         try {
-            // Encode and decode the value to ensure it matches the property's signature
+            // Encode and decode the value to ensure it matches the property's signature; the setter gets it in the form the
+            // service's methods get their arguments (the connection's DecodeOpts)
             const encoder: DBusBufferEncoder = new DBusBufferEncoder()
             const decoder: DBusBufferDecoder = new DBusBufferDecoder(encoder.endianness, encoder.encode(this.#definedProperties[name].signature, value))
-            ;[value] = decoder.decode(this.#definedProperties[name].signature, false)
+            ;[value] = decoder.decode(this.#definedProperties[name].signature, this.dbus?.decodeDefaults)
         } catch (e) {
             throw createDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The property signature '${this.#definedProperties[name].signature}' does not match its value.`)
         }

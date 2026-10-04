@@ -44,6 +44,9 @@ function undocumented(): string[] {
             if (member.name && ts.isPrivateIdentifier(member.name)) continue
             if (ts.isIndexSignatureDeclaration(member) || ts.isClassStaticBlockDeclaration(member as ts.Node)) continue
             if (ts.isConstructorDeclaration(member)) {
+                // With overloads only the overload signatures are published, and @internal ones are stripped
+                const overloaded: boolean = declaration.members.filter(ts.isConstructorDeclaration).length > 1
+                if ((overloaded && member.body) || ts.getJSDocTags(member).some((tag: ts.JSDocTag): boolean => tag.tagName.text === 'internal')) continue
                 if (hasJSDoc(member)) {
                     const params: string[] = ts.getJSDocTags(member).filter(ts.isJSDocParameterTag).map((tag: ts.JSDocParameterTag): string => tag.name.getText())
                     for (const parameter of member.parameters) if (!params.includes(parameter.name.getText())) missing.push(`${symbol.name}.constructor @param ${parameter.name.getText()}`)

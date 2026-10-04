@@ -1,3 +1,5 @@
+import {DecodeOpts} from './DecodeOpts'
+
 /**
  * Interface defining options for invoking a method on a DBus object.
  * Used to specify the target service, object, interface, method, and arguments for a remote method call.
@@ -50,4 +52,9 @@ export interface InvokeOpts {
      * Send the call without waiting for a reply (NO_REPLY_EXPECTED); invoke then returns nothing.
      */
     noReply?: boolean
+
+    /**
+     * How to give the reply's values, overriding the connection's DecodeOpts for this call.
+     */
+    decode?: DecodeOpts
 }

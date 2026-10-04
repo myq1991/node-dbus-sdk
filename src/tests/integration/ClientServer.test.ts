@@ -96,15 +96,10 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
 
         // Plain decoding unwraps nested variants, which would hide the extra wrapper, so inspect the typed reply
         it('returns a DBusVariant result', async (): Promise<void> => {
-            const typedClient: DBus = await withTimeout(DBus.connect({busAddress: bus.address, advancedResponse: true}), 5000, 'connect typed client')
-            try {
-                const [variant] = await withTimeout(typedClient.invoke({service: SERVICE_NAME, objectPath: TEST_OBJECT_PATH, interface: TEST_INTERFACE, method: 'TypedVariant'}), 2000, 'TypedVariant')
-                assert.ok(variant instanceof DBusVariant)
-                assert.ok(variant.$value instanceof DBusUInt32, `variant holds ${variant.$value?.constructor?.name}`)
-                assert.equal(variant.$value.value, 7)
-            } finally {
-                await withTimeout(typedClient.disconnect(), 2000, 'disconnect typed client').catch((): void => undefined)
-            }
+            const [variant] = await withTimeout(client.invoke({service: SERVICE_NAME, objectPath: TEST_OBJECT_PATH, interface: TEST_INTERFACE, method: 'TypedVariant', decode: {types: 'all'}}), 2000, 'TypedVariant')
+            assert.ok(variant instanceof DBusVariant)
+            assert.ok(variant.content instanceof DBusUInt32, `variant holds ${variant.content?.constructor?.name}`)
+            assert.equal(variant.content.value, 7)
         })
 
         it('tells a handler defined with withContext who called it', async (): Promise<void> => {

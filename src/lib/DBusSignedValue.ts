@@ -1,6 +1,8 @@
 import {Signature} from './Signature'
 import {DataType} from '../types/DataType'
 import {InvalidValueError, SignatureError} from './Errors'
+import {DEFAULT_DECODE, ResolvedDecodeOpts} from './resolveDecode'
+import {fitsInteger, INTEGER_RANGES} from './integerRanges'
 
 /**
  * The complete type of empty arrays. Values only expose the first character of their type ($signature), and an
@@ -11,33 +13,79 @@ import {InvalidValueError, SignatureError} from './Errors'
 const completeTypes: WeakMap<DBusSignedValue, DataType> = new WeakMap()
 
 /**
- * A class representing a DBus signed value with a specific signature and associated data.
- * This class wraps a value with its corresponding DBus type signature, enabling proper
- * encoding and decoding of DBus messages. It supports both basic types (e.g., integers, strings)
- * and container types (e.g., arrays, structs, dictionaries) as defined by the DBus specification.
+ * Where a plain container's members came from, for those holding variants: the decoded values they were converted
+ * from, read only if the container is sent again (decoding stays cheap), or signatures by member.
+ */
+type VariantSource =
+    { kind: 'decoded', items: DBusSignedValue[], dictionary: boolean, mapKeys: boolean, opts: ResolvedDecodeOpts, byKey?: Map<any, DBusSignedValue> }
+    | { kind: 'signatures', signatures: Map<any, string> }
+
+/**
+ * The original types of values that arrived in variants, kept for the plain container holding them (object, Map or
+ * array): when such a container is sent again, a member still fitting its type goes out with it instead of the type
+ * its plain value would be inferred as (e.g. 'u' instead of 'i'). Outside the objects, so they print, compare and
+ * serialize as before. Newest sources first: a container merged from several (see copyVariantTypes) has several.
+ */
+const variantTypes: WeakMap<object, VariantSource[]> = new WeakMap()
+
+/**
+ * Beyond this many sources, a container's sources are merged into one signature table.
+ */
+const MAX_VARIANT_SOURCES: number = 16
+
+const OBJECT_PATH: RegExp = /^\/$|^(\/[A-Za-z0-9_]+)+$/
+
+/**
+ * A value with an explicit DBus type: use it wherever a value is sent to give it a type other than the one it would
+ * get otherwise, typically inside variants (`v`) and `a{sv}` dictionaries. Containers may hold plain values, which
+ * take their types from the signature, and typed values, which keep theirs. The type classes (DBusUInt32,
+ * DBusObjectPath, DBusArray, …) are DBusSignedValue too.
+ *
+ * Received values come back as type class instances where DecodeOpts.types asks for them.
+ *
+ * @example
+ * new DBusSignedValue('u', 7)                                            // the same as new DBusUInt32(7)
+ * new DBusSignedValue('a{sv}', {mtu: new DBusUInt32(1500), name: 'eth0'})
+ * new DBusSignedValue('as', [])                                          // an empty array of strings
+ * new DBusSignedValue('(uu)', [1, 2])
  */
 export class DBusSignedValue {
     /**
-     * The signature of the DBus value (e.g., 's' for string, 'i' for integer, 'a' for array).
-     * This identifies the type of data stored in the value according to the DBus type system.
+     * @internal
+     * The type code of the value (e.g. 'a' for any array); its complete type is `signature`.
      */
     public readonly $signature: string
 
     /**
-     * The signature of the array item (for 'a' type), if applicable.
-     * This is used to specify the type of elements within an array, particularly useful
-     * for distinguishing different array contents (e.g., 'ay' for byte array).
+     * @internal
+     * The type code of the elements of an array.
      */
-    public readonly $arrayItemSignature?: string
+    public $arrayItemSignature?: string
 
     /**
-     * The value associated with the signature.
-     * Can be a primitive (e.g., number, string), a single DBusSignedValue (for nested types like variants),
-     * or an array of DBusSignedValue instances (for containers like arrays or structs).
+     * @internal
+     * The value in the form the encoder writes: a primitive, a Buffer for bytes, the contained DBusSignedValue for a
+     * variant, or the DBusSignedValue children of a container.
      */
     public readonly $value: any | DBusSignedValue | DBusSignedValue[]
 
     /**
+     * The complete signature of this value, e.g. 'u', 'as' or 'a{sv}'.
+     */
+    public get signature(): string {
+        return DBusSignedValue.completeSignature(this)
+    }
+
+    /**
+     * This value as a plain JavaScript value, the way it is decoded by default: numbers, bigints for 64-bit
+     * integers, strings, booleans, Buffers for byte arrays, arrays, and objects for dictionaries.
+     */
+    public get value(): any {
+        return DBusSignedValue.convert([this], DEFAULT_DECODE)[0]
+    }
+
+    /**
+     * @internal
      * Static method to parse a DBus signature and value into an array of DBusSignedValue objects.
      * Distinguishes between independent parameter sequences (e.g., 'si' for string and integer)
      * and structs (e.g., '(si)' for a struct containing string and integer).
@@ -72,7 +120,7 @@ export class DBusSignedValue {
 
             // Create independent DBusSignedValue objects for each type and corresponding value
             // Check if the value is already a DBusSignedValue instance
-            return dataTypes.map((dataType: DataType, index: number): DBusSignedValue => DBusSignedValue.typed(dataType, values[index]))
+            return dataTypes.map((dataType: DataType, index: number): DBusSignedValue => DBusSignedValue.typedIn(values, index, dataType, values[index]))
         } else {
             // For single types, structs, or other composite types, return a single DBusSignedValue object
             // If value is already a DBusSignedValue instance and matches the signature, return it directly
@@ -92,7 +140,104 @@ export class DBusSignedValue {
      * @returns An array of plain JavaScript values representing the data without DBus signatures.
      */
     public static toPlain(values: DBusSignedValue[]): any[] {
-        return values.map((value: DBusSignedValue): any => DBusSignedValue.convertToPlain(value))
+        return DBusSignedValue.convert(values, DEFAULT_DECODE)
+    }
+
+    /**
+     * @internal
+     * Converts values, as decoded, into what DecodeOpts asks for. With types 'none', the original signatures of
+     * values that came in variants are recorded on the plain containers holding them (see variantTypes).
+     *
+     * @param values - The values.
+     * @param opts - The decoding choices.
+     * @param toTypeClass - Converts a value into its type class instance; needed for types other than 'none'
+     *                      (passed in because the type classes extend this class).
+     * @returns The converted values.
+     */
+    public static convert(values: DBusSignedValue[], opts: ResolvedDecodeOpts, toTypeClass?: (value: DBusSignedValue) => DBusSignedValue): any[] {
+        if (opts.types === 'all') return values.map((value: DBusSignedValue): DBusSignedValue => toTypeClass!(value))
+        const converted: any[] = values.map((value: DBusSignedValue): any => DBusSignedValue.convertValue(value, opts, toTypeClass))
+        if (values.some((value: DBusSignedValue): boolean => value.$signature === 'v')) DBusSignedValue.noteVariants(converted, values, false, opts)
+        return converted
+    }
+
+    /**
+     * @internal
+     * Copies the recorded variant signatures of one plain container onto another, e.g. when a copy of received
+     * properties is kept; existing records of the target are kept unless the source has the same member.
+     *
+     * @param source - The container the values were received in.
+     * @param target - The copy.
+     */
+    public static copyVariantTypes(source: object, target: object): void {
+        const recorded: VariantSource[] | undefined = variantTypes.get(source)
+        if (!recorded) return
+        const sources: VariantSource[] = [...recorded, ...(variantTypes.get(target) ?? [])]
+        variantTypes.set(target, sources.length > MAX_VARIANT_SOURCES ? [DBusSignedValue.mergeSources(sources)] : sources)
+    }
+
+    /**
+     * Merges sources (newest first) into one signature table.
+     */
+    private static mergeSources(sources: VariantSource[]): VariantSource {
+        const signatures: Map<any, string> = new Map()
+        for (const source of [...sources].reverse()) {
+            if (source.kind === 'signatures') {
+                source.signatures.forEach((signature: string, key: any): Map<any, string> => signatures.set(key, signature))
+                continue
+            }
+            const slots: [any, DBusSignedValue][] = source.dictionary ? [...DBusSignedValue.slotsByKey(source).entries()] : source.items.map((item: DBusSignedValue, index: number): [any, DBusSignedValue] => [index, item])
+            for (const [key, slot] of slots) {
+                const signature: string | undefined = DBusSignedValue.variantSignature(slot)
+                if (signature) signatures.set(key, signature)
+            }
+        }
+        return {kind: 'signatures', signatures}
+    }
+
+    /**
+     * The decoded value of each member of a dictionary source, by the key the plain container has for it.
+     */
+    private static slotsByKey(source: Extract<VariantSource, { kind: 'decoded' }>): Map<any, DBusSignedValue> {
+        if (!source.byKey) {
+            source.byKey = new Map()
+            for (const entry of source.items) {
+                const [key, entryValue] = entry.$value as DBusSignedValue[]
+                const plainKey: any = DBusSignedValue.convertValue(key, source.opts)
+                source.byKey.set(source.mapKeys ? plainKey : String(plainKey), entryValue)
+            }
+        }
+        return source.byKey
+    }
+
+    /**
+     * The recorded signature of a variant value as received ('v:' prefixes for variants holding variants), or
+     * undefined if the value was not a variant.
+     */
+    private static variantSignature(slot: DBusSignedValue | undefined): string | undefined {
+        if (!slot || slot.$signature !== 'v') return undefined
+        let content: DBusSignedValue = slot.$value as DBusSignedValue
+        let levels: string = ''
+        while (content.$signature === 'v') {
+            levels += 'v:'
+            content = content.$value as DBusSignedValue
+        }
+        return levels + DBusSignedValue.completeSignature(content)
+    }
+
+    /**
+     * The signature a member of a plain container was received with in a variant, if recorded.
+     */
+    private static recordedSignature(container: object, key: any): string | undefined {
+        const sources: VariantSource[] | undefined = variantTypes.get(container)
+        if (!sources) return undefined
+        for (const source of sources) {
+            const signature: string | undefined = source.kind === 'signatures'
+                ? source.signatures.get(key)
+                : DBusSignedValue.variantSignature(source.dictionary ? DBusSignedValue.slotsByKey(source).get(key) : source.items[key])
+            if (signature) return signature
+        }
+        return undefined
     }
 
     /**
@@ -136,10 +281,11 @@ export class DBusSignedValue {
                     if (itemSignature && !'a({'.includes(itemSignature)) return `a${itemSignature}`
                     throw new SignatureError('Cannot build signature for empty array in variant')
                 }
-                // Get the signature of the first element
-                const firstElementSignature: string = DBusSignedValue.completeSignature(values[0])
-                // Check if all elements have the same signature
-                const isConsistent: boolean = values.every((val: DBusSignedValue): boolean => DBusSignedValue.completeSignature(val) === firstElementSignature)
+                // Each element's signature is computed once: computing it again per check doubles the work at every level
+                // of nesting
+                const elementSignatures: string[] = values.map((val: DBusSignedValue): string => DBusSignedValue.completeSignature(val))
+                const firstElementSignature: string = elementSignatures[0]
+                const isConsistent: boolean = elementSignatures.every((signature: string): boolean => signature === firstElementSignature)
                 if (isConsistent) return `a${firstElementSignature}`
                 // If inconsistent, check if it matches a dictionary structure like 'a{sv}'
                 const isDictArray: boolean = values.every((val: DBusSignedValue): boolean => val.$signature === '{')
@@ -183,6 +329,7 @@ export class DBusSignedValue {
     }
 
     /**
+     * @internal
      * Converts an object property name back to a dictionary key of the given type: object keys are always strings,
      * so {1: 'a'} for a{is} or {false: 'a'} for a{bs} arrive as '1' and 'false'.
      *
@@ -211,6 +358,7 @@ export class DBusSignedValue {
     }
 
     /**
+     * @internal
      * Converts an item to a value of the given type, the one rule for every slot (arguments, struct fields, array
      * items, dictionary keys and values): a DBusSignedValue is used as it is, except that one whose type is not
      * 'v' placed into a variant slot becomes the variant's content; anything else is converted.
@@ -227,25 +375,124 @@ export class DBusSignedValue {
     }
 
     /**
-     * Private static method to recursively convert a single DBusSignedValue object to a plain JavaScript value.
-     * Handles different DBus types (basic, array, dictionary, struct, variant) and unwraps nested structures.
+     * @internal
+     * Like typed, for a member of a plain container: a plain value for a variant slot whose container recorded the
+     * signature it was received with (see variantTypes) goes out with that signature, if the value still fits it.
      *
-     * @param value - The DBusSignedValue object to convert.
-     * @returns The plain JavaScript value extracted from the DBusSignedValue.
+     * @param container - The plain object, Map or array holding the item.
+     * @param key - The item's property name, Map key or index.
+     * @param dataType - The type of the slot.
+     * @param item - The item.
+     * @returns The value for the slot.
      */
-    private static convertToPlain(value: DBusSignedValue): any {
+    protected static typedIn(container: object, key: any, dataType: DataType, item: any): DBusSignedValue {
+        if (dataType.type === 'v' && !(item instanceof DBusSignedValue)) {
+            const recorded: DBusSignedValue | undefined = DBusSignedValue.recorded(DBusSignedValue.recordedSignature(container, key), item)
+            if (recorded) return new DBusSignedValue('v', recorded)
+        }
+        return DBusSignedValue.typed(dataType, item)
+    }
+
+    /**
+     * The value a variant held when received, rebuilt with its recorded signature ('v:' prefixes for variants
+     * holding variants), if the plain value still fits it.
+     */
+    private static recorded(signature: string | undefined, item: any): DBusSignedValue | undefined {
+        if (!signature) return undefined
+        let levels: number = 0
+        while (signature.startsWith('v:', levels * 2)) levels++
+        const contentSignature: string = signature.substring(levels * 2)
+        if (!DBusSignedValue.fits(contentSignature, item)) return undefined
+        let value: DBusSignedValue = new DBusSignedValue(contentSignature, item)
+        for (let level: number = 0; level < levels; level++) value = new DBusSignedValue('v', value)
+        return value
+    }
+
+    /**
+     * @internal
+     * The value to encode for a message body: the arguments, or the only one, which then keeps the signature it was
+     * received with if it came in a variant and the arguments list recorded it.
+     *
+     * @param signature - The body's signature.
+     * @param args - The arguments.
+     * @returns What to give the encoder for the signature.
+     */
+    public static bodyValue(signature: string, args: any[]): any {
+        if (args.length !== 1) return args
+        if (signature === 'v' && !(args[0] instanceof DBusSignedValue)) {
+            const recorded: DBusSignedValue | undefined = DBusSignedValue.recorded(DBusSignedValue.recordedSignature(args, 0), args[0])
+            // The recorded value is the variant's content: the variant itself wraps it
+            if (recorded) return new DBusSignedValue('v', recorded)
+        }
+        return args[0]
+    }
+
+    /**
+     * Whether a plain value can be sent with a signature: integers within range, numbers for doubles, booleans,
+     * strings (valid paths for object paths), and the matching kind of container. The content of containers is
+     * checked when they are encoded.
+     */
+    private static fits(signature: string, value: any): boolean {
+        const code: string = signature[0]
+        if (code in INTEGER_RANGES) return fitsInteger(code, value)
+        switch (code) {
+            case 'd':
+                return typeof value === 'number'
+            case 'b':
+                return typeof value === 'boolean' || value === 0 || value === 1
+            case 's':
+            case 'g':
+                return typeof value === 'string'
+            case 'o':
+                return typeof value === 'string' && OBJECT_PATH.test(value)
+            case 'v':
+                return value !== undefined && value !== null
+            case '(':
+                return Array.isArray(value)
+            case 'a':
+                if (signature[1] === 'y') return value instanceof Uint8Array || Array.isArray(value)
+                if (signature[1] === '{') return value instanceof Map || Array.isArray(value) || (typeof value === 'object' && value !== null && DBusSignedValue.isPlainObject(value))
+                return Array.isArray(value) || ArrayBuffer.isView(value)
+            default:
+                return false
+        }
+    }
+
+    /**
+     * Remembers, with types 'none', which decoded values a plain container holding variants was converted from (with
+     * other choices the converted values carry their types themselves). Nothing is computed until the container is
+     * sent again.
+     */
+    private static noteVariants(container: object, items: DBusSignedValue[], dictionary: boolean, opts: ResolvedDecodeOpts): void {
+        if (opts.types !== 'none') return
+        variantTypes.set(container, [{kind: 'decoded', items, dictionary, mapKeys: container instanceof Map, opts}])
+    }
+
+    /**
+     * Converts one value as DecodeOpts asks (see convert), recursively.
+     */
+    private static convertValue(value: DBusSignedValue, opts: ResolvedDecodeOpts, toTypeClass?: (value: DBusSignedValue) => DBusSignedValue): any {
         switch (value.$signature) {
             case 'a': {
                 if (Buffer.isBuffer(value.$value)) return value.$value
                 const items: DBusSignedValue[] = value.$value as DBusSignedValue[]
                 const itemSignature: string | undefined = value.$arrayItemSignature || items[0]?.$signature
                 if (itemSignature === '{') {
-                    // An array of dictionary entries is a dictionary: one object with every entry
-                    const dictionary: Record<string, any> = {}
+                    // An array of dictionary entries is a dictionary: one object (or Map) with every entry
+                    const asMap: boolean = opts.dictionaries === 'map'
+                    const dictionary: any = asMap ? new Map() : {}
                     for (const entry of items) {
                         const [key, entryValue] = entry.$value as DBusSignedValue[]
-                        dictionary[DBusSignedValue.convertToPlain(key)] = DBusSignedValue.convertToPlain(entryValue)
+                        const plainKey: any = DBusSignedValue.convertValue(key, opts, toTypeClass)
+                        const plainValue: any = DBusSignedValue.convertValue(entryValue, opts, toTypeClass)
+                        if (asMap) {
+                            dictionary.set(plainKey, plainValue)
+                        } else {
+                            dictionary[plainKey] = plainValue
+                        }
                     }
+                    // Entries share one type, so the first tells whether the values are variants
+                    if ((items[0]?.$value as DBusSignedValue[] | undefined)?.[1].$signature === 'v') DBusSignedValue.noteVariants(dictionary, items, true, opts)
                     return dictionary
                 }
                 if (itemSignature === 'y') {
@@ -253,30 +500,57 @@ export class DBusSignedValue {
                     for (let i: number = 0; i < items.length; i++) bytes[i] = items[i].$value
                     return bytes
                 }
-                return items.map((item: DBusSignedValue): any => DBusSignedValue.convertToPlain(item))
+                const array: any[] = items.map((item: DBusSignedValue): any => DBusSignedValue.convertValue(item, opts, toTypeClass))
+                if (itemSignature === 'v') DBusSignedValue.noteVariants(array, items, false, opts)
+                return array
             }
             case '{': { // A single dictionary entry outside an array
                 const [key, entryValue] = value.$value as DBusSignedValue[]
-                return {[DBusSignedValue.convertToPlain(key)]: DBusSignedValue.convertToPlain(entryValue)}
+                return {[DBusSignedValue.convertValue(key, opts, toTypeClass)]: DBusSignedValue.convertValue(entryValue, opts, toTypeClass)}
             }
-            case '(':
-                return (value.$value as DBusSignedValue[]).map((item: DBusSignedValue): any => DBusSignedValue.convertToPlain(item))
+            case '(': {
+                const fields: DBusSignedValue[] = value.$value as DBusSignedValue[]
+                const struct: any[] = fields.map((field: DBusSignedValue): any => DBusSignedValue.convertValue(field, opts, toTypeClass))
+                if (fields.some((field: DBusSignedValue): boolean => field.$signature === 'v')) DBusSignedValue.noteVariants(struct, fields, false, opts)
+                return struct
+            }
             case 'v':
-                return DBusSignedValue.convertToPlain(value.$value as DBusSignedValue)
+                if (opts.types === 'variants' && toTypeClass) {
+                    // A DBusVariant placed where a variant goes is that variant itself, so a variant holding a variant
+                    // is given whole: its content alone would lose one level when sent back
+                    const content: DBusSignedValue = value.$value as DBusSignedValue
+                    return toTypeClass(content.$signature === 'v' ? value : content)
+                }
+                return DBusSignedValue.convertValue(value.$value as DBusSignedValue, opts, toTypeClass)
+            case 'x':
+            case 't':
+                // Only safe integers become numbers, so that no value is ever changed
+                if (opts.int64 === 'number' && typeof value.$value === 'bigint' && value.$value >= BigInt(Number.MIN_SAFE_INTEGER) && value.$value <= BigInt(Number.MAX_SAFE_INTEGER)) return Number(value.$value)
+                return value.$value
             default:
-                return value.$value instanceof DBusSignedValue ? DBusSignedValue.convertToPlain(value.$value) : value.$value
+                return value.$value instanceof DBusSignedValue ? DBusSignedValue.convertValue(value.$value, opts, toTypeClass) : value.$value
         }
     }
 
     /**
-     * Constructor for creating a DBusSignedValue object from a signature and value.
-     * Processes the signature (string, DataType, or array of DataType) and associates it with the provided value,
-     * handling basic types, structs, arrays, dictionaries, and variants appropriately.
+     * Gives a value a DBus type.
      *
-     * @param signature - The DBus signature, as a string (e.g., 's'), a single DataType, or an array of DataType for structs.
-     * @param value - The value associated with the signature, can be raw data, DBusSignedValue, or array of values.
-     * @throws {SignatureError} If the value structure does not match the signature or if the type is unsupported.
+     * @param signature - The complete signature of one type, e.g. 'u', 'as', 'a{sv}' or '(si)'.
+     * @param value - The value: plain values take their types from the signature, DBusSignedValue values (and type
+     *                class instances) inside containers keep theirs. A variant ('v') holds a typed value, or a plain
+     *                one whose type is inferred (see inferSignature).
+     * @throws {SignatureError} If the signature is invalid or the value's shape does not match it (e.g. a string for
+     *         an array). Values out of range for their type are rejected when encoded.
      */
+    constructor(signature: string, value: any)
+    /**
+     * @internal
+     * Also accepts parsed types, as the library builds values.
+     *
+     * @param signature - A signature string, a parsed type, or a list of parsed types (taken as a struct).
+     * @param value - The value.
+     */
+    constructor(signature: string | DataType | DataType[], value: any)
     constructor(signature: string | DataType | DataType[], value: any | DBusSignedValue | DBusSignedValue[]) {
         // Handle signature input: parse string to DataType array, or use directly if already DataType or array
         const dataTypes: DataType[] = typeof signature === 'string'
@@ -299,7 +573,8 @@ export class DBusSignedValue {
             if (structValues.length !== dataTypes.length) {
                 throw new SignatureError(`Struct value length (${structValues.length}) does not match signature child length (${dataTypes.length})`)
             }
-            this.$value = structValues.map((item: any, index: number): DBusSignedValue => DBusSignedValue.typed(dataTypes[index], item))
+            const container: object = value
+            this.$value = structValues.map((item: any, index: number): DBusSignedValue => DBusSignedValue.typedIn(container, index, dataTypes[index], item))
         } else {
             const dataType: DataType = dataTypes[0]
             this.$signature = dataType.type // Extract the type as the signature for single type
@@ -354,7 +629,7 @@ export class DBusSignedValue {
                                             throw new SignatureError('Invalid dictionary child types')
                                         }
                                         const keyObj: DBusSignedValue = DBusSignedValue.typed(keyDataType, fromMap ? key : DBusSignedValue.keyFromPropertyName(keyDataType.type, key))
-                                        const valObj: DBusSignedValue = DBusSignedValue.typed(valueDataType, val)
+                                        const valObj: DBusSignedValue = DBusSignedValue.typedIn(value, key, valueDataType, val)
                                         // Create a DBusSignedValue for a single dictionary entry {...}
                                         return new DBusSignedValue(dataType.child![0], [keyObj, valObj])
                                     })
@@ -364,7 +639,7 @@ export class DBusSignedValue {
                             throw new SignatureError(`Expected array for signature "a", got: ${typeof value}. Non-dictionary array types do not support object input except for Buffer with ay.`)
                         }
                         // Handle Array or TypedArray for array type
-                        this.$value = Array.from(value).map((item: any): DBusSignedValue => DBusSignedValue.typed(dataType.child![0], item))
+                        this.$value = Array.from(value).map((item: any, index: number): DBusSignedValue => DBusSignedValue.typedIn(value, index, dataType.child![0], item))
                         break
 
                     case '{': // Dictionary (single key-value pair)
@@ -404,7 +679,7 @@ export class DBusSignedValue {
                         if (structValues.length !== dataType.child.length) {
                             throw new SignatureError(`Struct value length (${structValues.length}) does not match signature child length (${dataType.child.length})`)
                         }
-                        this.$value = structValues.map((item: any, index: number): DBusSignedValue => DBusSignedValue.typed(dataType.child![index], item))
+                        this.$value = structValues.map((item: any, index: number): DBusSignedValue => DBusSignedValue.typedIn(value, index, dataType.child![index], item))
                         break
 
                     default:

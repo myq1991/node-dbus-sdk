@@ -6,6 +6,8 @@ import {DBusMessageEndianness} from '../../lib/enums/DBusMessageEndianness'
 import {alternativeInputForms, InputForm, loadWireMatrix, MatrixCase, toExpected, toInput, WireMatrix} from '../helpers/TaggedValue'
 import {knownFailure, MatrixCheck} from '../fixtures/KnownFailures'
 import {knownBug} from '../helpers/KnownBug'
+import {DecodeOpts} from '../../types/DecodeOpts'
+import {DBusSignedValue} from '../../lib/DBusSignedValue'
 
 const matrix: WireMatrix = loadWireMatrix()
 
@@ -54,6 +56,41 @@ describe(`wire format matrix (${matrix.generator})`, (): void => {
                     }
                 })
             }
+        })
+    }
+})
+
+/**
+ * What is received can be sent again unchanged: for every case of the matrix, the values decoded from GDBus's bytes,
+ * in every decoding mode, encode to the same bytes. With types 'none' this relies on the signatures recorded for
+ * values that came in variants; with 'variants' and 'all' the values carry their types.
+ */
+describe(`re-encoding decoded values (${matrix.generator})`, (): void => {
+    // Objects list integer-like property names in ascending order first, whatever the order they were added in, so
+    // these dictionaries come back with their entries reordered (the same entries; Maps keep the order)
+    const reorderedAsObjects: string[] = ['dict: a{ns}', 'dict: a{is}']
+    const modes: [string, DecodeOpts, string[]][] = [
+        ['plain values', {}, reorderedAsObjects],
+        ['types variants', {types: 'variants'}, reorderedAsObjects],
+        ['types all', {types: 'all'}, []],
+        ['dictionaries as Maps', {dictionaries: 'map'}, []],
+        ['plain values with 64-bit integers as numbers', {int64: 'number'}, reorderedAsObjects]
+    ]
+    for (const [name, opts, expected] of modes) {
+        it(`gives the original bytes back from ${name}`, (): void => {
+            const mismatches: string[] = []
+            for (const testCase of matrix.cases) {
+                const decoded: any[] = new DBusBufferDecoder(DBusMessageEndianness.LE, Buffer.from(testCase.le, 'hex')).decode(testCase.signature, opts)
+                let encoded: string
+                try {
+                    // As a message body is encoded: the arguments list, or its only value
+                    encoded = new DBusBufferEncoder().encode(testCase.signature, DBusSignedValue.bodyValue(testCase.signature, decoded)).toString('hex')
+                } catch (error) {
+                    encoded = `throws ${(error as Error).message}`
+                }
+                if (encoded !== testCase.le) mismatches.push(testCase.id)
+            }
+            assert.deepEqual(mismatches, expected)
         })
     }
 })

@@ -474,6 +474,17 @@ export type {ReplyOpts} from './types/ReplyOpts'
 export type {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
 
 /**
+ * Exports the DecodeOpts type: how received values are given (plain, or with their DBus types kept as type class
+ * instances; dictionaries as objects or Maps; 64-bit integers as bigint or number).
+ */
+export type {DecodeOpts} from './types/DecodeOpts'
+
+/**
+ * Exports the ProxyOpts type: options for interface proxies and object managers, such as how they decode values.
+ */
+export type {ProxyOpts} from './types/ProxyOpts'
+
+/**
  * Exports the DBusObjectManagerOpts type: what a DBusObjectManager is created with.
  */
 export type {DBusObjectManagerOpts} from './types/DBusObjectManagerOpts'

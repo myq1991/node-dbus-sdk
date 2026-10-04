@@ -1,6 +1,7 @@
 import EventEmitter from 'node:events'
 import {CreateSignalEmitterOpts} from '../types/CreateSignalEmitterOpts'
 import {ReceivedSignal} from '../types/ReceivedSignal'
+import {DecodeOpts} from '../types/DecodeOpts'
 
 /**
  * @internal
@@ -58,6 +59,11 @@ export class DBusSignalEmitter extends EventEmitter {
     protected readonly offSignalHandler?: (signalRuleString: string) => void
 
     /**
+     * How this emitter's listeners get the signals' arguments, if it overrides the connection's DecodeOpts.
+     */
+    public readonly decode: DecodeOpts | undefined
+
+    /**
      * The service name associated with this emitter.
      */
     public readonly service: string
@@ -104,6 +110,7 @@ export class DBusSignalEmitter extends EventEmitter {
         this.onSignalHandler = onSignalHandler
         this.offSignalHandler = offSignalHandler
         this.service = opts.service
+        this.decode = opts.decode
         this.#uniqueName = opts.uniqueName
         this.#objectPath = opts.objectPath
         this.#interface = opts.interface

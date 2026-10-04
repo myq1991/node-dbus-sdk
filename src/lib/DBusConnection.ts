@@ -20,6 +20,8 @@ import EventEmitter from 'node:events'
 import {Socket} from 'node:net'
 import {NetConnectOpts} from 'net'
 import {DBusMessage} from './DBusMessage'
+import {DecodeOpts} from '../types/DecodeOpts'
+import {resolveDecode, ResolvedDecodeOpts} from './resolveDecode'
 import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 
 /**
@@ -353,7 +355,7 @@ export class DBusConnection extends EventEmitter {
             throw error
         }
         const [authMethod, uid, guid] = handshake
-        return new DBusConnection(stream, authMethod, uid, guid, !!opts.advancedResponse, !!opts.convertBigIntToNumber)
+        return new DBusConnection(stream, authMethod, uid, guid, opts.decode)
     }
 
     /**
@@ -417,6 +419,16 @@ export class DBusConnection extends EventEmitter {
         return this.#stream ? !this.#stream.closed : false
     }
 
+    readonly #decode: ResolvedDecodeOpts
+
+    /**
+     * @internal
+     * How received values are given by default (DecodeOpts with every choice made).
+     */
+    public get decodeDefaults(): ResolvedDecodeOpts {
+        return this.#decode
+    }
+
     /**
      * Constructor for DBusConnection.
      * Initializes the connection with the provided stream and authentication details,
@@ -427,11 +439,11 @@ export class DBusConnection extends EventEmitter {
      * @param authMethod - The authentication method that succeeded during handshake.
      * @param uid - The user ID used during authentication, as a string (later parsed to number).
      * @param guid - The GUID provided by the server after successful authentication.
-     * @param advancedResponse - Boolean flag to enable advanced response handling, where DBus return messages are organized using DBusTypeClass instances.
-     * @param convertBigIntToNumber - Boolean flag to enable auto convert bigint to javascript number.
+     * @param decode - How received values are given by default (see DecodeOpts); each message's body uses it.
      */
-    constructor(stream: Duplex, authMethod: string, uid: string, guid: string, advancedResponse: boolean = false, convertBigIntToNumber: boolean = false) {
+    constructor(stream: Duplex, authMethod: string, uid: string, guid: string, decode?: DecodeOpts) {
         super()
+        this.#decode = resolveDecode(decode)
         this.#stream = stream
         this.#authMethod = authMethod
         this.#uid = parseInt(uid)
@@ -463,7 +475,7 @@ export class DBusConnection extends EventEmitter {
                         state = false
                         let message: DBusMessage
                         try {
-                            message = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, advancedResponse, convertBigIntToNumber)
+                            message = DBusMessage.decode(header, fieldsAndBody, fieldsLength, bodyLength, decode)
                         } catch (error: any) {
                             // The message was framed by its declared lengths, so the following ones are unaffected:
                             // report this one and keep reading instead of throwing out of the stream handler

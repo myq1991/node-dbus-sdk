@@ -3,55 +3,13 @@ import {InvalidValueError, ObjectPathError, SignatureError} from './Errors'
 import {DBusSignedValue} from './DBusSignedValue'
 import {Signature} from './Signature'
 import {DataType} from '../types/DataType'
+import {describe, integer, integer64} from './integerRanges'
 
 /**
  * Alignment in bytes of each DBus type code, per the DBus specification.
  */
 const ALIGNMENT: Record<string, number> = {
     y: 1, b: 4, n: 2, q: 2, i: 4, u: 4, x: 8, t: 8, d: 8, h: 4, s: 4, o: 4, g: 1, a: 4, '(': 8, '{': 8, v: 1
-}
-
-/**
- * Describes a value for error messages.
- */
-function describe(value: any): string {
-    if (typeof value === 'string') return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}…` : value)
-    if (typeof value === 'bigint') return `${value}n`
-    if (value === null || typeof value !== 'object') return String(value)
-    return Object.prototype.toString.call(value)
-}
-
-/**
- * Checks that a value is an integer within [min, max] (a number, or a bigint for convenience) and returns it as a number.
- *
- * @throws {InvalidValueError} Otherwise, instead of writing a truncated, wrapped or NaN value.
- */
-function integer(value: any, min: number, max: number, typeName: string): number {
-    const number: number = typeof value === 'bigint' ? Number(value) : value
-    if (typeof number !== 'number' || !Number.isInteger(number) || number < min || number > max) {
-        throw new InvalidValueError(`${typeName} must be an integer from ${min} to ${max}, got ${describe(value)}`)
-    }
-    return number
-}
-
-/**
- * Checks that a value is an integer within [min, max] given as a bigint, an integer number or a decimal string.
- *
- * @throws {InvalidValueError} Otherwise.
- */
-function integer64(value: any, min: bigint, max: bigint, typeName: string): bigint {
-    let big: bigint | undefined
-    try {
-        if (typeof value === 'bigint') big = value
-        else if (typeof value === 'number' && Number.isInteger(value)) big = BigInt(value)
-        else if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) big = BigInt(value.trim())
-    } catch {
-        big = undefined
-    }
-    if (big === undefined || big < min || big > max) {
-        throw new InvalidValueError(`${typeName} must be an integer from ${min} to ${max}, got ${describe(value)}`)
-    }
-    return big
 }
 
 /**

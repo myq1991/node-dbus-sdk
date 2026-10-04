@@ -6,6 +6,9 @@ import {CreateConnectOpts} from './types/CreateConnectOpts'
 import {DBusConnection} from './lib/DBusConnection'
 import {DBusMessage} from './lib/DBusMessage'
 import {InvokeOpts} from './types/InvokeOpts'
+import {DecodeOpts} from './types/DecodeOpts'
+import {ProxyOpts} from './types/ProxyOpts'
+import {ResolvedDecodeOpts} from './lib/resolveDecode'
 import {DBusMessageFlags} from './lib/enums/DBusMessageFlags'
 import {DBusMessageType} from './lib/enums/DBusMessageType'
 import {GetPropertyValueOpts} from './types/GetPropertyValueOpts'
@@ -22,13 +25,17 @@ import {ReplyOpts} from './types/ReplyOpts'
 import {EmitSignalOpts} from './types/EmitSignalOpts'
 import {BusNameBasicInfo} from './types/BusNameBasicInfo'
 import {createDBusError} from './lib/createDBusError'
-import {DBusTypeClass} from './lib/DBusTypeClass'
 import {DBusVariant} from './lib/datatypes/DBusVariant'
 
 /**
  * The resolve and reject functions of a method call waiting for its reply.
  */
 type InflightCall = [(reply: DBusMessage) => void, (error: Error) => void]
+
+/**
+ * Plain values whatever the connection's DecodeOpts, for the library's own calls.
+ */
+const PLAIN: DecodeOpts = {types: 'none', dictionaries: 'object', int64: 'bigint'}
 
 /**
  * Main class for interacting with a DBus connection.
@@ -141,6 +148,14 @@ export class DBus extends EventEmitter {
      */
     public get uniqueName(): string {
         return this.#uniqueName
+    }
+
+    /**
+     * @internal
+     * How received values are given by default on this connection (DecodeOpts with every choice made).
+     */
+    public get decodeDefaults(): ResolvedDecodeOpts {
+        return this.#connection.decodeDefaults
     }
 
     /**
@@ -264,13 +279,13 @@ export class DBus extends EventEmitter {
      * @returns A Promise that resolves when the unique name is set.
      */
     protected async hello(): Promise<void> {
-        const [uniqueName] = await this.invoke({
+        const [uniqueName] = await this.#invokePlain({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
             method: 'Hello'
         })
-        this.#uniqueName = uniqueName instanceof DBusTypeClass ? uniqueName.value : uniqueName
+        this.#uniqueName = uniqueName
     }
 
     /**
@@ -298,7 +313,7 @@ export class DBus extends EventEmitter {
      * @throws {InvalidValueError | SignatureError} When the data does not fit the signature.
      */
     public emitSignal(opts: EmitSignalOpts): void {
-        this.write(DBusMessage.encode({
+        this.write(DBusMessage.withArguments({
             serial: this.#serial++,
             type: DBusMessageType.SIGNAL,
             flags: DBusMessageFlags.NO_REPLY_EXPECTED,
@@ -308,7 +323,7 @@ export class DBus extends EventEmitter {
             member: opts.signal,
             destination: opts.destination,
             signature: opts.signature ? opts.signature : undefined
-        }, ...opts.data ? opts.data : []))
+        }, opts.data).toBuffer())
     }
 
     /**
@@ -332,7 +347,7 @@ export class DBus extends EventEmitter {
                 signature: 's'
             }, opts.data.message))
         } else {
-            this.write(DBusMessage.encode({
+            this.write(DBusMessage.withArguments({
                 serial: this.#serial++,
                 replySerial: opts.replySerial,
                 type: DBusMessageType.METHOD_RETURN,
@@ -340,7 +355,7 @@ export class DBus extends EventEmitter {
                 sender: this.#uniqueName,
                 destination: opts.destination,
                 signature: opts.signature ? opts.signature : undefined
-            }, ...(opts.data ? opts.data : [])))
+            }, opts.data).toBuffer())
         }
     }
 
@@ -383,7 +398,7 @@ export class DBus extends EventEmitter {
     public invoke(opts: InvokeOpts): Promise<any[]> | void {
         const noReply: boolean = !!opts.noReply
         if (noReply) {
-            this.write(DBusMessage.encode({
+            this.write(DBusMessage.withArguments({
                 serial: this.#serial++,
                 type: DBusMessageType.METHOD_CALL,
                 flags: DBusMessageFlags.NO_REPLY_EXPECTED,
@@ -392,9 +407,9 @@ export class DBus extends EventEmitter {
                 interfaceName: opts.interface,
                 member: opts.method,
                 signature: opts.signature ? opts.signature : undefined
-            }, ...opts.args ? opts.args : []))
+            }, opts.args).toBuffer())
         } else {
-            return this.#call(opts).then((reply: DBusMessage): any[] => reply.body)
+            return this.#call(opts).then((reply: DBusMessage): any[] => reply.getBody(opts.decode))
         }
     }
 
@@ -408,6 +423,14 @@ export class DBus extends EventEmitter {
      */
     public invokeForReply(opts: InvokeOpts): Promise<DBusMessage> {
         return this.#call(opts)
+    }
+
+    /**
+     * Calls a method and gives its reply as plain values whatever the connection's DecodeOpts: for the library's own
+     * calls, which read the results.
+     */
+    #invokePlain(opts: InvokeOpts): Promise<any[]> {
+        return this.#call(opts).then((reply: DBusMessage): any[] => reply.getBody(PLAIN))
     }
 
     /**
@@ -425,7 +448,7 @@ export class DBus extends EventEmitter {
                 clearTimeout(timer)
                 rejectCall(error)
             }
-            const message: DBusMessage = new DBusMessage({
+            const message: DBusMessage = DBusMessage.withArguments({
                 serial: this.#serial++,
                 type: DBusMessageType.METHOD_CALL,
                 flags: DBusMessageFlags.REPLY_EXPECTED,
@@ -434,7 +457,7 @@ export class DBus extends EventEmitter {
                 interfaceName: opts.interface,
                 member: opts.method,
                 signature: opts.signature ? opts.signature : undefined
-            }, ...opts.args ? opts.args : [])
+            }, opts.args)
             this.#inflightCalls[message.header.serial] = [resolve, reject]
             try {
                 this.write(message.toBuffer())
@@ -470,7 +493,8 @@ export class DBus extends EventEmitter {
             interface: 'org.freedesktop.DBus.Properties',
             method: 'Get',
             signature: 'ss',
-            args: [opts.interface, opts.property]
+            args: [opts.interface, opts.property],
+            decode: opts.decode
         })
         return value
     }
@@ -640,7 +664,7 @@ export class DBus extends EventEmitter {
                     case DBusMessageType.ERROR: {
                         const call: InflightCall | undefined = this.#takeInflightCall(message.header.replySerial)
                         if (!call) return
-                        const error: Error = new Error(message.body[0] ? message.body[0] instanceof DBusTypeClass ? message.body[0].value : message.body[0] : '')
+                        const error: Error = new Error(message.getBody(PLAIN)[0] ?? '')
                         error.name = message.header.errorName ? message.header.errorName : error.name
                         return call[1](error)
                     }
@@ -649,7 +673,14 @@ export class DBus extends EventEmitter {
                         const objectPath: string = message.header.path
                         const interfaceName: string = message.header.interfaceName
                         const signalName: string = message.header.member
-                        const signalArgs: any[] = message.body
+                        // Each emitter gets the arguments in the form it asked for, converted once per distinct choice
+                        const argsByDecode: Map<string, any[]> = new Map()
+                        const argsFor = (decode: DecodeOpts | undefined): any[] => {
+                            if (!decode) return message.body
+                            const key: string = `${decode.types}|${decode.dictionaries}|${decode.int64}`
+                            if (!argsByDecode.has(key)) argsByDecode.set(key, message.getBody(decode))
+                            return argsByDecode.get(key)!
+                        }
                         const emitResults: boolean[] = []
                         this.#signalEmitters.forEach((emitter: DBusSignalEmitter): void => {
                             emitResults.push(((): boolean => {
@@ -658,6 +689,7 @@ export class DBus extends EventEmitter {
                                 if (emitter.interface !== '*' && emitter.interface !== interfaceName) return false
                                 const eventNames: (string | symbol)[] = emitter.eventNames()
                                 if (!eventNames.includes(signalName) && !eventNames.includes('*') && !eventNames.includes(ANY_SIGNAL_EVENT)) return false
+                                const signalArgs: any[] = argsFor(emitter.decode)
                                 const emitDirectly: boolean = emitter.emit(signalName, ...signalArgs)
                                 const emitWildcard: boolean = emitter.emit('*', signalName, ...signalArgs)
                                 const emitAny: boolean = emitter.emit(ANY_SIGNAL_EVENT, {sender, objectPath, interface: interfaceName, name: signalName, args: signalArgs, message})
@@ -1149,7 +1181,7 @@ export class DBus extends EventEmitter {
      */
     public async getNameOwner(name: string): Promise<string | undefined> {
         try {
-            const [owner] = await this.invoke({
+            const [owner] = await this.#invokePlain({
                 service: 'org.freedesktop.DBus',
                 objectPath: '/org/freedesktop/DBus',
                 interface: 'org.freedesktop.DBus',
@@ -1157,7 +1189,7 @@ export class DBus extends EventEmitter {
                 signature: 's',
                 args: [name]
             })
-            return owner instanceof DBusTypeClass ? owner.value : owner
+            return owner
         } catch (e) {
             return undefined
         }
@@ -1170,13 +1202,13 @@ export class DBus extends EventEmitter {
      * @returns A Promise resolving to an array of activatable bus names (e.g., ['org.test.Service']).
      */
     public async listActivatableNames(): Promise<string[]> {
-        const [activatableNames] = await this.invoke({
+        const [activatableNames] = await this.#invokePlain({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
             method: 'ListActivatableNames'
         })
-        return activatableNames instanceof DBusTypeClass ? activatableNames.value : activatableNames
+        return activatableNames
     }
 
     /**
@@ -1186,13 +1218,13 @@ export class DBus extends EventEmitter {
      * @returns A Promise resolving to an array of active bus names (e.g., ['org.test.Service', ':1.123']).
      */
     public async listNames(): Promise<string[]> {
-        const [names] = await this.invoke({
+        const [names] = await this.#invokePlain({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
             method: 'ListNames'
         })
-        return names instanceof DBusTypeClass ? names.value : names
+        return names
     }
 
     /**
@@ -1203,7 +1235,7 @@ export class DBus extends EventEmitter {
      * @returns A Promise resolving to a boolean indicating if the name has an owner (true) or not (false).
      */
     public async nameHasOwner(name: string): Promise<boolean> {
-        const [hasOwner] = await this.invoke({
+        const [hasOwner] = await this.#invokePlain({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
@@ -1211,7 +1243,7 @@ export class DBus extends EventEmitter {
             method: 'NameHasOwner',
             args: [name]
         })
-        return hasOwner instanceof DBusTypeClass ? hasOwner.value : hasOwner
+        return hasOwner
     }
 
     /**
@@ -1223,7 +1255,7 @@ export class DBus extends EventEmitter {
      * @returns A Promise resolving to a result code indicating success or the reason for failure (e.g., RequestNameResultCode.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER).
      */
     public async requestName(name: string, flags: RequestNameFlags = RequestNameFlags.DBUS_NAME_FLAG_DEFAULT): Promise<RequestNameResultCode> {
-        const [res] = await this.invoke({
+        const [res] = await this.#invokePlain({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
@@ -1231,7 +1263,7 @@ export class DBus extends EventEmitter {
             method: 'RequestName',
             args: [name, flags]
         })
-        return res instanceof DBusTypeClass ? res.value : res
+        return res
     }
 
     /**
@@ -1242,7 +1274,7 @@ export class DBus extends EventEmitter {
      * @returns A Promise resolving to a numeric result code indicating the outcome of the release operation.
      */
     public async releaseName(name: string): Promise<number> {
-        const [res] = await this.invoke({
+        const [res] = await this.#invokePlain({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
@@ -1250,7 +1282,7 @@ export class DBus extends EventEmitter {
             method: 'ReleaseName',
             args: [name]
         })
-        return res instanceof DBusTypeClass ? res.value : res
+        return res
     }
 
     /**
@@ -1277,7 +1309,7 @@ export class DBus extends EventEmitter {
      * @returns A Promise resolving to a numeric result code indicating the outcome of the start operation.
      */
     public async startServiceByName(name: string, flags: number = 0): Promise<number> {
-        const [res] = await this.invoke({
+        const [res] = await this.#invokePlain({
             service: 'org.freedesktop.DBus',
             objectPath: '/org/freedesktop/DBus',
             interface: 'org.freedesktop.DBus',
@@ -1285,7 +1317,7 @@ export class DBus extends EventEmitter {
             method: 'StartServiceByName',
             args: [name, flags]
         })
-        return res instanceof DBusTypeClass ? res.value : res
+        return res
     }
 
     /**
@@ -1297,7 +1329,7 @@ export class DBus extends EventEmitter {
      */
     public async getConnectionUnixProcessID(name: string): Promise<number | undefined> {
         try {
-            const [pid] = await this.invoke({
+            const [pid] = await this.#invokePlain({
                 service: 'org.freedesktop.DBus',
                 objectPath: '/org/freedesktop/DBus',
                 interface: 'org.freedesktop.DBus',
@@ -1305,7 +1337,7 @@ export class DBus extends EventEmitter {
                 signature: 's',
                 args: [name]
             })
-            return pid instanceof DBusTypeClass ? pid.value : pid
+            return pid
         } catch (e) {
             return undefined
         }
@@ -1431,14 +1463,15 @@ export class DBus extends EventEmitter {
      * @param service - The service's well-known name.
      * @param objectPath - Path of the service's object manager (default '/'). Services document it; BlueZ uses '/',
      *                     UDisks2 '/org/freedesktop/UDisks2'.
+     * @param opts - decode: how property values are given (see DecodeOpts).
      * @returns The object manager client, with its objects loaded.
      * @throws {ServiceNotFoundError} As getService.
      * @throws {Error} The DBus error GetManagedObjects failed with, e.g. 'org.freedesktop.DBus.Error.UnknownMethod'
      *         when the path has no object manager.
      */
-    public async getObjectManager(service: string, objectPath: string = '/'): Promise<DBusObjectManager> {
+    public async getObjectManager(service: string, objectPath: string = '/', opts: ProxyOpts = {}): Promise<DBusObjectManager> {
         const dbusService: DBusService = await this.getService(service)
-        const manager: DBusObjectManager = new DBusObjectManager({dbus: this, service: service, uniqueName: dbusService.uniqueName, objectPath: objectPath})
+        const manager: DBusObjectManager = new DBusObjectManager({dbus: this, service: service, uniqueName: dbusService.uniqueName, objectPath: objectPath, decode: opts.decode})
         try {
             await manager.load()
         } catch (error) {
@@ -1459,11 +1492,13 @@ export class DBus extends EventEmitter {
      * @param service - The service's well-known name.
      * @param objectPath - The object path.
      * @param iface - The interface name.
+     * @param opts - decode: how the proxy gives the values it receives, e.g. {types: 'variants'} to read values
+     *               that will be sent back (see DecodeOpts).
      * @returns The interface proxy.
      * @throws {ServiceNotFoundError} As getService.
      * @throws {InterfaceNotFoundError} When the object's introspection data does not list the interface.
      */
-    public async getInterface(service: string, objectPath: string, iface: string): Promise<DBusInterface> {
-        return (await this.getObject(service, objectPath)).getInterface(iface)
+    public async getInterface(service: string, objectPath: string, iface: string, opts?: ProxyOpts): Promise<DBusInterface> {
+        return (await this.getObject(service, objectPath)).getInterface(iface, opts)
     }
 }
