@@ -92,6 +92,31 @@ greeter.signal.on('Greeted', (name: string, count: number) => console.log(name, 
 `listObjectPaths()`, `listInterfaceNames()` and `introspect()` explore what is there (see
 [07-introspect.ts](examples/07-introspect.ts)). `getService` starts a service that is activatable but not running.
 
+### Following an object manager
+
+Services with many objects that come and go, such as BlueZ, UDisks2 and NetworkManager, publish them through
+`org.freedesktop.DBus.ObjectManager`. `getObjectManager` keeps a copy of those objects with their interfaces and
+properties, and tells you when they change.
+
+```typescript
+const manager = await bus.getObjectManager('org.bluez')       // the manager's path: '/' by default
+for (const path of manager.listObjectPaths()) {
+    console.log(path, manager.listInterfaceNames(path), manager.getProperties(path, 'org.bluez.Device1'))
+}
+manager.on('objectAdded', (path, interfaces) => { /* {interface: {property: value}} */ })
+manager.on('objectRemoved', (path, interfaceNames) => { /* ... */ })
+manager.on('interfacesAdded', (path, interfaces) => { /* an existing object gained interfaces */ })
+manager.on('interfacesRemoved', (path, interfaceNames) => { /* ... */ })
+manager.on('propertiesChanged', (path, iface, changed, invalidated) => { /* the copy is already updated */ })
+
+const device = await manager.getInterface('/org/bluez/hci0/dev_00_11_22_33_44_55', 'org.bluez.Device1')
+await device.method.Connect()
+manager.close()
+```
+
+When the service leaves the bus, its objects are removed with `objectRemoved`. When it comes back, they are read
+again. All the properties are followed with a single match rule.
+
 ### Without introspection
 
 `invoke` takes the signature explicitly. It always resolves to the array of returned values.
@@ -125,6 +150,7 @@ greeter.signal.on('Greeted', (name, count) => { /* ... */ })
 const clock = bus.createSignalEmitter({service: '*', uniqueName: '*', objectPath: '*', interface: 'org.example.Clock1'})
 clock.on('Tick', (count, time) => { /* ... */ })
 clock.on('*', (signalName, ...args) => { /* every signal the emitter selects */ })
+clock.onAny((signal) => { /* the same, with signal.sender, .objectPath, .interface, .name and .args */ })
 
 // Names appearing on and leaving the bus (unique names too)
 bus.on('serviceOnline', (name) => { /* ... */ })
@@ -206,15 +232,27 @@ process.once('SIGTERM', () => service.stop({graceful: true, timeout: 5000}))
 - With `emitPropertiesChanged`, a change made through the setter sends `PropertiesChanged`. That covers a DBus `Set`
   call and `iface.setProperty(name, value)` from your code. Use `{emitValue: false}` to send the property as
   invalidated instead of sending its value.
-- To announce a change made another way, for example to a read-only property, call
-  `object.propertiesInterface.emitPropertiesChanged(iface.name, {Name: iface.getPropertySignedValue('Name')})`.
+- Announce a change made another way, for example to a read-only property the service updates itself, with
+  `iface.emitPropertiesChanged('Name')` (or a list of names). Clients that cache properties, such as proxies and
+  object manager clients, rely on these signals. Changes announced in the same turn of the event loop go out in one
+  signal.
+- A property whose getter throws is left out of `GetAll` and the object manager's reports. `Get` returns the error.
 
 **Signals** are sent when the `eventEmitter` given to `defineSignal` emits an event with the signal's name. The
 event's arguments become the signal's arguments.
 
-**Objects** can be added and removed while the service runs. The root object `/` always exists and carries
-`org.freedesktop.DBus.ObjectManager`, which announces each change with `InterfacesAdded` and `InterfacesRemoved`.
-Do not add another object at `/`.
+**Objects** can be added and removed while the service runs. The root object `/` always exists; do not add another
+object at `/`.
+
+**Object manager.** `org.freedesktop.DBus.ObjectManager` lists the objects below it (`GetManagedObjects`) and
+announces each change with `InterfacesAdded` and `InterfacesRemoved`.
+
+- By default it is on `/`, as BlueZ does.
+- `new LocalService(name, {objectManagerPath: '/org/example/App'})` puts it on that path, as UDisks2 does, so it
+  manages only the objects below. Add interfaces to that object with `service.getObject(path)`.
+- `objectManagerPath: null` leaves it out.
+- To nest managers, add `new ObjectManagerInterface()` to another object. Each object is reported by the nearest
+  manager above it, never by a manager on its own path.
 
 **Annotations**: give `annotations: {'org.freedesktop.DBus.Deprecated': 'true'}` on methods, arguments, properties
 or signals, or call `defineAnnotation` on the interface. They appear in the introspection data.

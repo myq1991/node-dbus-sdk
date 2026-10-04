@@ -73,6 +73,10 @@ or -0 where they occur. Unlike the old name suggested, the result cannot always 
 
 - `HandshakeOpts.simple` and `HandshakeOpts.direct`. They were never used and had no effect.
 - `ObjectNotFoundError`. Nothing threw it.
+- `PropertiesInterface.emitPropertiesChanged(interface, changed, invalidated)` is internal. Announce changes with
+  `iface.emitPropertiesChanged(names)` on your `LocalInterface`, which also types the values correctly.
+- `ObjectManagerInterface.interfacesAdded` / `interfacesRemoved` are internal. Adding and removing objects and
+  interfaces sends the signals.
 
 ## Changed behaviour
 
@@ -98,6 +102,16 @@ or -0 where they occur. Unlike the old name suggested, the result cannot always 
 - **Dictionaries from a `Map`.** A `Map` given for `a{..}` or for a variant is encoded with its entries, and its keys
   keep their types. Before, it was sent as an empty dictionary. A `Date`, `Set` or similar object given for a
   dictionary or a variant is rejected. Before, it also became an empty dictionary.
+- **Object manager reports.** These are the changes on the service side:
+  - Changes to the manager's own object are no longer announced. Before, adding an interface to `/` sent an
+    `InterfacesAdded` for `/`, which `GetManagedObjects` does not list.
+  - With nested managers, each object is reported by its nearest manager only.
+  - Property values are read only while the service runs, when they are reported.
+  - A property whose getter throws is left out of `GetAll`, `GetManagedObjects` and `InterfacesAdded`. Before, it
+    made `addObject` and `addInterface` throw, even before the service ran, and made the whole `GetManagedObjects`
+    call fail.
+- **Signals after `stop()`.** Emitting a signal's event after the service stopped no longer throws a
+  `Disconnected` error from your `emit` call. Nothing is sent.
 - **Library errors have names.** `error.name` is the class name (`'TimeoutError'`, `'InvalidValueError'`, …) instead
   of `'Error'`. A library error thrown in a method handler therefore reaches the caller as `<service>.<ClassName>`
   instead of `<service>.Error`.
@@ -115,6 +129,14 @@ or -0 where they occur. Unlike the old name suggested, the result cannot always 
   returned the hardware UUID. The `native-machine-id` dependency is gone, so installing no longer compiles native code.
 
 ## New
+
+- `DBus.getObjectManager(service, path)`: a client for a service's ObjectManager. It keeps a copy of the managed
+  objects and emits `objectAdded`, `objectRemoved`, `interfacesAdded`, `interfacesRemoved` and `propertiesChanged`.
+- `LocalInterface.emitPropertiesChanged(names)` announces properties the service changed itself, e.g. read-only ones.
+- `new LocalService(name, {objectManagerPath})` puts the object manager on another path, or leaves it out with
+  `null`. More managers can be nested by adding an `ObjectManagerInterface` to other objects.
+- `DBusSignalEmitter.onAny(listener)` receives every selected signal with its sender, object path, interface and name.
+- `DBus.connected` tells whether the connection is open.
 
 - `withContext: true` on `defineMethod`: the handler receives the caller (`context.sender`) as an extra last argument.
 - `annotations` on methods, arguments, properties and signals, and `defineAnnotation` on interfaces.

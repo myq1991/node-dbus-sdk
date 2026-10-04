@@ -10,7 +10,7 @@ Each file is a complete program that imports `dbus-sdk` the way your code would.
 | [03-greeter-client.ts](03-greeter-client.ts) | Its client: positional and named arguments, return values, DBus errors, timeouts, properties, signals, `PropertiesChanged` |
 | [04-signals.ts](04-signals.ts) | Emitting signals, subscribing with match rules (`createSignalEmitter`), `serviceOnline` / `serviceOffline` |
 | [05-types.ts](05-types.ts) | How each DBus type maps to JavaScript and back, variant type inference, explicit types with `DBusSignedValue` and type classes, validation errors |
-| [06-object-manager.ts](06-object-manager.ts) | `org.freedesktop.DBus.ObjectManager`: objects that come and go, `GetManagedObjects`, `InterfacesAdded` / `InterfacesRemoved` |
+| [06-object-manager.ts](06-object-manager.ts) | `org.freedesktop.DBus.ObjectManager`: a service whose objects come and go and announces property changes, and a client (`getObjectManager`) that keeps a copy of them |
 | [07-introspect.ts](07-introspect.ts) | Walking a service's object tree and listing every method, property and signal |
 
 ## Running them

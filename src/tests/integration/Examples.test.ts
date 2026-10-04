@@ -157,9 +157,12 @@ describe('examples', {skip: (!PrivateBus.available && 'dbus-daemon not found') |
     it('06-object-manager lists objects and follows changes', async (): Promise<void> => {
         const run: ExampleRun = await finished(startExample('06-object-manager.ts', bus.address))
         assertSucceeded(run)
-        assert.match(run.stdout, /managed \/org\/example\/devices\/sda \{ Id: 'sda', Model: 'Disk A' \}/)
-        assert.match(run.stdout, /added \/org\/example\/devices\/sdb \{ Id: 'sdb', Model: 'Disk B' \}/)
-        assert.match(run.stdout, /removed \/org\/example\/devices\/sdb \[ 'org\.example\.Device1' \]/)
+        assert.deepEqual(run.stdout.trim().split('\n'), [
+            'managed /org/example/Disks/sda { Model: \'Disk A\', Temperature: 30 }',
+            'added /org/example/Disks/sdb { Model: \'Disk B\', Temperature: 30 }',
+            'changed /org/example/Disks/sdb { Temperature: 45 } → copy: { Model: \'Disk B\', Temperature: 45 }',
+            'removed /org/example/Disks/sdb → objects: [ \'/org/example/Disks/sda\' ]'
+        ])
     })
 
     it('07-introspect walks a service', async (): Promise<void> => {
