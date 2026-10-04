@@ -261,6 +261,9 @@ add('infer', 'v', [('ai', [1, 2])], infer=True, label='number array')
 add('infer', 'v', [('a{sv}', [('k', ('s', 'v'))])], infer=True, label='object')
 add('infer', 'v', [('a{sv}', [])], infer=True, label='empty object')
 add('infer', 'v', [('(is)', (1, 'a'))], infer=True, label='mixed array')
+add('infer', 'v', [('ad', [1, 1.5])], infer=True, label='integers and floats')
+add('infer', 'v', [('aa{sv}', [[('a', ('i', 1))], [('b', ('s', 'x'))]])], infer=True, label='array of objects')
+add('infer', 'a{sv}', [[('items', ('aa{sv}', [[('a', ('i', 1))], [('a', ('i', 2))]]))]], infer=True, label='object holding an array of objects')
 add('infer', 'a{sv}', [[('a', ('i', 1)), ('b', ('s', 'x')), ('c', ('b', False)), ('d', ('a{sv}', [('e', ('d', 0.5))]))]], infer=True, label='object')
 
 # Methods used by the echo services in the integration tests, one per distinct signature

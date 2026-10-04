@@ -2,7 +2,9 @@ import {describe, it} from 'node:test'
 import assert from 'node:assert/strict'
 import {DBusBufferEncoder} from '../../lib/DBusBufferEncoder'
 import {DBusMessageEndianness} from '../../lib/enums/DBusMessageEndianness'
-import {ObjectPathError, SignatureError} from '../../lib/Errors'
+import {InvalidValueError, ObjectPathError, SignatureError} from '../../lib/Errors'
+import {DBusSignedValue} from '../../lib/DBusSignedValue'
+import {DBusBufferDecoder} from '../../lib/DBusBufferDecoder'
 import {DBusUInt32} from '../../lib/datatypes/DBusUInt32'
 import {DBusInt64} from '../../lib/datatypes/DBusInt64'
 import {WireVector, WireVectors} from '../fixtures/WireVectors'
@@ -50,6 +52,41 @@ describe('DBusBufferEncoder', (): void => {
             assert.equal(encode('v', [new DBusUInt32(7)]).toString('hex'), hex('01 7500 00 07000000').toString('hex'))
             assert.equal(encode('v', [new DBusInt64(7n)]).toString('hex'), hex('01 7800 0000000000 0700000000000000').toString('hex'))
         })
+    })
+
+    describe('variant type inference', (): void => {
+        const encode = (signature: string, value: any): string => new DBusBufferEncoder().encode(signature, value).toString('hex')
+
+        /**
+         * A plain value given for a variant must encode exactly as the same value with its type given explicitly.
+         */
+        const cases: [string, any, string, any][] = [
+            ['an integer within INT32', 7, 'i', 7],
+            ['an integer beyond INT32', 1700000000000, 'x', 1700000000000n],
+            ['a negative integer beyond INT32', -(2 ** 40), 'x', -(2n ** 40n)],
+            ['a float', 0.25, 'd', 0.25],
+            ['an integer beyond the safe range', 2 ** 60, 'd', 2 ** 60],
+            ['integers that all fit INT32', [1, -2], 'ai', [1, -2]],
+            ['integers of which one exceeds INT32', [1, 2 ** 40], 'ax', [1n, 2n ** 40n]],
+            ['integers and floats', [1, 1.5], 'ad', [1, 1.5]],
+            ['objects', [{a: 'x'}, {b: 'y'}], 'aa{sv}', [{a: new DBusSignedValue('s', 'x')}, {b: new DBusSignedValue('s', 'y')}]]
+        ]
+        for (const [label, plain, signature, explicit] of cases) {
+            it(`infers ${signature} for ${label}`, (): void => {
+                assert.equal(encode('v', plain), encode('v', new DBusSignedValue(signature, explicit)))
+            })
+        }
+
+        it('keeps every object of an array instead of merging them', (): void => {
+            const body: Buffer = new DBusBufferEncoder().encode('v', [{a: 1}, {b: 2}])
+            assert.deepEqual(new DBusBufferDecoder(DBusMessageEndianness.LE, body).decode('v'), [[{a: 1}, {b: 2}]])
+        })
+
+        for (const [label, value] of [['null', null], ['undefined', undefined], ['a function', (): void => undefined]] as [string, any][]) {
+            it(`rejects ${label}, which has no DBus type`, (): void => {
+                assert.throws((): Buffer => new DBusBufferEncoder().encode('v', value), (error: unknown): boolean => error instanceof InvalidValueError && error.name === 'InvalidValueError' && /Cannot infer a DBus type/.test(error.message))
+            })
+        }
     })
 
     describe('byte arrays', (): void => {

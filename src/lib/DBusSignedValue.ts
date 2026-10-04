@@ -1,6 +1,6 @@
 import {Signature} from './Signature'
 import {DataType} from '../types/DataType'
-import {SignatureError} from './Errors'
+import {InvalidValueError, SignatureError} from './Errors'
 
 /**
  * The complete type of empty arrays. Values only expose the first character of their type ($signature), and an
@@ -356,79 +356,56 @@ export class DBusSignedValue {
     }
 
     /**
-     * Private method to infer the DBus signature type from a value for variant type 'v'.
-     * Analyzes the type and structure of the value to determine an appropriate DBus signature.
-     * Handles basic types (strings, numbers), arrays, buffers, and objects for dictionary inference.
+     * Infers the type of a plain value given for a variant ('v'):
+     * - string → 's', boolean → 'b', bigint → 'x'
+     * - number → 'i' for an integer within INT32, 'x' for a larger safe integer, 'd' otherwise
+     * - Buffer / Uint8Array → 'ay'; other typed arrays → the matching integer array ('an', 'aq', 'ax', 'at')
+     * - array → 'a' + the items' type when they share one (numbers widen together, e.g. [1, 1.5] → 'ad'),
+     *   otherwise a struct of the items' types, e.g. [1, 'a'] → '(is)'; an empty array → 'ai'
+     * - any other object → 'a{sv}', each property value being inferred in turn
+     * A value already wrapped in a DBusSignedValue keeps its signature.
      *
-     * @param value - The value to infer the type from, can be any JavaScript value.
-     * @returns The inferred DBus signature string (e.g., 's' for string, 'ai' for integer array).
+     * @param value - The plain value.
+     * @returns The inferred signature.
+     * @throws {InvalidValueError} For null, undefined, functions and symbols, which have no DBus type.
      */
     private inferType(value: any): string {
-        // If value is already a DBusSignedValue instance, use its signature
-        if (value instanceof DBusSignedValue) {
-            return value.$signature
+        if (value instanceof DBusSignedValue) return value.$signature
+        switch (typeof value) {
+            case 'string':
+                return 's'
+            case 'boolean':
+                return 'b'
+            case 'bigint':
+                return 'x'
+            case 'number':
+                return DBusSignedValue.inferNumberType([value])
         }
+        if (value === null || typeof value !== 'object') {
+            throw new InvalidValueError(`Cannot infer a DBus type for ${value === null ? 'null' : typeof value} in a variant; give the value a type with new DBusSignedValue(signature, value)`)
+        }
+        if (value instanceof Uint8Array) return 'ay' // Buffer included
+        if (value instanceof Int8Array || value instanceof Int16Array) return 'an'
+        if (value instanceof Uint16Array) return 'aq'
+        if (value instanceof BigInt64Array) return 'ax'
+        if (value instanceof BigUint64Array) return 'at'
+        if (Array.isArray(value)) {
+            if (!value.length) return 'ai'
+            if (value.every((item: any): boolean => typeof item === 'number')) return `a${DBusSignedValue.inferNumberType(value)}`
+            const itemTypes: string[] = value.map((item: any): string => this.inferType(item))
+            if (itemTypes.every((itemType: string): boolean => itemType === itemTypes[0])) return `a${itemTypes[0]}`
+            return `(${itemTypes.join('')})`
+        }
+        return 'a{sv}'
+    }
 
-        // Infer signature based on value type and structure
-        if (typeof value === 'string') {
-            return 's' // String
-        } else if (typeof value === 'number') {
-            // Check if integer or floating-point
-            return Number.isInteger(value) ? 'i' : 'd' // Integer or double
-        } else if (typeof value === 'boolean') {
-            return 'b' // Boolean
-        } else if (typeof value === 'bigint') {
-            return 'x' // 64-bit integer
-        } else if (Buffer.isBuffer(value)) {
-            return 'ay' // Byte array
-        } else if (value instanceof Uint8Array) {
-            return 'ay' // Byte array
-        } else if (value instanceof Int8Array) {
-            return 'an' // 16-bit integer array (approximation)
-        } else if (value instanceof Uint16Array) {
-            return 'aq' // 16-bit unsigned integer array
-        } else if (value instanceof Int16Array) {
-            return 'an' // 16-bit integer array
-        } else if (value instanceof BigUint64Array) {
-            return 'at' // 64-bit unsigned integer array
-        } else if (value instanceof BigInt64Array) {
-            return 'ax' // 64-bit integer array
-        } else if (Array.isArray(value) || (typeof value === 'object' && value !== null && 'length' in value && typeof value.length === 'number' && value.length >= 0)) {
-            // Array or TypedArray, attempt to infer child type
-            if (value.length === 0) {
-                return 'ai' // Default empty array to integer array
-            }
-            // Check if it might be a dictionary array (each element is an object)
-            const firstItem = value[0]
-            if (typeof firstItem === 'object' && firstItem !== null && !Buffer.isBuffer(firstItem) && !(firstItem instanceof Uint8Array) && !('length' in firstItem && typeof firstItem.length === 'number')) {
-                const keys = Object.keys(firstItem)
-                if (keys.length > 0) {
-                    // Infer as dictionary array a{sv}
-                    return 'a{sv}'
-                }
-            }
-            // Check if all elements have the same type
-            const items = Array.from(value)
-            const firstType = this.inferType(firstItem)
-            const allSameType = items.every(item => this.inferType(item) === firstType)
-            if (!allSameType) {
-                // If types are inconsistent, infer as struct
-                const childTypes = items.map(item => this.inferType(item))
-                return `(${childTypes.join('')})`
-            }
-            // Otherwise, treat as regular array with child type based on first element
-            return `a${firstType}`
-        } else if (typeof value === 'object' && value !== null) {
-            // Object, infer as dictionary array
-            const entries = Object.entries(value)
-            if (entries.length === 0) {
-                return 'a{sv}' // Default empty object to string-variant dictionary
-            }
-            // Prefer to infer as dictionary array a{sv}, with string keys and variant values
-            return 'a{sv}'
-        } else {
-            // Default to string type for unsupported or unknown types
-            return 's'
-        }
+    /**
+     * The narrowest type that holds all the given numbers: 'i' if they are integers within INT32, 'x' if they are
+     * safe integers, 'd' otherwise.
+     */
+    private static inferNumberType(numbers: number[]): string {
+        if (numbers.every((num: number): boolean => Number.isInteger(num) && num >= -0x80000000 && num <= 0x7fffffff)) return 'i'
+        if (numbers.every((num: number): boolean => Number.isSafeInteger(num))) return 'x'
+        return 'd'
     }
 }

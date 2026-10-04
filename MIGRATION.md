@@ -72,6 +72,7 @@ or -0 where they occur. Unlike the old name suggested, the result cannot always 
 ## Removed
 
 - `HandshakeOpts.simple` and `HandshakeOpts.direct`. They were never used and had no effect.
+- `ObjectNotFoundError`. Nothing threw it.
 
 ## Changed behaviour
 
@@ -89,6 +90,14 @@ or -0 where they occur. Unlike the old name suggested, the result cannot always 
 - **Arrays of objects are no longer merged.** `aa{sv}`, `aay` and `av` holding objects decode to arrays, as they
   should. Before, they were merged into a single object.
 - **An empty `ay` decodes to an empty Buffer**, not `[]`.
+- **Variant type inference.** These are the changes for plain values given for `v`:
+  - An array of objects is sent as `aa{sv}`. Before, its objects were merged into one `a{sv}`.
+  - An integer outside the INT32 range is sent as `x`. Before, it was rejected.
+  - An array mixing integers and floats is sent as `ad`. Before, it became a struct.
+  - `null`, `undefined` and functions are rejected with an `InvalidValueError` that says so.
+- **Library errors have names.** `error.name` is the class name (`'TimeoutError'`, `'InvalidValueError'`, …) instead
+  of `'Error'`. A library error thrown in a method handler therefore reaches the caller as `<service>.<ClassName>`
+  instead of `<service>.Error`.
 - **`LocalInterface.setProperty` returns a Promise.** It waits for the setter, which may be `async`. Use
   `await setProperty(...)` instead of `try/catch` around a synchronous call. Setters are now registered even without
   `emitPropertiesChanged`, and write-only properties work.

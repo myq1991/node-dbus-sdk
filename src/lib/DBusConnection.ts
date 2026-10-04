@@ -214,7 +214,7 @@ export class DBusConnection extends EventEmitter {
             const createReject: (error: Error) => void = (error: Error): void => clean((): void => reject(error))
             const timeoutHandler: () => void = (): void => {
                 socket.destroy()
-                return createReject(new TimeoutError(`Connect timeout after ${opts.timeout} seconds`))
+                return createReject(new TimeoutError(`Connect timeout after ${opts.timeout} ms`))
             }
             const errorHandler: (error: Error) => void = (error: Error): void => createReject(error)
             const connectHandler: () => void = (): void => createResolve()
