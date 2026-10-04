@@ -7,6 +7,7 @@ import {AlignmentError, InvalidValueError, ReadBufferError} from '../../lib/Erro
 import {DBusTypeClass} from '../../lib/DBusTypeClass'
 import {DBusInt64} from '../../lib/datatypes/DBusInt64'
 import {DBusArray} from '../../lib/datatypes/DBusArray'
+import {DBusByte} from '../../lib/datatypes/DBusByte'
 import {WireVector, WireVectors} from '../fixtures/WireVectors'
 import {LibdbusMessageFixture, LibdbusMessages} from '../fixtures/LibdbusMessages'
 import {wireMessageBody} from '../helpers/WireMessage'
@@ -86,6 +87,22 @@ describe('DBusBufferDecoder', (): void => {
             assert.equal(int64.value, 5n)
             assert.ok(array instanceof DBusArray)
             assert.deepEqual((array as DBusTypeClass).value, [1n, 2n])
+        })
+    })
+
+    describe('byte arrays', (): void => {
+        it('returns a copy that does not change with the data it was decoded from', (): void => {
+            const wire: Buffer = hex('03000000 010203')
+            const [bytes] = decode('ay', wire)
+            wire[4] = 0xff
+            assert.deepEqual(bytes, Buffer.from([1, 2, 3]))
+        })
+
+        it('returns DBusArray of DBusByte in typed mode', (): void => {
+            const [array] = new DBusBufferDecoder(DBusMessageEndianness.LE, hex('03000000 010203')).decode('ay', true)
+            assert.ok(array instanceof DBusArray)
+            assert.ok(array.$value.every((item: any): boolean => item instanceof DBusByte))
+            assert.deepEqual(array.value, Buffer.from([1, 2, 3]))
         })
     })
 

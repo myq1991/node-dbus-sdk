@@ -385,6 +385,15 @@ export class DBusBufferEncoder {
      * @returns This instance for method chaining.
      */
     public writeArray(signedValues: DBusSignedValue[], arrayItemSignature?: string): this {
+        if (Buffer.isBuffer(signedValues)) {
+            // A byte array held as one Buffer: its length, then the bytes as they are (BYTE needs no alignment)
+            const bytes: Buffer = signedValues as Buffer
+            this.writeLength(bytes.length)
+            this.reserve(bytes.length)
+            bytes.copy(this.buffer, this.length)
+            this.length += bytes.length
+            return this
+        }
         const elementType: string | undefined = arrayItemSignature || signedValues[0]?.$signature
         const lengthOffset: number = this.claim(4, 4) // Filled in once the elements are written
         this.align(elementType ? ALIGNMENT[elementType] || 1 : 1)

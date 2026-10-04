@@ -78,6 +78,10 @@ function toTypeClassInstance(value: DBusSignedValue): DBusTypeClass {
             return new DBusUnixFD(value.$value)
         // Container data types
         case 'a':
+            if (Buffer.isBuffer(value.$value)) {
+                // Typed results keep one DBusByte per byte, as before byte arrays were held as one Buffer
+                return new DBusArray(Array.from(value.$value, (byte: number): DBusTypeClass => new DBusByte(byte)), DBusByte as unknown as typeof DBusTypeClass)
+            }
             const arrayItemSignature: string = value.$arrayItemSignature!
             const arrayValues: DBusTypeClass[] = (value.$value as DBusSignedValue[]).map((item: DBusSignedValue): DBusTypeClass => SignedValueToTypeClassInstance(item))
             return new DBusArray(arrayValues, typeClassConstructors.find(typeClassConstructor => typeClassConstructor.type === arrayItemSignature))

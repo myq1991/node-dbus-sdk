@@ -528,6 +528,12 @@ export class DBusBufferDecoder {
         if (arrayEndOffset > this.buffer.length) {
             throw new ReadBufferError(`Cannot read ARRAY content: ${byteLength} bytes at offset ${this.offset} exceed buffer length ${this.buffer.length}`)
         }
+        if (elementType.type === 'y') {
+            // A byte array is its bytes: copy them into one Buffer (not a view, so the message can be released)
+            const bytes: Buffer = Buffer.from(this.buffer.subarray(this.offset, arrayEndOffset))
+            this.offset = arrayEndOffset
+            return new DBusSignedValue({type: 'a', child: [elementType]}, bytes)
+        }
         const elements: DBusSignedValue[] = []
         while (this.offset < arrayEndOffset) {
             elements.push(this.readSignedValue(elementType)) // Recursively read each element

@@ -52,6 +52,21 @@ describe('DBusBufferEncoder', (): void => {
         })
     })
 
+    describe('byte arrays', (): void => {
+        it('encodes a Uint8Array', (): void => {
+            assert.equal(encode('ay', [new Uint8Array([1, 2, 3])]).toString('hex'), '03000000010203')
+        })
+
+        it('encodes only the bytes of a Buffer slice', (): void => {
+            const slice: Buffer = Buffer.from([9, 1, 2, 3, 9]).subarray(1, 4)
+            assert.equal(encode('ay', [slice]).toString('hex'), '03000000010203')
+        })
+
+        it('encodes a Uint8Array inside a variant as ay', (): void => {
+            assert.equal(encode('v', [new Uint8Array([1, 2])]).toString('hex'), hex('02 617900 02000000 0102').toString('hex'))
+        })
+    })
+
     describe('validation', (): void => {
         it('rejects an invalid object path', (): void => {
             assert.throws((): Buffer => encode('o', ['no-leading-slash']), ObjectPathError)

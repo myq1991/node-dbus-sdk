@@ -105,6 +105,7 @@ export class DBusSignedValue {
     public static dataTypeOf(value: DBusSignedValue): DataType | undefined {
         const recorded: DataType | undefined = completeTypes.get(value)
         if (recorded) return recorded
+        if (Buffer.isBuffer(value.$value)) return {type: 'a', child: [{type: 'y', child: []}]}
         return 'a({'.includes(value.$signature) ? undefined : {type: value.$signature as any}
     }
 
@@ -172,6 +173,7 @@ export class DBusSignedValue {
     private static convertToPlain(value: DBusSignedValue): any {
         switch (value.$signature) {
             case 'a': {
+                if (Buffer.isBuffer(value.$value)) return value.$value
                 const items: DBusSignedValue[] = value.$value as DBusSignedValue[]
                 const itemSignature: string | undefined = value.$arrayItemSignature || items[0]?.$signature
                 if (itemSignature === '{') {
@@ -260,6 +262,11 @@ export class DBusSignedValue {
                 // Handle composite types: array, dictionary, struct
                 switch (dataType.type) {
                     case 'a': // Array
+                        if (dataType.child[0].type === 'y' && value instanceof Uint8Array) {
+                            // Bytes stay one Buffer (shared, not copied) instead of one value per byte
+                            this.$value = Buffer.isBuffer(value) ? value : Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+                            break
+                        }
                         // Check if value is an array or TypedArray-like object
                         const isArrayLike: boolean = Array.isArray(value) || (typeof value === 'object' && value !== null && 'length' in value && typeof value.length === 'number' && value.length >= 0)
                         if (!isArrayLike) {
@@ -283,11 +290,6 @@ export class DBusSignedValue {
                                         return new DBusSignedValue(dataType.child![0], [keyObj, valObj])
                                     })
                                 }
-                                break
-                            } else if (dataType.child[0].type === 'y' && Buffer.isBuffer(value)) {
-                                // For 'ay' type, convert Buffer to array if provided
-                                const arrayValue: number[] = Array.from(value)
-                                this.$value = arrayValue.map(byte => new DBusSignedValue('y', byte))
                                 break
                             }
                             throw new SignatureError(`Expected array for signature "a", got: ${typeof value}. Non-dictionary array types do not support object input except for Buffer with ay.`)
