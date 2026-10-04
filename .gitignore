@@ -30,3 +30,6 @@ yarn-error.log*
 
 !src
 package-lock.json
+
+# Local notes
+CLAUDE.md
