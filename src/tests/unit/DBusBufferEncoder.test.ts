@@ -91,6 +91,31 @@ describe('DBusBufferEncoder', (): void => {
             )
         })
 
+        it('encodes a Map as a dictionary, keeping the types of its keys', (): void => {
+            const roundTrip = (signature: string, value: any): any[] => new DBusBufferDecoder(DBusMessageEndianness.LE, new DBusBufferEncoder().encode(signature, value)).decode(signature)
+            assert.deepEqual(roundTrip('a{sv}', new Map<string, unknown>([['a', 1], ['b', 'x']])), [{a: 1, b: 'x'}])
+            assert.deepEqual(roundTrip('a{is}', new Map([[1, 'one'], [-2, 'minus two']])), [{1: 'one', '-2': 'minus two'}])
+            assert.equal(encode('a{xs}', new Map([[2n ** 40n, 'big']])), encode('a{xs}', [[2n ** 40n, 'big']]))
+            assert.equal(DBusSignedValue.inferSignature(new Map([[1, 'a']])), 'a{iv}')
+            assert.equal(DBusSignedValue.inferSignature(new Map()), 'a{sv}')
+            assert.equal(encode('v', new Map([[1, 'a']])), encode('v', new DBusSignedValue('a{iv}', [[1, new DBusSignedValue('s', 'a')]])))
+        })
+
+        for (const [label, value] of [['a Date', new Date(0)], ['a Set', new Set([1])], ['a RegExp', /x/]] as [string, any][]) {
+            it(`rejects ${label} instead of sending an empty dictionary`, (): void => {
+                assert.throws((): Buffer => new DBusBufferEncoder().encode('v', value), (error: unknown): boolean => error instanceof InvalidValueError && /Cannot convert/.test(error.message))
+                assert.throws((): Buffer => new DBusBufferEncoder().encode('a{sv}', value), InvalidValueError)
+            })
+        }
+
+        it('still accepts an empty plain object and a class instance with fields', (): void => {
+            assert.equal(encode('v', {}), encode('v', new DBusSignedValue('a{sv}', [])))
+            class Point {
+                public x: number = 1
+            }
+            assert.equal(encode('v', new Point()), encode('v', {x: 1}))
+        })
+
         it('keeps every object of an array instead of merging them', (): void => {
             const body: Buffer = new DBusBufferEncoder().encode('v', [{a: 1}, {b: 2}])
             assert.deepEqual(new DBusBufferDecoder(DBusMessageEndianness.LE, body).decode('v'), [[{a: 1}, {b: 2}]])

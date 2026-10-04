@@ -95,6 +95,9 @@ or -0 where they occur. Unlike the old name suggested, the result cannot always 
   - An integer outside the INT32 range is sent as `x`. Before, it was rejected.
   - An array mixing integers and floats is sent as `ad`. Before, it became a struct.
   - `null`, `undefined` and functions are rejected with an `InvalidValueError` that says so.
+- **Dictionaries from a `Map`.** A `Map` given for `a{..}` or for a variant is encoded with its entries, and its keys
+  keep their types. Before, it was sent as an empty dictionary. A `Date`, `Set` or similar object given for a
+  dictionary or a variant is rejected. Before, it also became an empty dictionary.
 - **Library errors have names.** `error.name` is the class name (`'TimeoutError'`, `'InvalidValueError'`, …) instead
   of `'Error'`. A library error thrown in a method handler therefore reaches the caller as `<service>.<ClassName>`
   instead of `<service>.Error`.

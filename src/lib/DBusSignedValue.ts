@@ -335,7 +335,13 @@ export class DBusSignedValue {
                         if (!isArrayLike) {
                             // For dictionary arrays a{...}, support object input
                             if (dataType.child[0].type === '{' && typeof value === 'object' && value !== null) {
-                                const entries: [string, unknown][] = Object.entries(value)
+                                // A Map keeps its keys' types; an object's property names are converted to the key type
+                                const fromMap: boolean = value instanceof Map
+                                const entries: [any, unknown][] = fromMap ? [...value.entries()] : Object.entries(value)
+                                if (!entries.length && !fromMap && !DBusSignedValue.isPlainObject(value)) {
+                                    // A Date, Set or similar has no own properties: it would silently become an empty dictionary
+                                    throw new InvalidValueError(`Cannot convert ${Object.prototype.toString.call(value)} to a DBus dictionary; convert it to a plain object, a Map, or a string or number first`)
+                                }
                                 if (entries.length === 0) {
                                     // If the input is an empty object, create an empty array with the correct signature structure
                                     this.$value = []
@@ -347,7 +353,7 @@ export class DBusSignedValue {
                                         if (!keyDataType || !valueDataType) {
                                             throw new SignatureError('Invalid dictionary child types')
                                         }
-                                        const keyObj: DBusSignedValue = DBusSignedValue.typed(keyDataType, DBusSignedValue.keyFromPropertyName(keyDataType.type, key))
+                                        const keyObj: DBusSignedValue = DBusSignedValue.typed(keyDataType, fromMap ? key : DBusSignedValue.keyFromPropertyName(keyDataType.type, key))
                                         const valObj: DBusSignedValue = DBusSignedValue.typed(valueDataType, val)
                                         // Create a DBusSignedValue for a single dictionary entry {...}
                                         return new DBusSignedValue(dataType.child![0], [keyObj, valObj])
@@ -423,7 +429,8 @@ export class DBusSignedValue {
      * - Buffer / Uint8Array → 'ay'; other typed arrays → the matching integer array ('an', 'aq', 'ax', 'at')
      * - array → 'a' + the items' type when they share one (numbers widen together, e.g. [1, 1.5] → 'ad'),
      *   otherwise a struct of the items' types, e.g. [1, 'a'] → '(is)'; an empty array → 'ai'
-     * - any other object → 'a{sv}', each property value being inferred in turn
+     * - a Map → 'a{' + its keys' type + 'v}', e.g. 'a{iv}' for integer keys
+     * - any other object → 'a{sv}', each property value being inferred in turn (a Date, Set or similar is rejected)
      * A value already wrapped in a DBusSignedValue keeps its signature.
      *
      * @example
@@ -462,7 +469,30 @@ export class DBusSignedValue {
             if (itemTypes.every((itemType: string): boolean => itemType === itemTypes[0])) return `a${itemTypes[0]}`
             return `(${itemTypes.join('')})`
         }
+        if (value instanceof Map) return `a{${DBusSignedValue.inferKeyType([...value.keys()])}v}`
         return 'a{sv}'
+    }
+
+    /**
+     * The key type of a dictionary given as a Map: 's' for strings (and an empty Map), the narrowest integer or double
+     * type for numbers, 'x' for bigints, 'b' for booleans.
+     *
+     * @throws {InvalidValueError} When the keys are of mixed or non-basic types.
+     */
+    private static inferKeyType(keys: any[]): string {
+        if (keys.every((key: any): boolean => typeof key === 'string')) return 's'
+        if (keys.every((key: any): boolean => typeof key === 'number')) return DBusSignedValue.inferNumberType(keys)
+        if (keys.every((key: any): boolean => typeof key === 'bigint')) return 'x'
+        if (keys.every((key: any): boolean => typeof key === 'boolean')) return 'b'
+        throw new InvalidValueError('Cannot infer a DBus type for the keys of a Map in a variant: they must all be strings, numbers, bigints or booleans')
+    }
+
+    /**
+     * Whether a value is a plain object ({...} or Object.create(null)), as opposed to a Date, Set or class instance.
+     */
+    private static isPlainObject(value: object): boolean {
+        const prototype: object | null = Object.getPrototypeOf(value)
+        return prototype === Object.prototype || prototype === null
     }
 
     /**
