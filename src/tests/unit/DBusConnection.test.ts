@@ -74,7 +74,7 @@ describe('DBusConnection framing', (): void => {
         }
     })
 
-    it('frames big-endian messages', knownBug('header and body lengths are always read as little-endian'), async (): Promise<void> => {
+    it('frames big-endian messages', async (): Promise<void> => {
         const {stream, received} = createConnection()
         const fields: any[] = [
             [1, new DBusSignedValue('o', '/test')],

@@ -20,6 +20,7 @@ import EventEmitter from 'node:events'
 import {Socket} from 'node:net'
 import {NetConnectOpts} from 'net'
 import {DBusMessage} from './DBusMessage'
+import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 
 /**
  * A class representing a low-level DBus connection.
@@ -418,9 +419,11 @@ export class DBusConnection extends EventEmitter {
                         header = stream.read(16) // DBus message header is 16 bytes
                         if (!header) break
                         state = true
-                        fieldsLength = header.readUInt32LE(12) // Length of header fields
+                        // The first byte tells the byte order of the whole message ('l' little, 'B' big endian)
+                        const bigEndian: boolean = header[0] === DBusMessageEndianness.BE
+                        fieldsLength = bigEndian ? header.readUInt32BE(12) : header.readUInt32LE(12) // Length of header fields
                         fieldsLengthPadded = ((fieldsLength + 7) >> 3) << 3 // Padded to 8-byte boundary
-                        bodyLength = header.readUInt32LE(4) // Length of message body
+                        bodyLength = bigEndian ? header.readUInt32BE(4) : header.readUInt32LE(4) // Length of message body
                         fieldsAndBodyLength = fieldsLengthPadded + bodyLength
                     } else {
                         fieldsAndBody = stream.read(fieldsAndBodyLength)
