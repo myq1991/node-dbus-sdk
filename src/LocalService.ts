@@ -108,7 +108,13 @@ export class LocalService {
                     const {
                         signature,
                         result
-                    } = await localInterface.callMethod(targetMethod, payloadSignature, ...message.body)
+                    } = await localInterface.invokeMethod(targetMethod, payloadSignature, message.body, {
+                        sender: message.header.sender,
+                        objectPath: targetObjectPath,
+                        interface: targetInterface,
+                        method: targetMethod,
+                        message: message
+                    })
                     // parse() splits several output arguments (the handler returns them as an array) and keeps
                     // DBusSignedValue/DBusTypeClass results whose type already matches, instead of wrapping them again
                     const resultSignedValue: DBusSignedValue[] = signature ? DBusSignedValue.parse(signature, result) : []

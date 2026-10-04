@@ -221,7 +221,22 @@ configured.
 ### Key Methods
 
 - **`defineMethod(opts: DefineMethodOpts): this`**: Defines a custom method with input/output signatures and an
-  implementation.
+  implementation. A method with several output arguments returns them as an array. With `withContext: true`, the
+  implementation receives a `MethodCallContext` as an extra last argument. It holds `sender`, the caller's unique bus
+  name, for example for access control with polkit; it also holds `objectPath`, `interface`, `method` and the call
+  `message`:
+
+  ```typescript
+  iface.defineMethod({
+      name: 'Reboot',
+      inputArgs: [{name: 'force', type: 'b'}],
+      withContext: true,
+      method: async (force: boolean, context: MethodCallContext) => {
+          if (!await isAuthorized(context.sender)) throw CreateDBusError('org.example.Error.NotAuthorized', 'Not allowed')
+          // ...
+      }
+  })
+  ```
 - **`removeMethod(name: string): this`**: Removes a defined method by name.
 - **`defineProperty(opts: DefinePropertyOpts): this`**: Defines a custom property with type, access mode (read/write),
   getter/setter functions, and optional property change signal emission. The access mode follows from the functions

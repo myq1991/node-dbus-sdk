@@ -1,6 +1,7 @@
 import {DBusPropertyAccess} from './lib/enums/DBusPropertyAccess'
 import {DefineMethodArgumentOpts, DefineMethodOpts} from './types/DefineMethodOpts'
 import {DefinePropertyOpts, emitPropertiesChangedOpts} from './types/DefinePropertyOpts'
+import {MethodCallContext} from './types/MethodCallContext'
 import {DefineSignalOpts} from './types/DefineSignalOpts'
 import {IntrospectMethod} from './types/IntrospectMethod'
 import {IntrospectProperty} from './types/IntrospectProperty'
@@ -55,6 +56,7 @@ export class LocalInterface {
         inputSignature?: string
         outputSignature?: string
         method: (...args: any[]) => Promise<any | any[]> | any | any[]
+        withContext: boolean
     }> = {}
 
     /**
@@ -382,7 +384,8 @@ export class LocalInterface {
         this.#definedMethods[opts.name] = {
             inputSignature: opts.inputArgs ? opts.inputArgs.map((inputArg: DefineMethodArgumentOpts): string => inputArg.type).join('') : undefined,
             outputSignature: opts.outputArgs ? opts.outputArgs.map((outputArg: DefineMethodArgumentOpts): string => outputArg.type).join('') : undefined,
-            method: opts.method
+            method: opts.method,
+            withContext: !!opts.withContext
         }
         this.#introspectMethods.push({
             name: opts.name,
@@ -544,10 +547,27 @@ export class LocalInterface {
         signature?: string
         result: any
     }> {
+        return this.invokeMethod(name, payloadSignature, args)
+    }
+
+    /**
+     * Calls a defined method like callMethod, passing the call's context to methods defined with `withContext`.
+     *
+     * @param name - The name of the method to call.
+     * @param payloadSignature - The signature of the arguments, checked against the method's input signature.
+     * @param args - The arguments.
+     * @param context - The call being answered; undefined when the method is called directly.
+     * @returns The method's output signature and result.
+     * @throws {DBusError} If the method is not found or the argument signature does not match.
+     */
+    public async invokeMethod(name: string, payloadSignature: string | undefined, args: any[], context?: MethodCallContext): Promise<{
+        signature?: string
+        result: any
+    }> {
         if (!this.#definedMethods[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownMethod', `Method ${name} not found`)
         const methodInfo = this.#definedMethods[name]
         if (!Signature.areSignaturesCompatible(methodInfo.inputSignature, payloadSignature)) throw CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The input parameter signature '${payloadSignature}' does not match the expected method signature '${methodInfo.inputSignature}'.`)
-        const result: any = await methodInfo.method(...args)
+        const result: any = methodInfo.withContext ? await methodInfo.method(...args, context) : await methodInfo.method(...args)
         return {
             signature: methodInfo.outputSignature ? methodInfo.outputSignature : undefined,
             result: result

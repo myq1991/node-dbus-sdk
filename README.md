@@ -69,7 +69,8 @@ Whether you're building a client to interact with existing DBus services or expo
 - **Object Management**: Manages local objects via `LocalObject`, supporting introspection and standard interfaces like
   `org.freedesktop.DBus.Properties` and `org.freedesktop.DBus.Introspectable`.
 - **Method Call Handling**: Routes incoming method calls to the appropriate local interface and method, returning
-  formatted replies or errors.
+  formatted replies or errors. Methods defined with `withContext: true` also receive the caller's bus name
+  (`context.sender`), e.g. for access control.
 
 ### 7. **Error Handling and Validation**
 

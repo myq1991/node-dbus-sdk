@@ -3,6 +3,7 @@ import {LocalService} from '../../LocalService'
 import {LocalObject} from '../../LocalObject'
 import {LocalInterface} from '../../LocalInterface'
 import {CreateDBusError} from '../../lib/CreateDBusError'
+import {MethodCallContext} from '../../types/MethodCallContext'
 import {DBusUint32} from '../../lib/datatypes/DBusUint32'
 import {DBusVariant} from '../../lib/datatypes/DBusVariant'
 
@@ -74,6 +75,13 @@ export function createTestService(name: string): TestService {
             name: 'TypedVariant',
             outputArgs: [{name: 'value', type: 'v'}],
             method: (): DBusVariant => new DBusVariant(new DBusUint32(7))
+        })
+        .defineMethod({
+            name: 'Caller',
+            inputArgs: [{name: 'label', type: 's'}],
+            outputArgs: [{name: 'label', type: 's'}, {name: 'sender', type: 's'}, {name: 'path', type: 'o'}, {name: 'method', type: 's'}],
+            withContext: true,
+            method: (label: string, context: MethodCallContext): [string, string, string, string] => [label, context.sender, context.objectPath, context.method]
         })
         .defineMethod({
             name: 'Fail',

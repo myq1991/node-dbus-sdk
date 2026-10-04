@@ -11,6 +11,8 @@ import {
 import {knownBug} from '../helpers/KnownBug'
 import {catchUnhandledRejections} from '../helpers/Async'
 import {CreateDBusError} from '../../lib/CreateDBusError'
+import {MethodCallContext} from '../../types/MethodCallContext'
+import {DBusMessage} from '../../lib/DBusMessage'
 
 function createInterface(): LocalInterface {
     let label: string = 'initial'
@@ -85,6 +87,34 @@ describe('LocalInterface', (): void => {
             const access: Record<string, DBusPropertyAccess> = {}
             createInterface().introspectInterface.property.forEach((property): DBusPropertyAccess => access[property.name] = property.access)
             assert.deepEqual(access, {Label: DBusPropertyAccess.READWRITE, Version: DBusPropertyAccess.READ})
+        })
+    })
+
+    describe('call context', (): void => {
+        function createContextInterface(): LocalInterface {
+            return new LocalInterface('org.example.Context').defineMethod({
+                name: 'Inspect',
+                inputArgs: [{name: 'value', type: 'u'}],
+                outputArgs: [{type: 's'}],
+                withContext: true,
+                method: (value: number, context?: MethodCallContext): string => `${value} from ${context ? context.sender : 'nobody'}`
+            })
+        }
+
+        it('passes the context given to invokeMethod after the arguments', async (): Promise<void> => {
+            const context: MethodCallContext = {sender: ':1.7', objectPath: '/o', interface: 'org.example.Context', method: 'Inspect', message: new DBusMessage({serial: 1})}
+            assert.deepEqual(await createContextInterface().invokeMethod('Inspect', 'u', [3], context), {signature: 's', result: '3 from :1.7'})
+        })
+
+        it('passes undefined as context when the method is called directly', async (): Promise<void> => {
+            assert.deepEqual(await createContextInterface().callMethod('Inspect', 'u', 3), {signature: 's', result: '3 from nobody'})
+        })
+
+        it('does not pass a context to methods defined without withContext', async (): Promise<void> => {
+            const received: any[][] = []
+            const iface: LocalInterface = new LocalInterface('org.example.Plain').defineMethod({name: 'Args', inputArgs: [{type: 'u'}], method: (...args: any[]): number => received.push(args)})
+            await iface.invokeMethod('Args', 'u', [3], {sender: ':1.7', objectPath: '/o', interface: 'org.example.Plain', method: 'Args', message: new DBusMessage({serial: 1})})
+            assert.deepEqual(received, [[3]])
         })
     })
 

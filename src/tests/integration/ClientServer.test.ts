@@ -57,7 +57,7 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
         })
 
         it('lists methods from introspection', (): void => {
-            assert.deepEqual(iface.listMethods().map((method): string => method.name).sort(), ['Add', 'DivMod', 'EchoBytes', 'EchoDict', 'EchoInt64Array', 'EchoVariant', 'Fail', 'TypedUint32', 'TypedVariant'])
+            assert.deepEqual(iface.listMethods().map((method): string => method.name).sort(), ['Add', 'Caller', 'DivMod', 'EchoBytes', 'EchoDict', 'EchoInt64Array', 'EchoVariant', 'Fail', 'TypedUint32', 'TypedVariant'])
         })
     })
 
@@ -105,6 +105,10 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
             } finally {
                 await withTimeout(typedClient.disconnect(), 2000, 'disconnect typed client').catch((): void => undefined)
             }
+        })
+
+        it('tells a handler defined with withContext who called it', async (): Promise<void> => {
+            assert.deepEqual(await withTimeout(iface.method.Caller('mine'), 2000, 'Caller'), ['mine', client.uniqueName, TEST_OBJECT_PATH, 'Caller'])
         })
 
         it('propagates DBus errors thrown by the handler', async (): Promise<void> => {

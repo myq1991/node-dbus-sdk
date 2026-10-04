@@ -407,6 +407,12 @@ export type {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
 export type {InvokeOpts} from './types/InvokeOpts'
 
 /**
+ * Exports the MethodCallContext type passed to method handlers defined with `withContext: true`.
+ * Carries the caller's unique bus name (e.g. for access control) and the call message.
+ */
+export type {MethodCallContext} from './types/MethodCallContext'
+
+/**
  * Exports the NoReplyModeMethodCall type for method calls without reply expectation.
  * Defines the structure for method calls that do not await or expect a response from the remote service.
  */

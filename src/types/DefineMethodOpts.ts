@@ -45,4 +45,11 @@ export interface DefineMethodOpts {
      * The return value can be a single value, an array of values, or a Promise resolving to either.
      */
     method: (...args: any[]) => Promise<any | any[]> | any | any[]
+
+    /**
+     * Whether the method also receives the call's context (the caller's bus name and more, see MethodCallContext)
+     * as an extra last argument, after the input arguments. Defaults to false.
+     * When the method is called directly through LocalInterface.callMethod, there is no call and the context is undefined.
+     */
+    withContext?: boolean
 }
