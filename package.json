@@ -26,6 +26,7 @@
     "test:integration": "npm run rebuild && node --test --test-timeout=120000 \"build/tests/integration/**/*.test.js\"",
     "test:perf": "npm run rebuild && node --test --test-concurrency=1 \"build/tests/perf/**/*.test.js\"",
     "example": "node --import ./examples/use-local-build.mjs",
+    "docs:api": "npm run build && node ./build/tests/tools/ApiDoc.js",
     "bench": "npm run rebuild && node --expose-gc ./build/tests/benchmark/run.js",
     "bench:compare": "node ./build/tests/benchmark/compare.js",
     "bench:ab": "npm run rebuild && node ./build/tests/benchmark/ab.js"

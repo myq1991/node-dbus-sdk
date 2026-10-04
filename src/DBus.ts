@@ -664,7 +664,8 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Adds an event listener for various DBus events.
+     * Adds an event listener for the 'serviceOnline' event, emitted when a bus name gets an owner: a service starts,
+     * or a connection (unique name) appears.
      * Supports a range of predefined events related to service status, name ownership,
      * method calls, and connection state, with type-safe callback signatures.
      *
@@ -681,7 +682,7 @@ export class DBus extends EventEmitter {
      */
     public on(eventName: 'serviceOnline', listener: (name: string) => void): this
     /**
-     * Adds an event listener for the 'serviceOffline' event, emitted when a service goes offline.
+     * Adds an event listener for the 'serviceOffline' event, emitted when a bus name loses its owner: a service stops, or a connection (unique name) closes.
      *
      * @param eventName - The string 'serviceOffline', indicating a service disconnection event.
      * @param listener - A callback function that receives the service name as an argument, invoked when a service goes offline.
@@ -689,7 +690,7 @@ export class DBus extends EventEmitter {
      */
     public on(eventName: 'serviceOffline', listener: (name: string) => void): this
     /**
-     * Adds an event listener for the 'serviceReplaced' event, emitted when a service owner is replaced.
+     * Adds an event listener for the 'serviceReplaced' event, emitted when a bus name passes from one owner to another.
      *
      * @param eventName - The string 'serviceReplaced', indicating a service ownership replacement event.
      * @param listener - A callback function that receives the service name as an argument, invoked when a service owner changes.
@@ -784,7 +785,7 @@ export class DBus extends EventEmitter {
      */
     public once(eventName: 'serviceOnline', listener: (name: string) => void): this
     /**
-     * Adds a one-time event listener for the 'serviceOffline' event, emitted when a service goes offline.
+     * Adds a one-time event listener for the 'serviceOffline' event, emitted when a bus name loses its owner: a service stops, or a connection (unique name) closes.
      *
      * @param eventName - The string 'serviceOffline', indicating a service disconnection event.
      * @param listener - A callback function that receives the service name as an argument, invoked once when a service goes offline.
@@ -792,7 +793,7 @@ export class DBus extends EventEmitter {
      */
     public once(eventName: 'serviceOffline', listener: (name: string) => void): this
     /**
-     * Adds a one-time event listener for the 'serviceReplaced' event, emitted when a service owner is replaced.
+     * Adds a one-time event listener for the 'serviceReplaced' event, emitted when a bus name passes from one owner to another.
      *
      * @param eventName - The string 'serviceReplaced', indicating a service ownership replacement event.
      * @param listener - A callback function that receives the service name as an argument, invoked once when a service owner changes.

@@ -486,7 +486,7 @@ export class DBusConnection extends EventEmitter {
     }
 
     /**
-     * Adds an event listener for DBus connection events.
+     * Adds an event listener for the 'message' event, emitted when a complete message has been received and decoded.
      * Supports multiple event types with specific callback signatures for handling messages,
      * connection closure, and errors. This method allows for type-safe event handling based on
      * the event name provided.

@@ -1,372 +1,323 @@
-# DBus SDK
+# dbus-sdk
 
 [![npm version](https://badge.fury.io/js/dbus-sdk.svg)](https://badge.fury.io/js/dbus-sdk)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/myq1991/node-dbus-sdk/blob/main/LICENSE)
 
-## Introduction
+A DBus library for Node.js, written in TypeScript. Use it to call services and to provide your own. It implements the
+DBus wire protocol itself, over Unix sockets, TCP or any stream, so it needs no native modules and no libdbus.
 
-`dbus-sdk` is a comprehensive TypeScript library for interacting with DBus, a message bus system that enables
-communication between processes on Linux and other Unix-like operating systems. This Node.js SDK provides a robust and
-type-safe API to connect to DBus, manage services, objects, and interfaces, invoke methods, handle signals, and define
-local services for custom DBus implementations. Designed to simplify inter-process communication (IPC), it abstracts the
-complexities of the DBus protocol while maintaining flexibility and control for developers.
+- **Client**: proxies built from introspection, so you call methods and use properties and signals with plain
+  JavaScript values.
+- **Service**: define methods, properties and signals. Introspection, `Properties`, `Peer` and `ObjectManager` are
+  answered for you.
+- **Correct on the wire**: values are validated against their types. The encoding is tested byte for byte against
+  GDBus and libdbus, and against a real `dbus-daemon`.
 
-Whether you're building a client to interact with existing DBus services or exposing your own custom services,
-`dbus-sdk` offers a seamless experience with full TypeScript support.
+```typescript
+import {DBus} from 'dbus-sdk'
 
-## Core Features
+const bus = await DBus.connect()   // the session bus
+const daemon = await bus.getInterface('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus')
+console.log(await daemon.method.ListNames())
+await bus.disconnect()
+```
 
-### 1. **DBus Connection Management**
+## Contents
 
-- **Connection Establishment**: Supports connecting to DBus via various transport options (e.g., socket paths, TCP, or
-  custom streams) using configurable `ConnectOpts`.
-- **Initialization**: Automatically performs a `Hello` call to obtain a unique connection name from the DBus daemon and
-  sets up event listeners for connection state changes.
-- **Event-Driven**: Built on Node.js `EventEmitter`, emits events for service status (`serviceOnline`,
-  `serviceOffline`, `serviceReplaced`), name ownership changes (`nameOwnerChanged`, `nameAcquired`, `nameLost`), the
-  connection (`connectionClose`, `connectionError`) and incoming method calls (`methodCall`).
-
-### 2. **Method Invocation and Replies**
-
-- **Method Calls**: Provides synchronous and asynchronous method invocation with support for signatures and argument
-  handling. Methods can be called with or without expecting a reply (`invoke` with `noReply` option).
-- **Replies**: Supports sending replies to method calls (`reply`) with both success responses (`METHOD_RETURN`) and
-  error responses (`ERROR`).
-- **Timeouts**: By default a call waits until its reply arrives or the connection closes; on close it is rejected with
-  `org.freedesktop.DBus.Error.Disconnected`. You can set a limit with `timeout` (milliseconds) on `invoke`, with
-  `callTimeout` when connecting, or with `dbus.callTimeout`. The limit also applies to calls made through
-  `DBusInterface`. A call without a reply in time is rejected with a `TimeoutError`.
-- **File descriptors**: Node.js sockets cannot pass file descriptors, so `UNIX_FD` (`h`) values cannot be sent and are
-  rejected with an error. Replies that carry file descriptors never reach the connection, so give such calls a timeout.
-
-### 3. **Signal Handling**
-
-- **Signal Emission**: Allows broadcasting DBus signals to other processes using `emitSignal` with customizable
-  options (e.g., object path, interface, signal name).
-- **Signal Subscription**: Implements a flexible signal subscription system via `createSignalEmitter`, enabling
-  applications to listen for specific signals with match rules dynamically added to the DBus daemon.
-
-### 4. **Property Management**
-
-- **Get/Set Properties**: Simplifies access to DBus properties through `getProperty` and `setProperty` methods,
-  interfacing with the standard `org.freedesktop.DBus.Properties` interface.
-- **Access Control**: Enforces property access modes (read, write, read-write) based on introspection data.
-
-### 5. **Service and Object Management**
-
-- **Hierarchy Structure**: Organizes DBus interactions into a hierarchy of `DBusService`, `DBusObject`, and
-  `DBusInterface` classes, mirroring the DBus object model.
-- **Introspection**: Supports dynamic introspection of remote services and objects to retrieve metadata about available
-  interfaces, methods, properties, and signals (`introspect`, `listInterfaceNames`, `listObjectPaths`).
-- **Service Discovery**: Facilitates listing and accessing DBus services and their objects (`getObjects`,
-  `getInterface`).
-
-### 6. **Local Service Implementation**
-
-- **Custom Services**: Enables the creation of local DBus services with `LocalService`, allowing developers to define
-  and expose their own DBus objects and interfaces. `stop({graceful: true, timeout})` lets calls in progress finish
-  before the service gives up its name.
-- **Interface Definition**: Provides `LocalInterface` for defining custom methods, properties, and signals with strict
-  validation of DBus naming conventions, including introspection annotations (e.g. `org.freedesktop.DBus.Deprecated`)
-  on interfaces, methods, arguments, properties and signals.
-- **Object Management**: Manages local objects via `LocalObject`, supporting introspection and standard interfaces like
-  `org.freedesktop.DBus.Properties` and `org.freedesktop.DBus.Introspectable`.
-- **Method Call Handling**: Routes incoming method calls to the appropriate local interface and method, returning
-  formatted replies or errors. Methods defined with `withContext: true` also receive the caller's bus name
-  (`context.sender`), e.g. for access control.
-
-### 7. **Error Handling and Validation**
-
-- **Custom Errors**: Implements DBus-specific error types (e.g., `ServiceNotFoundError`, `InterfaceNotFoundError`) and
-  validates names for services, interfaces, methods, properties, and signals.
-- **Signature Matching**: Ensures compatibility of argument signatures during method calls and property operations to
-  prevent runtime errors.
-
-## Key Components
-
-- **DBus**: The main class for managing DBus connections, method calls, signals, and events. It serves as the entry
-  point for interacting with the DBus daemon.
-- **DBusService**: Represents a DBus service, providing methods to list and access its objects.
-- **DBusObject**: Encapsulates a DBus object, allowing introspection and interface retrieval.
-- **DBusInterface**: Provides access to methods, properties, and signals of a specific DBus interface with type-safe
-  operations.
-- **LocalService**: Manages a custom DBus service, handling incoming method calls and integrating with the DBus bus.
-- **LocalObject**: Represents a local DBus object, associating interfaces and supporting introspection.
-- **LocalInterface**: Defines custom DBus interfaces with methods, properties, and signals for local service
-  implementation.
-
-## Prerequisites
-
-Before using `dbus-sdk`, ensure you have the following:
-
-- **Node.js**: Version 14 or higher (tested with Node.js 22).
-- **Operating System**: Linux or other Unix-like systems with DBus support. This library is primarily designed for
-  environments where DBus is available (e.g., Ubuntu, Fedora).
-- **TypeScript**: Version 4.5 or higher (if using TypeScript; optional for pure JavaScript projects).
-
-## Upgrading from 1.x
-
-Version 2.0 renames part of the API and validates values strictly. See [MIGRATION.md](MIGRATION.md) for every change
-and how to update code.
+- [Installation](#installation)
+- [Connecting](#connecting)
+- [Calling a service](#calling-a-service)
+- [Providing a service](#providing-a-service)
+- [Types](#types)
+- [Errors](#errors)
+- [Limitations](#limitations)
+- [Examples](#examples) · [API reference](#api-reference) · [Upgrading from 1.x](#upgrading-from-1x) · [Development](#development)
 
 ## Installation
-
-You can install `dbus-sdk` via npm:
 
 ```bash
 npm install dbus-sdk
 ```
 
-If you're using TypeScript, the type definitions are included in the package, so no additional `@types` installation is
-needed.
+- Node.js 18 or later. Type declarations are included.
+- A DBus bus to connect to. Linux systems run a system bus and, in desktop sessions, a session bus. On macOS,
+  `brew install dbus` provides `dbus-daemon`.
 
-## Type Conversion and Handling Philosophy
-
-### DBus to TypeScript Type Mapping
-
-One of the critical aspects of this library is its handling of data types between the DBus wire format and
-TypeScript/JavaScript. DBus employs a strict type system defined by signatures, which dictate how data is serialized and
-deserialized. This library bridges the gap between DBus's type system and TypeScript's dynamic type system through the
-`DBusSignedValue` class, along with the `DBusBufferEncoder` and `DBusBufferDecoder` classes for serialization and
-deserialization. Below is the mapping relationship between DBus types and their corresponding TypeScript
-representations:
-
-- **Basic Types**:
-    - `y` (BYTE): Maps to `number` in TypeScript (0-255 range).
-    - `b` (BOOLEAN): Maps to `boolean` in TypeScript (`true` or `false`).
-    - `n` (INT16): Maps to `number` in TypeScript (16-bit signed integer).
-    - `q` (UINT16): Maps to `number` in TypeScript (16-bit unsigned integer).
-    - `i` (INT32): Maps to `number` in TypeScript (32-bit signed integer).
-    - `u` (UINT32): Maps to `number` in TypeScript (32-bit unsigned integer).
-    - `x` (INT64): Maps to `bigint` in TypeScript (64-bit signed integer).
-    - `t` (UINT64): Maps to `bigint` in TypeScript (64-bit unsigned integer).
-    - `d` (DOUBLE): Maps to `number` in TypeScript (64-bit floating-point).
-    - `s` (STRING): Maps to `string` in TypeScript (UTF-8 encoded).
-    - `o` (OBJECT_PATH): Maps to `string` in TypeScript (with specific format validation).
-    - `g` (SIGNATURE): Maps to `string` in TypeScript (representing a DBus type signature).
-    - `h` (UNIX_FD): Maps to `number` in TypeScript (file descriptor index).
-
-- **Container Types**:
-    - `a` (ARRAY): Maps to `Array<any>` in TypeScript, with elements recursively mapped based on the child type. Special
-      handling for byte arrays (`ay`) maps to `Buffer`.
-    - `(` (STRUCT): Maps to `Array<any>` in TypeScript, representing a sequence of values corresponding to the struct's
-      fields.
-    - `{` (DICT_ENTRY): Maps to an object in TypeScript (e.g., `{ key: value }`), with key and value types recursively
-      mapped. Arrays of dictionary entries (`a{...}`) are often converted to a single object for convenience.
-    - `v` (VARIANT): Maps to `any` in TypeScript, dynamically containing another `DBusSignedValue` with its own type,
-      allowing for runtime type flexibility.
-
-### Type Handling Philosophy
-
-The library's approach to type handling is centered on balancing strict adherence to the DBus specification with the
-flexibility and usability of TypeScript. Key principles guiding this design include:
-
-1. **Type Safety and Validation**: The library uses the `DBusSignedValue` class to encapsulate both the DBus signature
-   and the corresponding value, ensuring that data adheres to the expected type structure during encoding and decoding.
-   This prevents runtime errors by validating signatures and value compatibility upfront, as seen in methods like
-   `Signature.areCompatible` and during parsing in `DBusSignedValue.parse`.
-2. **Transparent Conversion**: The library aims to make DBus interactions intuitive for TypeScript developers by
-   automatically converting between DBus wire format and JavaScript's native types. For instance,
-   `DBusBufferDecoder.decode` unwraps `DBusSignedValue` instances into plain JavaScript values, while
-   `DBusBufferEncoder.encode` infers or validates signatures from input data. Special handling for dictionaries (
-   `a{...}`) and byte arrays (`ay`) converts them to objects and `Buffer` respectively, aligning with common JavaScript
-   idioms.
-3. **Flexibility with Variants**: DBus's `VARIANT` type (`v`) is handled with dynamic typing in mind, allowing any valid
-   DBus type to be nested within a variant. The library infers types for variants when necessary (`inferType` method in
-   `DBusSignedValue`) and supports nested structures, ensuring developers can work with dynamic data without losing type
-   information.
-4. **Alignment and Serialization Precision**: As seen in `DBusBufferDecoder` and `DBusBufferEncoder`, the library
-   strictly adheres to DBus alignment rules (e.g., 4-byte for `INT32`, 8-byte for `STRUCT`) and endianness handling (
-   little or big endian), ensuring correct serialization and deserialization. This low-level precision is abstracted
-   away from the user, who interacts with high-level TypeScript values.
-5. **Error Prevention through Signature Matching**: The library prevents type mismatches by validating input and output
-   signatures during method calls and property operations. If a mismatch occurs, a descriptive error (e.g.,
-   `SignatureError`) is thrown to guide the developer, as implemented in `LocalInterface.callMethod` and `setProperty`.
-6. **Developer Experience**: The design prioritizes a seamless developer experience by minimizing the need for manual
-   type annotations. For example, when defining methods or properties in `LocalInterface`, developers specify DBus
-   signatures (`type` field in `DefinePropertyOpts`), but the library handles the conversion to and from JavaScript
-   types automatically. This reduces cognitive load while maintaining type integrity under the hood.
-
-By encapsulating type complexity within `DBusSignedValue` and providing robust encoding/decoding mechanisms via
-`DBusBufferEncoder` and `DBusBufferDecoder`, the library ensures that developers can focus on application logic rather
-than the intricacies of DBus's binary format or type system. This approach makes the library both powerful for advanced
-use cases (where explicit type control is needed) and accessible for simpler scenarios (where automatic type inference
-suffices).
-
-### Validation
-
-Values the DBus specification does not allow are rejected with an `InvalidValueError` (or `SignatureError` and
-`ObjectPathError`). Before, some of them were silently changed. The rules:
-
-- Integers must be integers within their type's range. A `bigint` is accepted for any integer type. A decimal string
-  is accepted for `x`/`t`.
-- `b` accepts only `true`, `false`, `1` and `0`.
-- `d` requires a number.
-- Strings must not contain NUL characters or lone UTF-16 surrogates.
-- `o` and `g` values must be a valid object path or signature.
-- Signatures must follow the structural rules: no empty structs, dict entries only as array elements and only with a
-  basic key type, at most 32 nested arrays and 32 nested structs, and at most 255 characters.
-
-When a dictionary is given as an object, its property names are converted to the key type. For example, `{1: 'a'}`
-works for `a{is}`, and `{false: 'a'}` works for `a{bs}`.
-
-Received data is checked the same way. Messages with invalid UTF-8, NUL characters, malformed object paths or
-signatures, non-zero padding, or arrays over 64 MiB are reported as errors instead of being decoded.
-
-## Quick Start Guide
-
-Below are two practical examples to help you quickly get started with `dbus-sdk`. The first example demonstrates how to
-expose a custom DBus service, and the second shows how to connect to and interact with a DBus service.
-
-### Example 1: Exposing a Custom DBus Service
-
-This example shows how to create and run a local DBus service with a custom interface, method, property, and signal.
-
-```typescript
-import {LocalService, LocalInterface, LocalObject} from 'dbus-sdk'
-import EventEmitter from 'node:events'
-
-async function runExposeService(): Promise<void> {
-    try {
-        // Initialize a local service with a unique name
-        const service = new LocalService('org.test.service')
-
-        // Create a local object at the root path
-        const object = new LocalObject('/')
-
-        // Define a custom interface
-        const iface = new LocalInterface('test.iface')
-
-        // Define a property with getter and setter
-        let testProp: string = 'you'
-        iface.defineProperty({
-            name: 'testProp',
-            type: 'av', // Array of variants
-            emitPropertiesChanged: {emitValue: true},
-            getter: () => testProp,
-            setter: (value: string) => {
-                testProp = value
-            }
-        })
-
-        // Define a method with input and output arguments
-        iface.defineMethod({
-            name: 'test',
-            inputArgs: [{type: 'u'}], // Unsigned integer input
-            outputArgs: [{type: 'v'}], // Variant output
-            method: (name: number = 1234) => {
-                console.log('name:', name)
-                return {name, haha: true, sleep: 'oh!'}
-            }
-        })
-
-        // Define a signal with an event emitter
-        const eventEmitter = new EventEmitter()
-        iface.defineSignal({
-            name: 'testSignal',
-            args: [{name: 'timestamp', type: 's'}], // String argument
-            eventEmitter
-        })
-
-        // Associate the interface with the object and the object with the service
-        object.addInterface(iface)
-        service.addObject(object)
-
-        // Connect to a DBus bus and run the service (adjust the bus address as needed)
-        await service.run({busAddress: 'tcp:host=192.168.1.236,port=44444'})
-        console.log('Custom DBus service is running...')
-
-        // Optionally emit a signal periodically
-        // setInterval(() => {
-        //     eventEmitter.emit('testSignal', `${Date.now()}`);
-        // }, 3000);
-    } catch (error) {
-        console.error('Failed to run the service:', error)
-    }
-}
-
-// Run the service
-runExposeService().catch(console.error)
-```
-
-### Example 2: Connecting to and Interacting with a DBus Service
-
-This example demonstrates how to connect to a DBus bus, access a service, and interact with its objects, properties, and
-signals.
+## Connecting
 
 ```typescript
 import {DBus} from 'dbus-sdk'
 
-async function runClient(): Promise<void> {
-    try {
-        // Connect to a DBus bus (adjust the bus address as needed)
-        const dbus = await DBus.connect({busAddress: 'tcp:host=192.168.1.236,port=44444'})
-        console.log('Connected to DBus successfully')
-
-        // Access a specific service
-        const service = await dbus.getService('org.test.service')
-
-        // Get an object from the service
-        const object = await service.getObject('/')
-
-        // Access the custom interface and properties interface
-        const customInterface = await object.getInterface('test.iface')
-        const propertiesInterface = await object.getInterface('org.freedesktop.DBus.Properties')
-
-        // Listen for property change signals
-        propertiesInterface.signal.on('PropertiesChanged', console.log)
-
-        // Set and get a property value
-        await customInterface.property.testProp.set([12345678])
-        console.log('Property value set:', await customInterface.property.testProp.get())
-        console.log('Property value set successfully')
-
-        // Periodically read the property value
-        setInterval(async () => {
-            try {
-                console.log('Current property value:', await customInterface.property.testProp.get())
-            } catch (e: any) {
-                console.error('Error reading property:', e.message)
-            }
-        }, 3000)
-    } catch (error) {
-        console.error('Failed to run the client:', error)
-    }
-}
-
-// Run the client
-runClient().catch(console.error)
+const session = await DBus.connect()                                                         // DBUS_SESSION_BUS_ADDRESS
+const system = await DBus.connect({busAddress: 'unix:path=/run/dbus/system_bus_socket'})    // the system bus
+const remote = await DBus.connect({busAddress: 'tcp:host=192.168.1.10,port=55556'})
 ```
 
-## Usage
+| Option | Meaning |
+|---|---|
+| none, or `busAddress` unset | The session bus, from `DBUS_SESSION_BUS_ADDRESS`. Throws `UnknownBusAddressError` when it is not set. |
+| `busAddress` | A DBus address, `unix:path=…` or `tcp:host=…,port=…`, or a `;`-separated list tried in order. |
+| `socket` / `host` + `port` / `stream` | A Unix socket path, a TCP endpoint, or a `Duplex` stream you opened. |
+| `timeout` | Milliseconds to wait for the connection (default 20000). |
+| `callTimeout` | Default milliseconds to wait for each method reply (default: no limit). |
+| `authMethods` | Authentication mechanisms to try, in order (default `['EXTERNAL', 'DBUS_COOKIE_SHA1', 'ANONYMOUS']`). |
+| `convertBigIntToNumber` | Return 64-bit integers as `number` instead of `bigint`. Values beyond 2⁵³ lose precision. |
+| `advancedResponse` | Return received values as type class instances that keep their DBus type (see [Types](#types)). |
 
-`dbus-sdk` is designed for both consuming existing DBus services and creating new ones. Developers can connect to a DBus
-bus, interact with remote services by invoking methods or listening to signals, and define local services to expose
-functionality to other processes. Its modular design and type safety make it suitable for complex IPC scenarios in
-Node.js applications.
+`bus.uniqueName` is the connection's name on the bus, e.g. `:1.42`. `await bus.disconnect()` closes the connection.
 
-For detailed API documentation, refer to
-the [TypeScript type definitions](https://github.com/myq1991/node-dbus-sdk/tree/main/doc/API.md) or explore the source
-code on [GitHub](https://github.com/myq1991/node-dbus-sdk).
+## Calling a service
 
-## Contributing
+### Through a proxy
 
-We welcome contributions to `dbus-sdk`! If you have suggestions, bug reports, or want to submit a pull request, please
-visit our [GitHub repository](https://github.com/myq1991/node-dbus-sdk). You can open
-an [issue](https://github.com/myq1991/node-dbus-sdk/issues) for bugs or feature requests, or fork the repository to
-contribute code.
+`getInterface` introspects the object and returns a proxy. Arguments take their types from the introspected
+signatures, so plain values are enough.
+
+```typescript
+const greeter = await bus.getInterface('org.example.Greeter', '/org/example/Greeter', 'org.example.Greeter1')
+
+const message = await greeter.method.Greet('Alice')     // one return value: the value itself
+const [count, since] = await greeter.method.Stats()     // several: an array
+await greeter.method.Reset()                            // none: undefined
+await greeter.namedMethod.Greet({name: 'Bob'})          // arguments by name instead of position
+greeter.noReplyMethod.Ping()                            // send without waiting for a reply
+
+const greeting = await greeter.property.Greeting.get()
+await greeter.property.Greeting.set('Howdy')
+
+greeter.signal.on('Greeted', (name: string, count: number) => console.log(name, count))
+```
+
+`bus.getService(name)` and `bus.getObject(name, path)` return proxies for a whole service or object. On them,
+`listObjectPaths()`, `listInterfaceNames()` and `introspect()` explore what is there (see
+[07-introspect.ts](examples/07-introspect.ts)). `getService` starts a service that is activatable but not running.
+
+### Without introspection
+
+`invoke` takes the signature explicitly. It always resolves to the array of returned values.
+
+```typescript
+const [owner] = await bus.invoke({
+    service: 'org.freedesktop.DBus',
+    objectPath: '/org/freedesktop/DBus',
+    interface: 'org.freedesktop.DBus',
+    method: 'GetNameOwner',
+    signature: 's',
+    args: ['org.example.Greeter'],
+    timeout: 5000              // optional; noReply: true sends without waiting
+})
+
+const target = {service: 'org.example.Greeter', objectPath: '/org/example/Greeter', interface: 'org.example.Greeter1'}
+const greeting = await bus.getProperty({...target, property: 'Greeting'})
+await bus.setProperty({...target, property: 'Greeting', value: 'Hi', signature: 's'})   // give the type: 's'
+```
+
+The bus's own methods have helpers: `listNames`, `getNameOwner`, `nameHasOwner`, `requestName`, `releaseName`,
+`listActivatableNames`, `startServiceByName`, `getConnectionUnixProcessID`.
+
+### Signals and bus events
+
+```typescript
+// One service's interface: follows the service when it restarts under a new unique name
+greeter.signal.on('Greeted', (name, count) => { /* ... */ })
+
+// Any sender: '*' matches anything. The listener gets the signal's arguments.
+const clock = bus.createSignalEmitter({service: '*', uniqueName: '*', objectPath: '*', interface: 'org.example.Clock1'})
+clock.on('Tick', (count, time) => { /* ... */ })
+clock.on('*', (signalName, ...args) => { /* every signal the emitter selects */ })
+
+// Names appearing on and leaving the bus (unique names too)
+bus.on('serviceOnline', (name) => { /* ... */ })
+bus.on('serviceOffline', (name) => { /* ... */ })
+```
+
+Listening adds a match rule on the bus, and removing the last listener removes it. The rule is sent without waiting
+for an answer. A signal sent by another connection right after you subscribe can reach the bus before the rule does.
+Any call on the same connection is answered after the bus has processed the rule, so once a call has returned, the
+signal is certain to arrive.
+
+Other events of `DBus`: `serviceReplaced`, `nameOwnerChanged(name, oldOwner, newOwner)`, `nameAcquired`, `nameLost`,
+`connectionClose`, `connectionError`, `methodCall`.
+
+## Providing a service
+
+A service is a `LocalService` holding `LocalObject`s, which hold `LocalInterface`s.
+
+```typescript
+import EventEmitter from 'node:events'
+import {createDBusError, LocalInterface, LocalObject, LocalService, RequestNameResultCode} from 'dbus-sdk'
+
+let greeting = 'Hello'
+const events = new EventEmitter()
+
+const iface = new LocalInterface('org.example.Greeter1')
+    .defineMethod({
+        name: 'Greet',
+        inputArgs: [{name: 'name', type: 's'}],
+        outputArgs: [{name: 'message', type: 's'}],
+        method: (name: string): string => {
+            events.emit('Greeted', name)                   // sends the Greeted signal
+            return `${greeting}, ${name}!`
+        }
+    })
+    .defineMethod({
+        name: 'Divide',
+        inputArgs: [{type: 'd'}, {type: 'd'}],
+        outputArgs: [{type: 'd'}],
+        method: (a: number, b: number): number => {
+            if (b === 0) throw createDBusError('org.example.Greeter1.Error.DivisionByZero', 'Cannot divide by zero')
+            return a / b
+        }
+    })
+    .defineProperty({
+        name: 'Greeting',
+        type: 's',
+        emitPropertiesChanged: true,                       // announce changes made through Set
+        getter: (): string => greeting,
+        setter: (value: string): void => { greeting = value }
+    })
+    .defineSignal({name: 'Greeted', args: [{name: 'name', type: 's'}], eventEmitter: events})
+
+const object = new LocalObject('/org/example/Greeter')
+object.addInterface(iface)
+const service = new LocalService('org.example.Greeter')
+service.addObject(object)
+
+if (await service.run() !== RequestNameResultCode.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
+    console.error('the name is taken')
+}
+process.once('SIGTERM', () => service.stop({graceful: true, timeout: 5000}))
+```
+
+**Methods**
+
+- The handler receives the input arguments in order, as plain values (see [Types](#types)). It may be `async`.
+- It returns the value of the single output argument, which may itself be an array (for `as`) or an object (for
+  `a{sv}`). With several output arguments, it returns an array holding one value per argument.
+- A thrown error becomes a DBus error reply. `createDBusError(name, message)` sets the DBus error name. Any other
+  error is named `<service name>.<error name>`.
+- With `withContext: true`, the handler gets a last extra argument describing the call. Its `sender` is the caller's
+  unique name, for access control.
+
+**Properties**
+
+- The access mode follows the functions you give: `getter` → read, `setter` → write, both → readwrite.
+- A setter may be `async`. If it throws, the caller of `Set` gets the error.
+- With `emitPropertiesChanged`, a change made through the setter sends `PropertiesChanged`. That covers a DBus `Set`
+  call and `iface.setProperty(name, value)` from your code. Use `{emitValue: false}` to send the property as
+  invalidated instead of sending its value.
+- To announce a change made another way, for example to a read-only property, call
+  `object.propertiesInterface.emitPropertiesChanged(iface.name, {Name: iface.getPropertySignedValue('Name')})`.
+
+**Signals** are sent when the `eventEmitter` given to `defineSignal` emits an event with the signal's name. The
+event's arguments become the signal's arguments.
+
+**Objects** can be added and removed while the service runs. The root object `/` always exists and carries
+`org.freedesktop.DBus.ObjectManager`, which announces each change with `InterfacesAdded` and `InterfacesRemoved`.
+Do not add another object at `/`.
+
+**Annotations**: give `annotations: {'org.freedesktop.DBus.Deprecated': 'true'}` on methods, arguments, properties
+or signals, or call `defineAnnotation` on the interface. They appear in the introspection data.
+
+**Running and stopping**
+
+- `run(opts)` takes the same options as `DBus.connect`, plus `flags` for requesting the name.
+- A taken name does not make `run` fail. The service queues for the name, so check the result. To fail instead, pass
+  `flags: RequestNameFlags.DBUS_NAME_FLAG_DO_NOT_QUEUE`.
+- `stop()` releases the name and disconnects at once. `stop({graceful: true, timeout})` first lets the calls in
+  progress finish.
+
+## Types
+
+How DBus types map to JavaScript values, in both directions. [05-types.ts](examples/05-types.ts) shows each case.
+
+| DBus | You send | You receive |
+|---|---|---|
+| `y` `n` `q` `i` `u` (integers up to 32 bits) | `number` (or `bigint`) | `number` |
+| `x` `t` (64-bit integers) | `bigint`, `number` or decimal string | `bigint` (`number` with `convertBigIntToNumber`) |
+| `d` (double) | `number` | `number` |
+| `b` (boolean) | `true` / `false` (or `1` / `0`) | `boolean` |
+| `s` `o` `g` (string, object path, signature) | `string` | `string` |
+| `ay` (bytes) | `Buffer`, `Uint8Array` or `number[]` | `Buffer` |
+| `a…` (array) | array | array |
+| `a{…}` (dictionary) | object, `Map`, or array of `[key, value]` pairs | object (keys become strings) |
+| `(…)` (struct) | array of the fields | array of the fields |
+| `v` (variant) | any value; its type is inferred (below) | the content's value (its type is not kept) |
+| `h` (file descriptor) | not supported | not supported |
+
+**Variants.** A plain value given for `v` is sent with an inferred type:
+
+- `string` → `s`, `boolean` → `b`, `bigint` → `x`, `Buffer` → `ay`.
+- An integer → `i`. An integer outside the INT32 range → `x`. Any other number → `d`.
+- An array → `a` plus the items' type. Items of different types make a struct instead, e.g. `[1, 'a']` → `(is)`.
+- A `Map` → `a{…v}` keyed by its keys' type. Any other object → `a{sv}`.
+
+`DBusSignedValue.inferSignature(value)` tells you which signature a value gets. To choose a type yourself, wrap the
+value as `new DBusSignedValue('u', 7)`, or use a type class: `new DBusUInt32(7)`, `new DBusObjectPath('/a')`, and so
+on, one per DBus type. These work anywhere a value goes, and are most useful inside variants and `a{sv}`.
+
+**Validation.** Values that the DBus specification does not allow are rejected with an `InvalidValueError`,
+`SignatureError` or `ObjectPathError` before anything is sent.
+
+- Integers must be integers within their type's range.
+- `b` accepts only `true`, `false`, `1` and `0`.
+- `d` requires a number.
+- Strings must not contain NUL characters or lone UTF-16 surrogates.
+- `o` and `g` must be a valid object path or signature.
+- Signatures must follow the structural rules: no empty structs; dict entries only as array elements and with a basic
+  key type; at most 32 nested arrays and 32 nested structs; at most 255 characters.
+
+Received data is checked the same way. A message with invalid UTF-8, malformed paths or signatures, non-zero padding,
+or arrays over 64 MiB is reported as an error instead of being decoded.
+
+## Errors
+
+- **Errors from the other side** of a call reject with an `Error`. Its `name` is the DBus error name (e.g.
+  `org.freedesktop.DBus.Error.UnknownMethod`) and its `message` is the error text.
+- **Errors from this library** are classes whose `name` is the class name. Each also has a stable `code` and `errno`.
+  The most common:
+  - `TimeoutError`: no reply within the timeout.
+  - `InvalidValueError`, `SignatureError`, `ObjectPathError`: a value does not fit its type.
+  - `ServiceNotFoundError`, `InterfaceNotFoundError`: what you asked for is not on the bus.
+  - `AccessPropertyForbiddenError`: you read or wrote a property against its access mode.
+  - `UnknownBusAddressError`, `AuthError`: connecting failed.
+- **Calls pending when the connection closes** reject with `org.freedesktop.DBus.Error.Disconnected`.
+- A call without a timeout waits until it is answered or the connection closes. Set `callTimeout` when a service
+  might never answer.
+
+## Limitations
+
+- **No file descriptor passing (`h`).** Node.js sockets cannot send or receive file descriptors. Methods that pass
+  them, such as logind's `Inhibit` or BlueZ's `Acquire`, cannot be used. Messages containing `h` are rejected.
+- **The system bus needs its address.** Without options, `DBus.connect()` connects to the session bus only.
+- **Only `unix:path=` and `tcp:` addresses.** `unix:abstract=`, `unix:tmpdir=` and other transports are not
+  supported. In a `;`-separated list, they are skipped in favour of the next address.
+- **Messages are decoded whole.** There is no streaming of large values. Received arrays over 64 MiB are rejected.
+
+## Examples
+
+[examples/](examples/README.md) holds complete programs covering connecting, a service and its client, signals,
+types, ObjectManager and introspection. The test suite runs each of them against a real bus.
+
+## API reference
+
+Every public class, method and type has documentation in the type declarations, which your editor shows. The
+declarations include examples for the main entry points. [doc/API.md](doc/API.md) gives an overview by class.
+
+## Upgrading from 1.x
+
+Version 2.0 renames part of the API and validates values strictly. [MIGRATION.md](MIGRATION.md) lists every change
+and how to update code.
+
+## Development
+
+```bash
+npm test                 # build, then unit and integration tests (integration tests need dbus-daemon)
+npm run test:unit        # without a bus
+npm run example -- examples/01-bus-basics.ts
+npx eslint --ext .ts src
+```
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/myq1991/node-dbus-sdk/blob/main/LICENSE). Feel free
-to use, modify, and distribute it as per the license terms.
-
-## Conclusion
-
-`dbus-sdk` provides a powerful and flexible solution for inter-process communication in TypeScript and Node.js
-environments. By abstracting low-level DBus protocol details and offering a structured, object-oriented API, it enables
-developers to build robust DBus clients and services with ease, supporting both standard operations and custom
-implementations.
-
-If you find this library useful, consider starring the project on [GitHub](https://github.com/myq1991/node-dbus-sdk) or
-sharing it with others. Happy coding!
+[MIT](LICENSE)

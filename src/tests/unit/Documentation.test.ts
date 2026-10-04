@@ -1,7 +1,9 @@
 import {describe, it} from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
+import {readFileSync} from 'node:fs'
 import ts from 'typescript'
+import {API_DOC_PATH, generateApiDoc} from '../tools/ApiDoc'
 
 const ROOT: string = path.resolve(__dirname, '../../..')
 const ENTRY: string = path.join(ROOT, 'src', 'NodeDBusSDK.ts')
@@ -67,5 +69,9 @@ function undocumented(): string[] {
 describe('documentation', (): void => {
     it('covers every public symbol, member and parameter', (): void => {
         assert.deepEqual(undocumented(), [], 'add JSDoc to these (or mark them @internal if they are not public API)')
+    })
+
+    it('is published in an up-to-date doc/API.md', (): void => {
+        assert.ok(readFileSync(API_DOC_PATH, 'utf8') === generateApiDoc(), 'doc/API.md is out of date: run npm run docs:api')
     })
 })
