@@ -109,7 +109,9 @@ export class LocalService {
                         signature,
                         result
                     } = await localInterface.callMethod(targetMethod, payloadSignature, ...message.body)
-                    const resultSignedValue: DBusSignedValue[] = signature ? [new DBusSignedValue(signature!, result)] : []
+                    // parse() splits several output arguments (the handler returns them as an array) and keeps
+                    // DBusSignedValue/DBusTypeClass results whose type already matches, instead of wrapping them again
+                    const resultSignedValue: DBusSignedValue[] = signature ? DBusSignedValue.parse(signature, result) : []
                     return this.dbus.reply({
                         destination: message.header.sender,
                         replySerial: message.header.serial,

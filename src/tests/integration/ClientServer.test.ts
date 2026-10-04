@@ -86,16 +86,16 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
             assert.deepEqual(await withTimeout(iface.method.EchoBytes(value), 5000, 'EchoBytes'), value)
         })
 
-        it('returns several output arguments', knownBug('LocalService replies of methods with several output arguments are corrupted: the results are wrapped as one struct value, which the encoder then splits with Object.values'), async (): Promise<void> => {
+        it('returns several output arguments', async (): Promise<void> => {
             assert.deepEqual(await withTimeout(iface.method.DivMod(17, 5), 2000, 'DivMod'), [3, 2])
         })
 
-        it('returns a DBusTypeClass result', knownBug('LocalService builds replies with new DBusSignedValue(outputSignature, result), so DBusTypeClass results are written as 0'), async (): Promise<void> => {
+        it('returns a DBusTypeClass result', async (): Promise<void> => {
             assert.equal(await withTimeout(iface.method.TypedUint32(), 2000, 'TypedUint32'), 4000000000)
         })
 
         // Plain decoding unwraps nested variants, which would hide the extra wrapper, so inspect the typed reply
-        it('returns a DBusVariant result', knownBug('LocalService builds replies with new DBusSignedValue(outputSignature, result), so DBusVariant results are wrapped twice'), async (): Promise<void> => {
+        it('returns a DBusVariant result', async (): Promise<void> => {
             const typedClient: DBus = await withTimeout(DBus.connect({busAddress: bus.address, advancedResponse: true}), 5000, 'connect typed client')
             try {
                 const [variant] = await withTimeout(typedClient.invoke({service: SERVICE_NAME, objectPath: TEST_OBJECT_PATH, interface: TEST_INTERFACE, method: 'TypedVariant'}), 2000, 'TypedVariant')
