@@ -77,15 +77,14 @@ export class ObjectManagerInterface extends LocalInterface {
      */
     protected getManagedObjects(): Record<string, Record<string, Record<string, any>>> {
         const managedObjects: Record<string, Record<string, Record<string, any>>> = {}
-        const objects: Record<string, LocalObject> | undefined = this.object?.service?.listObjects()
+        const objects: LocalObject[] | undefined = this.object?.service?.getObjects()
         if (!objects || !this.object) return managedObjects
         // Only the objects below the manager are managed by it, not the manager's own object
         const managerPath: string = this.object.name
         const childPrefix: string = managerPath === '/' ? '/' : `${managerPath}/`
-        for (const objectPath in objects) {
-            if (objectPath === managerPath || !objectPath.startsWith(childPrefix)) continue
-            const object: LocalObject = objects[objectPath]
-            managedObjects[objectPath] = object.getManagedInterfaces()
+        for (const object of objects) {
+            if (object.name === managerPath || !object.name.startsWith(childPrefix)) continue
+            managedObjects[object.name] = object.getManagedInterfaces()
         }
         return managedObjects
     }

@@ -16,18 +16,4 @@ export interface HandshakeOpts {
      * If not provided, the system may use the effective UID of the process.
      */
     uid?: number
-
-    /**
-     * An optional flag to control the verbosity of objects during the handshake.
-     * If set to false, more detailed or verbose object information may be included.
-     * Defaults to true (simplified output) if not specified.
-     */
-    simple?: boolean
-
-    /**
-     * An optional flag to indicate whether to attempt a direct connection.
-     * If set to true, the client may try to bypass certain intermediaries or proxies for a direct connection to the server.
-     * Defaults to false if not specified.
-     */
-    direct?: boolean
 }

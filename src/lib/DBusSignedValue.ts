@@ -50,7 +50,7 @@ export class DBusSignedValue {
      */
     public static parse(signature: string, value: any | DBusSignedValue | DBusSignedValue[]): DBusSignedValue[] {
         // Parse the signature string into an array of DataType objects
-        const dataTypes: DataType[] = Signature.parseSignature(signature)
+        const dataTypes: DataType[] = Signature.parse(signature)
 
         // Check if the signature represents a struct (starts with '(' and ends with ')')
         const isStruct: boolean = signature.trim().startsWith('(') && signature.trim().endsWith(')')
@@ -91,11 +91,12 @@ export class DBusSignedValue {
      * @param values - An array of DBusSignedValue objects to convert.
      * @returns An array of plain JavaScript values representing the data without DBus signatures.
      */
-    public static toJSON(values: DBusSignedValue[]): any[] {
+    public static toPlain(values: DBusSignedValue[]): any[] {
         return values.map((value: DBusSignedValue): any => DBusSignedValue.convertToPlain(value))
     }
 
     /**
+     * @internal
      * The complete type of a value when it is known without looking at its content: for basic types and for empty
      * arrays created with a complete signature.
      *
@@ -110,6 +111,7 @@ export class DBusSignedValue {
     }
 
     /**
+     * @internal
      * Records the complete type of a value, e.g. when converting a decoded value into a DBusTypeClass instance.
      *
      * @param value - The value.
@@ -217,7 +219,7 @@ export class DBusSignedValue {
     constructor(signature: string | DataType | DataType[], value: any | DBusSignedValue | DBusSignedValue[]) {
         // Handle signature input: parse string to DataType array, or use directly if already DataType or array
         const dataTypes: DataType[] = typeof signature === 'string'
-            ? signature.length > 1 ? Signature.parseSignature(signature) : [{type: <any>signature}]
+            ? signature.length > 1 ? Signature.parse(signature) : [{type: <any>signature}]
             : Array.isArray(signature)
                 ? signature
                 : [signature]
@@ -255,7 +257,7 @@ export class DBusSignedValue {
                 } else {
                     // Otherwise, infer signature from value type
                     const inferredType: string = this.inferType(value)
-                    const inferredDataType: DataType = Signature.parseSignature(inferredType)[0]
+                    const inferredDataType: DataType = Signature.parse(inferredType)[0]
                     this.$value = new DBusSignedValue(inferredDataType, value)
                 }
             } else if (dataType.child && dataType.child.length > 0) {

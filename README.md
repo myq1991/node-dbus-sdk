@@ -22,8 +22,9 @@ Whether you're building a client to interact with existing DBus services or expo
   custom streams) using configurable `ConnectOpts`.
 - **Initialization**: Automatically performs a `Hello` call to obtain a unique connection name from the DBus daemon and
   sets up event listeners for connection state changes.
-- **Event-Driven**: Built on Node.js `EventEmitter`, emits events for connection status (`online`, `offline`,
-  `replaced`), name ownership changes, and incoming messages.
+- **Event-Driven**: Built on Node.js `EventEmitter`, emits events for service status (`serviceOnline`,
+  `serviceOffline`, `serviceReplaced`), name ownership changes (`nameOwnerChanged`, `nameAcquired`, `nameLost`), the
+  connection (`connectionClose`, `connectionError`) and incoming method calls (`methodCall`).
 
 ### 2. **Method Invocation and Replies**
 
@@ -56,7 +57,7 @@ Whether you're building a client to interact with existing DBus services or expo
 - **Hierarchy Structure**: Organizes DBus interactions into a hierarchy of `DBusService`, `DBusObject`, and
   `DBusInterface` classes, mirroring the DBus object model.
 - **Introspection**: Supports dynamic introspection of remote services and objects to retrieve metadata about available
-  interfaces, methods, properties, and signals (`introspect`, `listInterfaces`, `listObjects`).
+  interfaces, methods, properties, and signals (`introspect`, `listInterfaceNames`, `listObjectPaths`).
 - **Service Discovery**: Facilitates listing and accessing DBus services and their objects (`getObjects`,
   `getInterface`).
 
@@ -102,6 +103,11 @@ Before using `dbus-sdk`, ensure you have the following:
 - **Operating System**: Linux or other Unix-like systems with DBus support. This library is primarily designed for
   environments where DBus is available (e.g., Ubuntu, Fedora).
 - **TypeScript**: Version 4.5 or higher (if using TypeScript; optional for pure JavaScript projects).
+
+## Upgrading from 1.x
+
+Version 2.0 renames part of the API and validates values strictly. See [MIGRATION.md](MIGRATION.md) for every change
+and how to update code.
 
 ## Installation
 
@@ -158,7 +164,7 @@ flexibility and usability of TypeScript. Key principles guiding this design incl
 1. **Type Safety and Validation**: The library uses the `DBusSignedValue` class to encapsulate both the DBus signature
    and the corresponding value, ensuring that data adheres to the expected type structure during encoding and decoding.
    This prevents runtime errors by validating signatures and value compatibility upfront, as seen in methods like
-   `Signature.areSignaturesCompatible` and during parsing in `DBusSignedValue.parse`.
+   `Signature.areCompatible` and during parsing in `DBusSignedValue.parse`.
 2. **Transparent Conversion**: The library aims to make DBus interactions intuitive for TypeScript developers by
    automatically converting between DBus wire format and JavaScript's native types. For instance,
    `DBusBufferDecoder.decode` unwraps `DBusSignedValue` instances into plain JavaScript values, while

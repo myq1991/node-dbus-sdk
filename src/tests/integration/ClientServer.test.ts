@@ -6,7 +6,7 @@ import {DBusInterface} from '../../DBusInterface'
 import {DBusObject} from '../../DBusObject'
 import {AccessPropertyForbiddenError} from '../../lib/Errors'
 import {DBusVariant} from '../../lib/datatypes/DBusVariant'
-import {DBusUint32} from '../../lib/datatypes/DBusUint32'
+import {DBusUInt32} from '../../lib/datatypes/DBusUInt32'
 import {IntrospectInterface} from '../../types/IntrospectInterface'
 import {PrivateBus} from '../helpers/PrivateBus'
 import {createTestService, TEST_INTERFACE, TEST_OBJECT_PATH, TestService} from '../helpers/TestService'
@@ -67,7 +67,7 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
         })
 
         it('calls with named arguments', async (): Promise<void> => {
-            assert.equal(await withTimeout(iface.parameterObjectifyMethod.Add({b: 3, a: 2}), 2000, 'Add'), 5)
+            assert.equal(await withTimeout(iface.namedMethod.Add({b: 3, a: 2}), 2000, 'Add'), 5)
         })
 
         for (const value of ['text', 42, 1.5, true]) {
@@ -100,7 +100,7 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
             try {
                 const [variant] = await withTimeout(typedClient.invoke({service: SERVICE_NAME, objectPath: TEST_OBJECT_PATH, interface: TEST_INTERFACE, method: 'TypedVariant'}), 2000, 'TypedVariant')
                 assert.ok(variant instanceof DBusVariant)
-                assert.ok(variant.$value instanceof DBusUint32, `variant holds ${variant.$value?.constructor?.name}`)
+                assert.ok(variant.$value instanceof DBusUInt32, `variant holds ${variant.$value?.constructor?.name}`)
                 assert.equal(variant.$value.value, 7)
             } finally {
                 await withTimeout(typedClient.disconnect(), 2000, 'disconnect typed client').catch((): void => undefined)
@@ -188,7 +188,7 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
         /**
          * Resolves when the event fires for the given bus name; unique connection names (":1.x") fire it too.
          */
-        function nameEvent(eventName: 'online' | 'offline', busName: string): Promise<void> {
+        function nameEvent(eventName: 'serviceOnline' | 'serviceOffline', busName: string): Promise<void> {
             return withTimeout(new Promise<void>((resolve): void => {
                 const listener = (name: string): void => {
                     if (name !== busName) return
@@ -201,10 +201,10 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
 
         it('emits online and offline when a service starts and stops', async (): Promise<void> => {
             const other: TestService = createTestService('org.example.Transient')
-            const online: Promise<void> = nameEvent('online', 'org.example.Transient')
+            const online: Promise<void> = nameEvent('serviceOnline', 'org.example.Transient')
             await withTimeout(other.service.run({busAddress: bus.address}), 5000, 'start transient service')
             await online
-            const offline: Promise<void> = nameEvent('offline', 'org.example.Transient')
+            const offline: Promise<void> = nameEvent('serviceOffline', 'org.example.Transient')
             await withTimeout(other.service.stop(), 5000, 'stop transient service')
             await offline
         })

@@ -45,4 +45,9 @@ export interface InvokeOpts {
      * connection closes.
      */
     timeout?: number
+
+    /**
+     * Send the call without waiting for a reply (NO_REPLY_EXPECTED); invoke then returns nothing.
+     */
+    noReply?: boolean
 }

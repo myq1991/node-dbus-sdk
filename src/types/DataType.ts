@@ -28,7 +28,7 @@
  * - '&' : Pointer or reference type (used in some contexts).
  * - '^' : Escaped or special type (used in some contexts).
  */
-export type Types =
+export type DBusTypeCode =
     '('
     | '{'
     | 'y'
@@ -62,9 +62,9 @@ export type Types =
 export interface DataType {
     /**
      * The type code representing a specific DBus data type or structural element.
-     * This corresponds to one of the characters defined in the Types union.
+     * This corresponds to one of the characters defined in the DBusTypeCode union.
      */
-    type: Types
+    type: DBusTypeCode
 
     /**
      * An optional array of child data types.

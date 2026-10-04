@@ -1,6 +1,6 @@
 import {hex} from '../helpers/Hex'
 import {DBusSignedValue} from '../../lib/DBusSignedValue'
-import {DBusUint32} from '../../lib/datatypes/DBusUint32'
+import {DBusUInt32} from '../../lib/datatypes/DBusUInt32'
 
 export interface WireVector {
     signature: string
@@ -83,6 +83,6 @@ export const WireVectors: WireVector[] = [
     {signature: '(yv)', args: [[1, 1n]], wire: hex('01 017800 00000000 0100000000000000')},
     {signature: 'av', args: [[1n]], wire: hex('0c000000 017800 00 0100000000000000')},
     {signature: 'sv', args: ['a', new DBusSignedValue('u', 7)], wire: hex('01000000 6100 017500 000000 07000000'), decoded: ['a', 7]},
-    {signature: 'sv', args: ['a', new DBusUint32(7)], wire: hex('01000000 6100 017500 000000 07000000'), decoded: ['a', 7]},
+    {signature: 'sv', args: ['a', new DBusUInt32(7)], wire: hex('01000000 6100 017500 000000 07000000'), decoded: ['a', 7]},
     {signature: 'ssv', args: ['a', 'b', 'c'], wire: hex('01000000 6100 0000 01000000 6200 017300 000000 01000000 6300')}
 ]

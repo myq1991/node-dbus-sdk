@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {DBusBufferEncoder} from '../../lib/DBusBufferEncoder'
 import {DBusMessageEndianness} from '../../lib/enums/DBusMessageEndianness'
 import {ObjectPathError, SignatureError} from '../../lib/Errors'
-import {DBusUint32} from '../../lib/datatypes/DBusUint32'
+import {DBusUInt32} from '../../lib/datatypes/DBusUInt32'
 import {DBusInt64} from '../../lib/datatypes/DBusInt64'
 import {WireVector, WireVectors} from '../fixtures/WireVectors'
 import {LibdbusMessageFixture, LibdbusMessages} from '../fixtures/LibdbusMessages'
@@ -47,7 +47,7 @@ describe('DBusBufferEncoder', (): void => {
 
     describe('explicit type classes', (): void => {
         it('uses the type of a DBusTypeClass inside a variant', (): void => {
-            assert.equal(encode('v', [new DBusUint32(7)]).toString('hex'), hex('01 7500 00 07000000').toString('hex'))
+            assert.equal(encode('v', [new DBusUInt32(7)]).toString('hex'), hex('01 7500 00 07000000').toString('hex'))
             assert.equal(encode('v', [new DBusInt64(7n)]).toString('hex'), hex('01 7800 0000000000 0700000000000000').toString('hex'))
         })
     })

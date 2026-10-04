@@ -1,6 +1,6 @@
 import {LocalInterface} from '../../LocalInterface'
 import EventEmitter from 'node:events'
-import {CreateDBusError} from '../CreateDBusError'
+import {createDBusError} from '../createDBusError'
 
 /**
  * A class representing the DBus Properties interface.
@@ -102,8 +102,8 @@ export class PropertiesInterface extends LocalInterface {
      * @throws {Error} DBus error with code 'org.freedesktop.DBus.Error.UnknownInterface' if the interface is not found.
      */
     protected async get(interfaceName: string, propertyName: string): Promise<any> {
-        const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
-        if (!targetInterface) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownInterface', `Interface ${interfaceName} not found`)
+        const targetInterface: LocalInterface | undefined = this.object?.getInterface(interfaceName)
+        if (!targetInterface) throw createDBusError('org.freedesktop.DBus.Error.UnknownInterface', `Interface ${interfaceName} not found`)
         return targetInterface.getPropertySignedValue(propertyName)
     }
 
@@ -119,8 +119,8 @@ export class PropertiesInterface extends LocalInterface {
      *                 or other DBus errors if the property is read-only or the value is invalid.
      */
     protected async set(interfaceName: string, propertyName: string, value: any): Promise<void> {
-        const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
-        if (!targetInterface) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownInterface', `Interface ${interfaceName} not found`)
+        const targetInterface: LocalInterface | undefined = this.object?.getInterface(interfaceName)
+        if (!targetInterface) throw createDBusError('org.freedesktop.DBus.Error.UnknownInterface', `Interface ${interfaceName} not found`)
         await targetInterface.setProperty(propertyName, value)
     }
 
@@ -132,7 +132,7 @@ export class PropertiesInterface extends LocalInterface {
      * @returns A Promise resolving to a record (object) mapping property names to their values.
      */
     protected async getAll(interfaceName: string): Promise<Record<string, any>> {
-        const targetInterface: LocalInterface | undefined = this.object?.findInterfaceByName(interfaceName)
+        const targetInterface: LocalInterface | undefined = this.object?.getInterface(interfaceName)
         if (!targetInterface) return {}
         // Readable properties only: a write-only property has no value and must not make the whole call fail
         return targetInterface.getManagedProperties()

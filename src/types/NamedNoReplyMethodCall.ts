@@ -1,0 +1,1 @@
+export type NamedNoReplyMethodCall = (parameterObject?: Record<string, any>) => void

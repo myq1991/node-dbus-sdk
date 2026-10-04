@@ -80,7 +80,7 @@ describe('ObjectManager', {skip: !PrivateBus.available && 'dbus-daemon not found
     })
 
     it('emits InterfacesAdded when an interface is added to an exported object', async (): Promise<void> => {
-        const object: LocalObject = service.findObjectByPath(`${BASE_PATH}/first`)!
+        const object: LocalObject = service.getObject(`${BASE_PATH}/first`)!
         const extra: LocalInterface = new LocalInterface(EXTRA_INTERFACE).defineProperty({name: 'Flag', type: 'b', getter: (): boolean => true})
         const [objectPath, interfaces] = await signalDuring('InterfacesAdded', (): boolean => object.addInterface(extra))
         assert.equal(objectPath, `${BASE_PATH}/first`)
@@ -88,7 +88,7 @@ describe('ObjectManager', {skip: !PrivateBus.available && 'dbus-daemon not found
     })
 
     it('emits InterfacesRemoved when an interface is removed', async (): Promise<void> => {
-        const object: LocalObject = service.findObjectByPath(`${BASE_PATH}/first`)!
+        const object: LocalObject = service.getObject(`${BASE_PATH}/first`)!
         const [objectPath, interfaces] = await signalDuring('InterfacesRemoved', (): boolean => object.removeInterface(EXTRA_INTERFACE))
         assert.equal(objectPath, `${BASE_PATH}/first`)
         assert.deepEqual(interfaces, [EXTRA_INTERFACE])

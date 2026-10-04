@@ -1,7 +1,7 @@
 import {DBusService} from './DBusService'
 import {DBusObject} from './DBusObject'
 import {DBusInterface} from './DBusInterface'
-import {ConnectOpts} from './types/ConnectOpts'
+import {CreateConnectOpts} from './types/CreateConnectOpts'
 import {DBusConnection} from './lib/DBusConnection'
 import {DBusMessage} from './lib/DBusMessage'
 import {InvokeOpts} from './types/InvokeOpts'
@@ -12,7 +12,6 @@ import {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
 import {DBusSignedValue} from './lib/DBusSignedValue'
 import {CreateSignalEmitterOpts} from './types/CreateSignalEmitterOpts'
 import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
-import {ServiceBasicInfo} from './types/ServiceBasicInfo'
 import {RequestNameFlags} from './lib/enums/RequestNameFlags'
 import {RequestNameResultCode} from './lib/enums/RequestNameResultCode'
 import {MessageDecodeError, ServiceNotFoundError, TimeoutError} from './lib/Errors'
@@ -21,7 +20,7 @@ import EventEmitter from 'node:events'
 import {ReplyOpts} from './types/ReplyOpts'
 import {EmitSignalOpts} from './types/EmitSignalOpts'
 import {BusNameBasicInfo} from './types/BusNameBasicInfo'
-import {CreateDBusError} from './lib/CreateDBusError'
+import {createDBusError} from './lib/createDBusError'
 import {DBusTypeClass} from './lib/DBusTypeClass'
 import {DBusVariant} from './lib/datatypes/DBusVariant'
 
@@ -97,7 +96,7 @@ export class DBus extends EventEmitter {
             case DBusMessageType.METHOD_CALL:
                 if (!header.sender || !header.serial || ((header.flags || 0) & DBusMessageFlags.NO_REPLY_EXPECTED)) return
                 try {
-                    this.reply({destination: header.sender, replySerial: header.serial, signature: 's', data: CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', error.message)})
+                    this.reply({destination: header.sender, replySerial: header.serial, signature: 's', data: createDBusError('org.freedesktop.DBus.Error.InvalidArgs', error.message)})
                 } catch {
                     // The connection is gone, so there is nobody to answer
                 }
@@ -150,7 +149,7 @@ export class DBus extends EventEmitter {
      * @param opts - Connection options (e.g., socket path, TCP details, or stream settings).
      * @returns A Promise resolving to an initialized DBus instance ready for use.
      */
-    public static async connect(opts: ConnectOpts): Promise<DBus> {
+    public static async connect(opts: CreateConnectOpts): Promise<DBus> {
         const bus: DBus = new DBus(await DBusConnection.createConnection(opts))
         bus.callTimeout = opts.callTimeout
         return await bus.initialize()
@@ -201,7 +200,7 @@ export class DBus extends EventEmitter {
         }
         this.#dbusManageInterface.signal
             .on('NameOwnerChanged', (name: string, oldOwner: string, newOwner: string): void => {
-                this.emit('NameOwnerChanged', name, oldOwner, newOwner)
+                this.emit('nameOwnerChanged', name, oldOwner, newOwner)
                 this.#weakServiceSet.forEach((serviceWeakRef: WeakRef<DBusService>): void => {
                     const dbusService: DBusService | undefined = serviceWeakRef.deref()
                     if (!dbusService) {
@@ -220,15 +219,15 @@ export class DBus extends EventEmitter {
                     if (emitter.uniqueName !== oldOwner) return
                     updateEmitterUniqueName.call(emitter, newOwner)
                 })
-                if (!!name && !oldOwner && !!newOwner) this.emit('online', name)
-                if (!!name && !!oldOwner && !newOwner) this.emit('offline', name)
-                if (!!name && !!oldOwner && !!newOwner) this.emit('replaced', name)
+                if (!!name && !oldOwner && !!newOwner) this.emit('serviceOnline', name)
+                if (!!name && !!oldOwner && !newOwner) this.emit('serviceOffline', name)
+                if (!!name && !!oldOwner && !!newOwner) this.emit('serviceReplaced', name)
             })
             .on('NameLost', (name: string): void => {
-                this.emit('NameLost', name)
+                this.emit('nameLost', name)
             })
             .on('NameAcquired', (name: string): void => {
-                this.emit('NameAcquired', name)
+                this.emit('nameAcquired', name)
             })
         return this
     }
@@ -259,7 +258,7 @@ export class DBus extends EventEmitter {
      * @throws {Error} If the DBus connection is disconnected, with a specific DBus error code.
      */
     public write(data: Buffer): void {
-        if (!this.#connection.connected) throw CreateDBusError('org.freedesktop.DBus.Error.Disconnected', 'DBus disconnected')
+        if (!this.#connection.connected) throw createDBusError('org.freedesktop.DBus.Error.Disconnected', 'DBus disconnected')
         this.#connection.write(data)
     }
 
@@ -318,41 +317,27 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Invokes a DBus method call with the specified options, without expecting a reply.
-     * Sends the method call message to the DBus daemon and does not wait for a response.
+     * Calls a method without waiting for a reply: the call is sent with NO_REPLY_EXPECTED and nothing is returned.
      *
-     * @param opts - Options for the method call, including service, object path, interface, method, signature, and arguments.
-     * @param noReply - Set to true to indicate no reply is expected.
-     * @returns void as no response is expected or processed.
+     * @param opts - Options for the method call, with `noReply: true`.
      */
-    public invoke(opts: InvokeOpts, noReply: true): void
+    public invoke(opts: InvokeOpts & { noReply: true }): void
     /**
-     * Invokes a DBus method call with the specified options, explicitly expecting a reply.
-     * Sends the method call message to the DBus daemon and waits for a response or error.
+     * Calls a method and waits for its reply.
      *
      * @param opts - Options for the method call, including service, object path, interface, method, signature, and arguments.
-     * @param noReply - Set to false to indicate a reply is expected.
-     * @returns A Promise resolving to an array of response data from the method call.
+     * @returns A Promise resolving to the reply's arguments; rejected with the DBus error the call failed with.
      */
-    public async invoke(opts: InvokeOpts, noReply: false): Promise<any[]>
+    public invoke(opts: InvokeOpts & { noReply?: false }): Promise<any[]>
     /**
-     * Invokes a DBus method call with the specified options, defaulting to expecting a reply.
-     * Sends the method call message to the DBus daemon and waits for a response or error.
+     * Calls a method, waiting for its reply unless `opts.noReply` is set.
      *
      * @param opts - Options for the method call, including service, object path, interface, method, signature, and arguments.
-     * @returns A Promise resolving to an array of response data from the method call.
+     * @returns A Promise resolving to the reply's arguments, or nothing when no reply is expected.
      */
-    public async invoke(opts: InvokeOpts): Promise<any[]>
-    /**
-     * Invokes a DBus method call with the specified options, with a configurable reply expectation.
-     * Sends the method call message to the DBus daemon and optionally waits for a response.
-     * This is the implementation signature that handles the logic for all overloads.
-     *
-     * @param opts - Options for the method call, including service, object path, interface, method, signature, and arguments.
-     * @param noReply - Boolean indicating if a reply is expected (default: false, meaning a reply is expected).
-     * @returns A Promise resolving to the response data if a reply is expected, otherwise void.
-     */
-    public invoke(opts: InvokeOpts, noReply: boolean = false): Promise<any[]> | void {
+    public invoke(opts: InvokeOpts): Promise<any[]> | void
+    public invoke(opts: InvokeOpts): Promise<any[]> | void {
+        const noReply: boolean = !!opts.noReply
         if (noReply) {
             this.write(DBusMessage.encode({
                 serial: this.#serial++,
@@ -619,7 +604,7 @@ export class DBus extends EventEmitter {
                 // No reply can arrive any more, so settle the calls still waiting for one
                 const calls: InflightCall[] = Object.values(this.#inflightCalls)
                 this.#inflightCalls = {}
-                calls.forEach(([, reject]: InflightCall): void => reject(CreateDBusError('org.freedesktop.DBus.Error.Disconnected', 'The connection was closed before a reply was received')))
+                calls.forEach(([, reject]: InflightCall): void => reject(createDBusError('org.freedesktop.DBus.Error.Disconnected', 'The connection was closed before a reply was received')))
                 this.emit('connectionClose')
             })
             .on('error', (error: Error): void => {
@@ -640,27 +625,27 @@ export class DBus extends EventEmitter {
      * @returns This instance for method chaining.
      *
      * @example
-     * dbus.on('online', (name) => console.log(`Service ${name} is online`));
+     * dbus.on('serviceOnline', (name) => console.log(`Service ${name} is online`));
      * dbus.on('methodCall', (message) => console.log('Method call received:', message));
      * dbus.on('connectionError', (error) => console.error('Connection error:', error));
      */
-    public on(eventName: 'online', listener: (name: string) => void): this
+    public on(eventName: 'serviceOnline', listener: (name: string) => void): this
     /**
-     * Adds an event listener for the 'offline' event, emitted when a service goes offline.
+     * Adds an event listener for the 'serviceOffline' event, emitted when a service goes offline.
      *
-     * @param eventName - The string 'offline', indicating a service disconnection event.
+     * @param eventName - The string 'serviceOffline', indicating a service disconnection event.
      * @param listener - A callback function that receives the service name as an argument, invoked when a service goes offline.
      * @returns This instance for method chaining.
      */
-    public on(eventName: 'offline', listener: (name: string) => void): this
+    public on(eventName: 'serviceOffline', listener: (name: string) => void): this
     /**
-     * Adds an event listener for the 'replaced' event, emitted when a service owner is replaced.
+     * Adds an event listener for the 'serviceReplaced' event, emitted when a service owner is replaced.
      *
-     * @param eventName - The string 'replaced', indicating a service ownership replacement event.
+     * @param eventName - The string 'serviceReplaced', indicating a service ownership replacement event.
      * @param listener - A callback function that receives the service name as an argument, invoked when a service owner changes.
      * @returns This instance for method chaining.
      */
-    public on(eventName: 'replaced', listener: (name: string) => void): this
+    public on(eventName: 'serviceReplaced', listener: (name: string) => void): this
     /**
      * Adds an event listener for the 'methodCall' event, emitted when a method call is received.
      *
@@ -670,29 +655,29 @@ export class DBus extends EventEmitter {
      */
     public on(eventName: 'methodCall', listener: (message: DBusMessage) => void): this
     /**
-     * Adds an event listener for the 'NameOwnerChanged' event, emitted when a bus name owner changes.
+     * Adds an event listener for the 'nameOwnerChanged' event, emitted when a bus name owner changes.
      *
-     * @param eventName - The string 'NameOwnerChanged', indicating a bus name ownership change event.
+     * @param eventName - The string 'nameOwnerChanged', indicating a bus name ownership change event.
      * @param listener - A callback function that receives the bus name, old owner, and new owner as arguments, invoked on ownership change.
      * @returns This instance for method chaining.
      */
-    public on(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
+    public on(eventName: 'nameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     /**
-     * Adds an event listener for the 'NameLost' event, emitted when a bus name is lost by this connection.
+     * Adds an event listener for the 'nameLost' event, emitted when a bus name is lost by this connection.
      *
-     * @param eventName - The string 'NameLost', indicating a bus name loss event.
+     * @param eventName - The string 'nameLost', indicating a bus name loss event.
      * @param listener - A callback function that receives the bus name as an argument, invoked when a name is lost.
      * @returns This instance for method chaining.
      */
-    public on(eventName: 'NameLost', listener: (name: string) => void): this
+    public on(eventName: 'nameLost', listener: (name: string) => void): this
     /**
-     * Adds an event listener for the 'NameAcquired' event, emitted when a bus name is acquired by this connection.
+     * Adds an event listener for the 'nameAcquired' event, emitted when a bus name is acquired by this connection.
      *
-     * @param eventName - The string 'NameAcquired', indicating a bus name acquisition event.
+     * @param eventName - The string 'nameAcquired', indicating a bus name acquisition event.
      * @param listener - A callback function that receives the bus name as an argument, invoked when a name is acquired.
      * @returns This instance for method chaining.
      */
-    public on(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public on(eventName: 'nameAcquired', listener: (name: string) => void): this
     /**
      * Adds an event listener for the 'connectionClose' event, emitted when the DBus connection is closed.
      *
@@ -743,27 +728,27 @@ export class DBus extends EventEmitter {
      * @returns This instance for method chaining.
      *
      * @example
-     * dbus.once('online', (name) => console.log(`Service ${name} is online`));
+     * dbus.once('serviceOnline', (name) => console.log(`Service ${name} is online`));
      * dbus.once('methodCall', (message) => console.log('First method call:', message));
      * dbus.once('connectionError', (error) => console.error('First error:', error));
      */
-    public once(eventName: 'online', listener: (name: string) => void): this
+    public once(eventName: 'serviceOnline', listener: (name: string) => void): this
     /**
-     * Adds a one-time event listener for the 'offline' event, emitted when a service goes offline.
+     * Adds a one-time event listener for the 'serviceOffline' event, emitted when a service goes offline.
      *
-     * @param eventName - The string 'offline', indicating a service disconnection event.
+     * @param eventName - The string 'serviceOffline', indicating a service disconnection event.
      * @param listener - A callback function that receives the service name as an argument, invoked once when a service goes offline.
      * @returns This instance for method chaining.
      */
-    public once(eventName: 'offline', listener: (name: string) => void): this
+    public once(eventName: 'serviceOffline', listener: (name: string) => void): this
     /**
-     * Adds a one-time event listener for the 'replaced' event, emitted when a service owner is replaced.
+     * Adds a one-time event listener for the 'serviceReplaced' event, emitted when a service owner is replaced.
      *
-     * @param eventName - The string 'replaced', indicating a service ownership replacement event.
+     * @param eventName - The string 'serviceReplaced', indicating a service ownership replacement event.
      * @param listener - A callback function that receives the service name as an argument, invoked once when a service owner changes.
      * @returns This instance for method chaining.
      */
-    public once(eventName: 'replaced', listener: (name: string) => void): this
+    public once(eventName: 'serviceReplaced', listener: (name: string) => void): this
     /**
      * Adds a one-time event listener for the 'methodCall' event, emitted when a method call is received.
      *
@@ -773,29 +758,29 @@ export class DBus extends EventEmitter {
      */
     public once(eventName: 'methodCall', listener: (message: DBusMessage) => void): this
     /**
-     * Adds a one-time event listener for the 'NameOwnerChanged' event, emitted when a bus name owner changes.
+     * Adds a one-time event listener for the 'nameOwnerChanged' event, emitted when a bus name owner changes.
      *
-     * @param eventName - The string 'NameOwnerChanged', indicating a bus name ownership change event.
+     * @param eventName - The string 'nameOwnerChanged', indicating a bus name ownership change event.
      * @param listener - A callback function that receives the bus name, old owner, and new owner as arguments, invoked once on ownership change.
      * @returns This instance for method chaining.
      */
-    public once(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
+    public once(eventName: 'nameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     /**
-     * Adds a one-time event listener for the 'NameLost' event, emitted when a bus name is lost by this connection.
+     * Adds a one-time event listener for the 'nameLost' event, emitted when a bus name is lost by this connection.
      *
-     * @param eventName - The string 'NameLost', indicating a bus name loss event.
+     * @param eventName - The string 'nameLost', indicating a bus name loss event.
      * @param listener - A callback function that receives the bus name as an argument, invoked once when a name is lost.
      * @returns This instance for method chaining.
      */
-    public once(eventName: 'NameLost', listener: (name: string) => void): this
+    public once(eventName: 'nameLost', listener: (name: string) => void): this
     /**
-     * Adds a one-time event listener for the 'NameAcquired' event, emitted when a bus name is acquired by this connection.
+     * Adds a one-time event listener for the 'nameAcquired' event, emitted when a bus name is acquired by this connection.
      *
-     * @param eventName - The string 'NameAcquired', indicating a bus name acquisition event.
+     * @param eventName - The string 'nameAcquired', indicating a bus name acquisition event.
      * @param listener - A callback function that receives the bus name as an argument, invoked once when a name is acquired.
      * @returns This instance for method chaining.
      */
-    public once(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public once(eventName: 'nameAcquired', listener: (name: string) => void): this
     /**
      * Adds a one-time event listener for the 'connectionClose' event, emitted when the DBus connection is closed.
      *
@@ -846,26 +831,26 @@ export class DBus extends EventEmitter {
      *
      * @example
      * const handler = (name) => console.log(`Service ${name} is online`);
-     * dbus.on('online', handler);
-     * dbus.off('online', handler); // Removes the handler
+     * dbus.on('serviceOnline', handler);
+     * dbus.off('serviceOnline', handler); // Removes the handler
      */
-    public off(eventName: 'online', listener: (name: string) => void): this
+    public off(eventName: 'serviceOnline', listener: (name: string) => void): this
     /**
-     * Removes an event listener for the 'offline' event, related to a service going offline.
+     * Removes an event listener for the 'serviceOffline' event, related to a service going offline.
      *
-     * @param eventName - The string 'offline', indicating a service disconnection event.
+     * @param eventName - The string 'serviceOffline', indicating a service disconnection event.
      * @param listener - The callback function to remove, which receives the service name as an argument.
      * @returns This instance for method chaining.
      */
-    public off(eventName: 'offline', listener: (name: string) => void): this
+    public off(eventName: 'serviceOffline', listener: (name: string) => void): this
     /**
-     * Removes an event listener for the 'replaced' event, related to a service owner being replaced.
+     * Removes an event listener for the 'serviceReplaced' event, related to a service owner being replaced.
      *
-     * @param eventName - The string 'replaced', indicating a service ownership replacement event.
+     * @param eventName - The string 'serviceReplaced', indicating a service ownership replacement event.
      * @param listener - The callback function to remove, which receives the service name as an argument.
      * @returns This instance for method chaining.
      */
-    public off(eventName: 'replaced', listener: (name: string) => void): this
+    public off(eventName: 'serviceReplaced', listener: (name: string) => void): this
     /**
      * Removes an event listener for the 'methodCall' event, related to incoming method calls.
      *
@@ -875,29 +860,29 @@ export class DBus extends EventEmitter {
      */
     public off(eventName: 'methodCall', listener: (message: DBusMessage) => void): this
     /**
-     * Removes an event listener for the 'NameOwnerChanged' event, related to bus name owner changes.
+     * Removes an event listener for the 'nameOwnerChanged' event, related to bus name owner changes.
      *
-     * @param eventName - The string 'NameOwnerChanged', indicating a bus name ownership change event.
+     * @param eventName - The string 'nameOwnerChanged', indicating a bus name ownership change event.
      * @param listener - The callback function to remove, which receives the bus name, old owner, and new owner as arguments.
      * @returns This instance for method chaining.
      */
-    public off(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
+    public off(eventName: 'nameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     /**
-     * Removes an event listener for the 'NameLost' event, related to losing a bus name.
+     * Removes an event listener for the 'nameLost' event, related to losing a bus name.
      *
-     * @param eventName - The string 'NameLost', indicating a bus name loss event.
+     * @param eventName - The string 'nameLost', indicating a bus name loss event.
      * @param listener - The callback function to remove, which receives the bus name as an argument.
      * @returns This instance for method chaining.
      */
-    public off(eventName: 'NameLost', listener: (name: string) => void): this
+    public off(eventName: 'nameLost', listener: (name: string) => void): this
     /**
-     * Removes an event listener for the 'NameAcquired' event, related to acquiring a bus name.
+     * Removes an event listener for the 'nameAcquired' event, related to acquiring a bus name.
      *
-     * @param eventName - The string 'NameAcquired', indicating a bus name acquisition event.
+     * @param eventName - The string 'nameAcquired', indicating a bus name acquisition event.
      * @param listener - The callback function to remove, which receives the bus name as an argument.
      * @returns This instance for method chaining.
      */
-    public off(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public off(eventName: 'nameAcquired', listener: (name: string) => void): this
     /**
      * Removes an event listener for the 'connectionClose' event, related to DBus connection closure.
      *
@@ -948,26 +933,26 @@ export class DBus extends EventEmitter {
      *
      * @example
      * const handler = (name) => console.log(`Service ${name} is online`);
-     * dbus.on('online', handler);
-     * dbus.removeListener('online', handler); // Removes the handler
+     * dbus.on('serviceOnline', handler);
+     * dbus.removeListener('serviceOnline', handler); // Removes the handler
      */
-    public removeListener(eventName: 'online', listener: (name: string) => void): this
+    public removeListener(eventName: 'serviceOnline', listener: (name: string) => void): this
     /**
-     * Removes an event listener for the 'offline' event, related to a service going offline.
+     * Removes an event listener for the 'serviceOffline' event, related to a service going offline.
      *
-     * @param eventName - The string 'offline', indicating a service disconnection event.
+     * @param eventName - The string 'serviceOffline', indicating a service disconnection event.
      * @param listener - The callback function to remove, which receives the service name as an argument.
      * @returns This instance for method chaining.
      */
-    public removeListener(eventName: 'offline', listener: (name: string) => void): this
+    public removeListener(eventName: 'serviceOffline', listener: (name: string) => void): this
     /**
-     * Removes an event listener for the 'replaced' event, related to a service owner being replaced.
+     * Removes an event listener for the 'serviceReplaced' event, related to a service owner being replaced.
      *
-     * @param eventName - The string 'replaced', indicating a service ownership replacement event.
+     * @param eventName - The string 'serviceReplaced', indicating a service ownership replacement event.
      * @param listener - The callback function to remove, which receives the service name as an argument.
      * @returns This instance for method chaining.
      */
-    public removeListener(eventName: 'replaced', listener: (name: string) => void): this
+    public removeListener(eventName: 'serviceReplaced', listener: (name: string) => void): this
     /**
      * Removes an event listener for the 'methodCall' event, related to incoming method calls.
      *
@@ -977,29 +962,29 @@ export class DBus extends EventEmitter {
      */
     public removeListener(eventName: 'methodCall', listener: (message: DBusMessage) => void): this
     /**
-     * Removes an event listener for the 'NameOwnerChanged' event, related to bus name owner changes.
+     * Removes an event listener for the 'nameOwnerChanged' event, related to bus name owner changes.
      *
-     * @param eventName - The string 'NameOwnerChanged', indicating a bus name ownership change event.
+     * @param eventName - The string 'nameOwnerChanged', indicating a bus name ownership change event.
      * @param listener - The callback function to remove, which receives the bus name, old owner, and new owner as arguments.
      * @returns This instance for method chaining.
      */
-    public removeListener(eventName: 'NameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
+    public removeListener(eventName: 'nameOwnerChanged', listener: (name: string, oldOwner: string, newOwner: string) => void): this
     /**
-     * Removes an event listener for the 'NameLost' event, related to losing a bus name.
+     * Removes an event listener for the 'nameLost' event, related to losing a bus name.
      *
-     * @param eventName - The string 'NameLost', indicating a bus name loss event.
+     * @param eventName - The string 'nameLost', indicating a bus name loss event.
      * @param listener - The callback function to remove, which receives the bus name as an argument.
      * @returns This instance for method chaining.
      */
-    public removeListener(eventName: 'NameLost', listener: (name: string) => void): this
+    public removeListener(eventName: 'nameLost', listener: (name: string) => void): this
     /**
-     * Removes an event listener for the 'NameAcquired' event, related to acquiring a bus name.
+     * Removes an event listener for the 'nameAcquired' event, related to acquiring a bus name.
      *
-     * @param eventName - The string 'NameAcquired', indicating a bus name acquisition event.
+     * @param eventName - The string 'nameAcquired', indicating a bus name acquisition event.
      * @param listener - The callback function to remove, which receives the bus name as an argument.
      * @returns This instance for method chaining.
      */
-    public removeListener(eventName: 'NameAcquired', listener: (name: string) => void): this
+    public removeListener(eventName: 'nameAcquired', listener: (name: string) => void): this
     /**
      * Removes an event listener for the 'connectionClose' event, related to DBus connection closure.
      *
@@ -1051,8 +1036,9 @@ export class DBus extends EventEmitter {
             interface: 'org.freedesktop.DBus',
             method: 'AddMatch',
             signature: 's',
-            args: [rule]
-        }, true)
+            args: [rule],
+            noReply: true
+        })
     }
 
     /**
@@ -1068,8 +1054,9 @@ export class DBus extends EventEmitter {
             interface: 'org.freedesktop.DBus',
             method: 'RemoveMatch',
             signature: 's',
-            args: [rule]
-        }, true)
+            args: [rule],
+            noReply: true
+        })
     }
 
     /**
@@ -1265,7 +1252,7 @@ export class DBus extends EventEmitter {
             this.listActivatableNames()
         ])
         const names: string[] = [...new Set([...activeNames, ...activatableNames])]
-        return await Promise.all(names.map((name: string): Promise<ServiceBasicInfo> => {
+        return await Promise.all(names.map((name: string): Promise<BusNameBasicInfo> => {
             return new Promise(async (resolve): Promise<void> => {
                 const [uniqueName, pid] = await Promise.all([
                     this.getNameOwner(name),
@@ -1288,7 +1275,7 @@ export class DBus extends EventEmitter {
      *
      * @returns A Promise resolving to an array of service information objects, excluding unique connection names.
      */
-    public async listServices(): Promise<ServiceBasicInfo[]> {
+    public async listServices(): Promise<BusNameBasicInfo[]> {
         const busNameInfos: BusNameBasicInfo[] = await this.listBusNames()
         return busNameInfos.filter((busNameInfo: BusNameBasicInfo): boolean => busNameInfo.name !== busNameInfo.uniqueName)
     }
@@ -1300,11 +1287,11 @@ export class DBus extends EventEmitter {
      * @returns A Promise resolving to an array of DBusService instances for the services currently on the bus.
      */
     public async getServices(): Promise<DBusService[]> {
-        const serviceBasicInfos: ServiceBasicInfo[] = await this.listServices()
+        const serviceBasicInfos: BusNameBasicInfo[] = await this.listServices()
         // Only running services: getService() would start every activatable one just for being listed
         return serviceBasicInfos
-            .filter((serviceBasicInfo: ServiceBasicInfo): boolean => serviceBasicInfo.active && !!serviceBasicInfo.uniqueName)
-            .map((serviceBasicInfo: ServiceBasicInfo): DBusService => this.trackService(serviceBasicInfo.name, serviceBasicInfo.uniqueName!))
+            .filter((serviceBasicInfo: BusNameBasicInfo): boolean => serviceBasicInfo.active && !!serviceBasicInfo.uniqueName)
+            .map((serviceBasicInfo: BusNameBasicInfo): DBusService => this.trackService(serviceBasicInfo.name, serviceBasicInfo.uniqueName!))
     }
 
     /**

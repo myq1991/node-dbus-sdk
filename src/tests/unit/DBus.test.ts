@@ -107,7 +107,7 @@ describe('DBus message dispatch', (): void => {
         })
 
         it('marks no-reply calls with NO_REPLY_EXPECTED', async (): Promise<void> => {
-            const result: void = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Fire'}, true)
+            const result: void = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Fire', noReply: true})
             assert.equal(result, undefined)
             const call: DBusMessage = await stream.nextOutgoing()
             assert.equal(call.header.flags & DBusMessageFlags.NO_REPLY_EXPECTED, DBusMessageFlags.NO_REPLY_EXPECTED)

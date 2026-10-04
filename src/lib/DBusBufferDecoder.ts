@@ -4,7 +4,7 @@ import {Signature} from './Signature'
 import {DataType} from '../types/DataType'
 import {AlignmentError, InvalidValueError, ReadBufferError, SignatureError} from './Errors'
 import {DBusTypeClass} from './DBusTypeClass'
-import {SignedValueToTypeClassInstance} from './SignedValueToTypeClassInstance'
+import {signedValueToTypeClassInstance} from './signedValueToTypeClassInstance'
 import * as nodeBuffer from 'node:buffer'
 import {TextDecoder} from 'node:util'
 
@@ -489,7 +489,7 @@ export class DBusBufferDecoder {
 
         // Read the signature content as ASCII text
         const value: string = this.buffer.toString('ascii', this.offset, this.offset + length)
-        if (validate) Signature.parseSignature(value) // Throws SignatureError for an invalid signature
+        if (validate) Signature.parse(value) // Throws SignatureError for an invalid signature
         this.offset += length // Increment offset by signature length
 
         // Check and skip the null terminator (must be 0)
@@ -620,7 +620,7 @@ export class DBusBufferDecoder {
         const variantSignature = signatureValue.$value as string
 
         // Parse the signature string to get the corresponding DataType(s)
-        const dataTypes: DataType[] = Signature.parseSignature(variantSignature)
+        const dataTypes: DataType[] = Signature.parse(variantSignature)
 
         // Validate that the variant signature describes exactly one type
         if (dataTypes.length !== 1) {
@@ -709,7 +709,7 @@ export class DBusBufferDecoder {
      * @throws {SignatureError} If the signature is empty or invalid.
      */
     public toSignedValues(signature: string): DBusTypeClass[] {
-        return this.readValues(signature).map((value: DBusSignedValue): DBusTypeClass => SignedValueToTypeClassInstance(value))
+        return this.readValues(signature).map((value: DBusSignedValue): DBusTypeClass => signedValueToTypeClassInstance(value))
     }
 
     /**
@@ -720,7 +720,7 @@ export class DBusBufferDecoder {
      * @throws {SignatureError} If the signature is empty or invalid.
      */
     protected readValues(signature: string): DBusSignedValue[] {
-        const dataTypes: DataType[] = Signature.parseSignature(signature)
+        const dataTypes: DataType[] = Signature.parse(signature)
         if (dataTypes.length === 0) {
             throw new SignatureError('Empty signature provided')
         }
@@ -739,6 +739,6 @@ export class DBusBufferDecoder {
     public decode(signature: string, typed: boolean = false): any[] {
         // Read values as DBusSignedValue instances and convert them based on the typed parameter
         // Plain values come straight from the decoded values; only typed results need DBusTypeClass instances
-        return typed ? this.toSignedValues(signature) : DBusSignedValue.toJSON(this.readValues(signature))
+        return typed ? this.toSignedValues(signature) : DBusSignedValue.toPlain(this.readValues(signature))
     }
 }

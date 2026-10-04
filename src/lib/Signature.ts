@@ -1,4 +1,4 @@
-import {DataType, Types} from '../types/DataType'
+import {DataType, DBusTypeCode} from '../types/DataType'
 import {SignatureError} from './Errors'
 
 /**
@@ -28,7 +28,7 @@ export class Signature {
      * @returns An array of DataType objects representing the parsed signature structure.
      * @throws {SignatureError} If the signature is invalid or contains unrecognized types.
      */
-    public static parseSignature(signature: string): DataType[] {
+    public static parse(signature: string): DataType[] {
         if (typeof signature !== 'string') throw new SignatureError(`A signature must be a string, got ${typeof signature}`)
         if (signature.length > MAX_SIGNATURE_LENGTH) throw new SignatureError(`Signature longer than ${MAX_SIGNATURE_LENGTH} characters: "${signature}"`)
         let index: number = 0
@@ -76,7 +76,7 @@ export class Signature {
                 case '}':
                     return fail(`unexpected "${c}"`)
                 default:
-                    if (c === 'v' || BASIC_TYPES.includes(c)) return {type: c as Types, child: []}
+                    if (c === 'v' || BASIC_TYPES.includes(c)) return {type: c as DBusTypeCode, child: []}
                     return fail(`unknown type code "${c}"`)
             }
         }
@@ -100,7 +100,7 @@ export class Signature {
      * @returns True if the signatures are compatible, false if they are not or if inputs are invalid.
      * @throws {SignatureError} If either signature is invalid (non-empty and cannot be parsed).
      */
-    public static areSignaturesCompatible(baseSignature: string | undefined, inputSignature: string | undefined): boolean {
+    public static areCompatible(baseSignature: string | undefined, inputSignature: string | undefined): boolean {
         // Normalize undefined signatures to empty strings for consistent handling
         baseSignature = baseSignature ? baseSignature : ''
         inputSignature = inputSignature ? inputSignature : ''
@@ -115,8 +115,8 @@ export class Signature {
 
         // Step 2: Parse both signatures into DataType arrays
         // Empty strings are handled by parseSignature and result in empty arrays
-        const baseDataTypes = Signature.parseSignature(baseSignature)
-        const inputDataTypes = Signature.parseSignature(inputSignature)
+        const baseDataTypes = Signature.parse(baseSignature)
+        const inputDataTypes = Signature.parse(inputSignature)
 
         // Step 3: Compare the parsed structures for top-level length
         if (baseDataTypes.length !== inputDataTypes.length) {
@@ -170,7 +170,7 @@ export class Signature {
     /**
      * Converts a parsed type back into its signature string, e.g. {type: 'a', child: [{type: 's'}]} into 'as'.
      *
-     * @param dataType - A complete type (see isComplete).
+     * @param dataType - A type whose containers list their child types, as returned by Signature.parse.
      * @returns The signature of the type.
      */
     public static stringify(dataType: DataType): string {
@@ -186,6 +186,7 @@ export class Signature {
     }
 
     /**
+     * @internal
      * Whether a parsed type carries its full structure: every container lists its child types
      * (one for arrays, two for dict entries, at least one for structs).
      *

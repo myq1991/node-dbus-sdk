@@ -11,7 +11,7 @@ import {
 } from '../../lib/Errors'
 import {knownBug} from '../helpers/KnownBug'
 import {catchUnhandledRejections} from '../helpers/Async'
-import {CreateDBusError} from '../../lib/CreateDBusError'
+import {createDBusError} from '../../lib/createDBusError'
 import {MethodCallContext} from '../../types/MethodCallContext'
 import {DBusMessage} from '../../lib/DBusMessage'
 
@@ -49,11 +49,11 @@ describe('LocalInterface', (): void => {
 
     describe('callMethod', (): void => {
         it('calls the handler and returns the output signature', async (): Promise<void> => {
-            assert.deepEqual(await createInterface().callMethod('Add', 'ii', 2, 3), {signature: 'i', result: 5})
+            assert.deepEqual(await createInterface().callMethod('Add', 'ii', [2, 3]), {signature: 'i', result: 5})
         })
 
         it('rejects an incompatible input signature', async (): Promise<void> => {
-            await assert.rejects(createInterface().callMethod('Add', 'ss', 'a', 'b'), {name: 'org.freedesktop.DBus.Error.InvalidArgs'})
+            await assert.rejects(createInterface().callMethod('Add', 'ss', ['a', 'b']), {name: 'org.freedesktop.DBus.Error.InvalidArgs'})
         })
 
         it('rejects an unknown method', async (): Promise<void> => {
@@ -102,19 +102,19 @@ describe('LocalInterface', (): void => {
             })
         }
 
-        it('passes the context given to invokeMethod after the arguments', async (): Promise<void> => {
+        it('passes the context given to callMethod after the arguments', async (): Promise<void> => {
             const context: MethodCallContext = {sender: ':1.7', objectPath: '/o', interface: 'org.example.Context', method: 'Inspect', message: new DBusMessage({serial: 1})}
-            assert.deepEqual(await createContextInterface().invokeMethod('Inspect', 'u', [3], context), {signature: 's', result: '3 from :1.7'})
+            assert.deepEqual(await createContextInterface().callMethod('Inspect', 'u', [3], context), {signature: 's', result: '3 from :1.7'})
         })
 
         it('passes undefined as context when the method is called directly', async (): Promise<void> => {
-            assert.deepEqual(await createContextInterface().callMethod('Inspect', 'u', 3), {signature: 's', result: '3 from nobody'})
+            assert.deepEqual(await createContextInterface().callMethod('Inspect', 'u', [3]), {signature: 's', result: '3 from nobody'})
         })
 
         it('does not pass a context to methods defined without withContext', async (): Promise<void> => {
             const received: any[][] = []
             const iface: LocalInterface = new LocalInterface('org.example.Plain').defineMethod({name: 'Args', inputArgs: [{type: 'u'}], method: (...args: any[]): number => received.push(args)})
-            await iface.invokeMethod('Args', 'u', [3], {sender: ':1.7', objectPath: '/o', interface: 'org.example.Plain', method: 'Args', message: new DBusMessage({serial: 1})})
+            await iface.callMethod('Args', 'u', [3], {sender: ':1.7', objectPath: '/o', interface: 'org.example.Plain', method: 'Args', message: new DBusMessage({serial: 1})})
             assert.deepEqual(received, [[3]])
         })
     })
@@ -129,7 +129,7 @@ describe('LocalInterface', (): void => {
                     emitPropertiesChanged: true,
                     getter: (): string => state.value,
                     setter: (value: string): void => {
-                        if (value === 'invalid') throw CreateDBusError('org.example.Error.Invalid', 'rejected synchronously')
+                        if (value === 'invalid') throw createDBusError('org.example.Error.Invalid', 'rejected synchronously')
                         state.value = value
                     }
                 })
@@ -140,7 +140,7 @@ describe('LocalInterface', (): void => {
                     getter: (): string => state.value,
                     setter: async (value: string): Promise<void> => {
                         await new Promise<void>((resolve): NodeJS.Immediate => setImmediate(resolve))
-                        if (value === 'invalid') throw CreateDBusError('org.example.Error.Invalid', 'rejected asynchronously')
+                        if (value === 'invalid') throw createDBusError('org.example.Error.Invalid', 'rejected asynchronously')
                         state.value = value
                     }
                 })

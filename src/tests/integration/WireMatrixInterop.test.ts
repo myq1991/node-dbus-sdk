@@ -4,7 +4,7 @@ import {DBus} from '../../DBus'
 import {LocalService} from '../../LocalService'
 import {LocalObject} from '../../LocalObject'
 import {LocalInterface} from '../../LocalInterface'
-import {CreateDBusError} from '../../lib/CreateDBusError'
+import {createDBusError} from '../../lib/createDBusError'
 import {inspect, isDeepStrictEqual} from 'node:util'
 import {PrivateBus} from '../helpers/PrivateBus'
 import {gdbusCall, gdbusCliAvailable, GDBusEchoService, pygobjectAvailable} from '../helpers/GDBus'
@@ -55,7 +55,7 @@ function createReferenceService(serviceName: string): LocalService {
             method: (...received: any[]): any => {
                 const testCase: MatrixCase = currentCase!
                 if (!isDeepStrictEqual(received, toExpected(testCase.args))) {
-                    throw CreateDBusError('org.example.Error.DecodedMismatch', `decoded ${inspect(received, {depth: null})}`)
+                    throw createDBusError('org.example.Error.DecodedMismatch', `decoded ${inspect(received, {depth: null})}`)
                 }
                 const reply: any[] = toInput(testCase.args)
                 return reply.length === 1 ? reply[0] : reply

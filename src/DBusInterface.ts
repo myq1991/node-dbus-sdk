@@ -7,15 +7,15 @@ import {IntrospectMethod} from './types/IntrospectMethod'
 import {IntrospectProperty} from './types/IntrospectProperty'
 import {IntrospectSignal} from './types/IntrospectSignal'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
-import {ReplyModeMethodCall} from './types/ReplyModeMethodCall'
-import {NoReplyModeMethodCall} from './types/NoReplyModeMethodCall'
+import {MethodCall} from './types/MethodCall'
+import {NoReplyMethodCall} from './types/NoReplyMethodCall'
 import {PropertyOperation} from './types/PropertyOperation'
 import {DBusPropertyAccess} from './lib/enums/DBusPropertyAccess'
 import {AccessPropertyForbiddenError, NotEnoughParamsError} from './lib/Errors'
 import {DBusSignalEmitter} from './lib/DBusSignalEmitter'
 import {DBusSignedValue} from './lib/DBusSignedValue'
-import {ReplyModeParameterObjectMethodCall} from './types/ReplyModeParameterObjectMethodCall'
-import {NoReplyModeParameterObjectMethodCall} from './types/NoReplyModeParameterObjectMethodCall'
+import {NamedMethodCall} from './types/NamedMethodCall'
+import {NamedNoReplyMethodCall} from './types/NamedNoReplyMethodCall'
 
 export class DBusInterface {
 
@@ -80,8 +80,8 @@ export class DBusInterface {
      * Each method handles input arguments with type signatures and returns the result of the invocation.
      * @returns A record of method names mapped to their callable implementations with reply mode.
      */
-    public get method(): Record<string, ReplyModeMethodCall> {
-        const methods: Record<string, ReplyModeMethodCall> = {}
+    public get method(): Record<string, MethodCall> {
+        const methods: Record<string, MethodCall> = {}
         this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
             methods[methodInfo.name] = async (...args: any[]): Promise<any> => {
                 const types: string[] = methodInfo.arg
@@ -111,8 +111,8 @@ export class DBusInterface {
      * based on the introspection data. This approach enhances readability and avoids errors due to parameter order.
      * @returns A record of method names mapped to their callable implementations with reply mode, accepting a parameter object.
      */
-    public get parameterObjectifyMethod(): Record<string, ReplyModeParameterObjectMethodCall> {
-        const methods: Record<string, ReplyModeMethodCall> = {}
+    public get namedMethod(): Record<string, NamedMethodCall> {
+        const methods: Record<string, MethodCall> = {}
         this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
             methods[methodInfo.name] = async (parameterObject?: Record<string, any>): Promise<any> => {
                 const args: any[] = this.objectifiedParameterToArguments(methodInfo, parameterObject ? parameterObject : {})
@@ -128,8 +128,8 @@ export class DBusInterface {
      * These methods are used for fire-and-forget calls.
      * @returns A record of method names mapped to their callable implementations with no-reply mode.
      */
-    public get noReplyMethod(): Record<string, NoReplyModeMethodCall> {
-        const noReplyMethods: Record<string, NoReplyModeMethodCall> = {}
+    public get noReplyMethod(): Record<string, NoReplyMethodCall> {
+        const noReplyMethods: Record<string, NoReplyMethodCall> = {}
         this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
             noReplyMethods[methodInfo.name] = (...args: any[]): void => {
                 const types: string[] = methodInfo.arg
@@ -141,8 +141,9 @@ export class DBusInterface {
                     interface: this.name,
                     method: methodInfo.name,
                     signature: types.length ? types.join('') : undefined,
-                    args: args
-                }, true)
+                    args: args,
+                    noReply: true
+                })
             }
         })
         return noReplyMethods
@@ -156,8 +157,8 @@ export class DBusInterface {
      * These methods are used for fire-and-forget calls.
      * @returns A record of method names mapped to their callable implementations with no-reply mode, accepting a parameter object.
      */
-    public get parameterObjectifyNoReplyMethod(): Record<string, NoReplyModeParameterObjectMethodCall> {
-        const noReplyMethods: Record<string, NoReplyModeParameterObjectMethodCall> = {}
+    public get namedNoReplyMethod(): Record<string, NamedNoReplyMethodCall> {
+        const noReplyMethods: Record<string, NamedNoReplyMethodCall> = {}
         this.listMethods().forEach((methodInfo: IntrospectMethod): void => {
             noReplyMethods[methodInfo.name] = (parameterObject?: Record<string, any>): void => {
                 const args: any[] = this.objectifiedParameterToArguments(methodInfo, parameterObject ? parameterObject : {})

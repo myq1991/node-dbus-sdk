@@ -1,0 +1,1 @@
+export type NamedMethodCall = (parameterObject?: Record<string, any>) => Promise<any>

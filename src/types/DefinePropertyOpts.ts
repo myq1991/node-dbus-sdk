@@ -3,7 +3,7 @@
  * Used to configure how property changes are signaled to other applications on the bus
  * when a property value is updated, allowing control over the content of the emitted signal.
  */
-export interface emitPropertiesChangedOpts {
+export interface EmitPropertiesChangedOpts {
     /**
      * A boolean flag indicating whether to include the new value of the property in the change signal.
      * If true, the updated value is included in the 'PropertiesChanged' signal sent over DBus;
@@ -35,10 +35,10 @@ export interface DefinePropertyOpts {
     /**
      * Configuration for emitting the 'PropertiesChanged' signal when the property value changes.
      * Can be a boolean (true to emit the signal with default behavior, false to disable emission)
-     * or an object of type emitPropertiesChangedOpts to specify detailed options such as whether
+     * or an object of type EmitPropertiesChangedOpts to specify detailed options such as whether
      * to include the new value in the signal.
      */
-    emitPropertiesChanged?: boolean | emitPropertiesChangedOpts
+    emitPropertiesChanged?: boolean | EmitPropertiesChangedOpts
 
     /**
      * An optional getter function for retrieving the property value.
@@ -52,7 +52,7 @@ export interface DefinePropertyOpts {
      * An optional setter function for updating the property value.
      * This function takes the new value as an argument and is called when the property is modified
      * via DBus (e.g., through the 'Set' method). It may return a Promise, which is awaited before the call is
-     * answered; an error it throws or rejects with is returned to the caller as a DBus error (use CreateDBusError
+     * answered; an error it throws or rejects with is returned to the caller as a DBus error (use createDBusError
      * to choose the error name). If not provided, the property is read-only.
      */
     setter?: (value: any) => unknown

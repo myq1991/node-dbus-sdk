@@ -94,6 +94,11 @@ describe('introspection of an object tree', {skip: !PrivateBus.available && 'dbu
         ])
     })
 
+    it('lists the interface names of a remote object', async (): Promise<void> => {
+        const object: DBusObject = await withTimeout(client.getObject(SERVICE_NAME, '/org/example/Tree/a'), 2000, 'get object')
+        assert.deepEqual((await withTimeout(object.listInterfaceNames(), 2000, 'listInterfaceNames')).sort(), ['org.example.Node', 'org.freedesktop.DBus.Introspectable', 'org.freedesktop.DBus.Peer', 'org.freedesktop.DBus.Properties'])
+    })
+
     it('describes a path without an object as a node without interfaces', async (): Promise<void> => {
         assert.deepEqual((await introspect('/org/example/Other')).interfaces, [])
     })
@@ -104,7 +109,7 @@ describe('introspection of an object tree', {skip: !PrivateBus.available && 'dbu
 
     it('lists every object of the service', async (): Promise<void> => {
         const remote: DBusService = await withTimeout(client.getService(SERVICE_NAME), 2000, 'get service')
-        assert.deepEqual((await withTimeout(remote.listObjects(), 3000, 'listObjects')).sort(), ['/', ...OBJECT_PATHS].sort())
+        assert.deepEqual((await withTimeout(remote.listObjectPaths(), 3000, 'listObjects')).sort(), ['/', ...OBJECT_PATHS].sort())
     })
 
     it('produces XML that GDBus can parse, for the whole tree', {skip: !gdbusCliAvailable && 'gdbus not found'}, async (): Promise<void> => {

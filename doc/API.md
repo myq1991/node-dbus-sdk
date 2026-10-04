@@ -47,10 +47,12 @@ approach to handle connection status changes and incoming messages.
 
 ### Key Methods
 
-- **`static async connect(opts: ConnectOpts): Promise<DBus>`**: Establishes a connection to a DBus bus using provided
-  options (e.g., socket path, TCP details). Returns an initialized `DBus` instance.
-- **`async invoke(opts: InvokeOpts, noReply?: boolean): Promise<any[]> | void`**: Invokes a remote DBus method. Supports
-  both reply-expected (returns a Promise with response data) and no-reply modes (returns void).
+- **`static async connect(opts: CreateConnectOpts): Promise<DBus>`**: Establishes a connection to a DBus bus using
+  provided options (e.g., socket path, TCP details, `authMethods`, `callTimeout`). Returns an initialized `DBus`
+  instance.
+- **`invoke(opts: InvokeOpts): Promise<any[]> | void`**: Invokes a remote DBus method and returns a Promise of the
+  reply's arguments. With `noReply: true` in the options the call is sent without expecting a reply and nothing is
+  returned; `timeout` limits how long to wait for the reply.
 - **`async getProperty(opts: GetPropertyValueOpts): Promise<any>`**: Retrieves a property value from a remote DBus
   object using the `org.freedesktop.DBus.Properties` interface.
 - **`async setProperty(opts: SetPropertyValueOpts): Promise<void>`**: Sets a property value on a remote DBus object
@@ -62,14 +64,15 @@ approach to handle connection status changes and incoming messages.
 - **`createSignalEmitter(opts: CreateSignalEmitterOpts): DBusSignalEmitter`**: Creates a signal emitter for subscribing
   to specific DBus signals based on service, object path, and interface.
 - **`on(eventName: string, listener: Function): this`**: Registers event listeners for various DBus events (e.g.,
-  `online`, `offline`, `NameOwnerChanged`) related to service status and connection state.
+  `serviceOnline`, `serviceOffline`, `nameOwnerChanged`) related to service status and connection state.
 
 ### Events
 
-- **`online(name: string)`**: Emitted when a service becomes available.
-- **`offline(name: string)`**: Emitted when a service goes offline.
-- **`replaced(name: string)`**: Emitted when a service's owner changes.
-- **`NameOwnerChanged(name: string, oldOwner: string, newOwner: string)`**: Emitted when a service's ownership changes.
+- **`serviceOnline(name: string)`**: Emitted when a bus name gets an owner (a service or a connection appears).
+- **`serviceOffline(name: string)`**: Emitted when a bus name loses its owner.
+- **`serviceReplaced(name: string)`**: Emitted when a bus name passes from one owner to another.
+- **`nameOwnerChanged(name: string, oldOwner: string, newOwner: string)`**: Emitted for every change of a name's owner.
+- **`nameAcquired(name: string)`** / **`nameLost(name: string)`**: Emitted when this connection gains or loses a name.
 - **`connectionClose()`**: Emitted when the DBus connection is closed.
 - **`connectionError(error: Error)`**: Emitted when a connection error occurs.
 - **`methodCall(message: DBusMessage)`**: Emitted for incoming method calls (used internally for local service
@@ -91,8 +94,8 @@ interaction with the service's structure.
 
 ### Key Methods
 
-- **`async listObjects(): Promise<string[]>`**: Retrieves a list of object paths available under this service by
-  recursively introspecting the object hierarchy.
+- **`async listObjectPaths(): Promise<string[]>`**: Retrieves the paths of the objects of this service by recursively
+  introspecting the object hierarchy.
 - **`async getObjects(): Promise<DBusObject[]>`**: Returns an array of `DBusObject` instances for all object paths under
   this service.
 - **`async getObject(objectPath: string): Promise<DBusObject>`**: Retrieves a specific `DBusObject` instance for the
@@ -114,7 +117,7 @@ interfaces.
 
 - **`async introspect(): Promise<IntrospectNode>`**: Performs introspection on the object to retrieve metadata about its
   interfaces, methods, properties, and signals as an XML-parsed structure.
-- **`async listInterfaces(): Promise<string[]>`**: Returns a list of interface names available on this object.
+- **`async listInterfaceNames(): Promise<string[]>`**: Returns the names of the interfaces available on this object.
 - **`async getInterfaces(): Promise<DBusInterface[]>`**: Retrieves all `DBusInterface` instances for the interfaces on
   this object.
 - **`async getInterface(iface: string): Promise<DBusInterface>`**: Returns a specific `DBusInterface` instance for the
@@ -130,10 +133,13 @@ object (e.g., `org.freedesktop.NetworkManager`). It offers type-safe operations 
 ### Key Properties
 
 - **`name: string`**: The name of the interface (e.g., `org.freedesktop.NetworkManager`).
-- **`method: Record<string, ReplyModeMethodCall>`**: A dynamically generated object mapping method names to callable
+- **`method: Record<string, MethodCall>`**: A dynamically generated object mapping method names to callable
   functions that expect a reply.
-- **`noReplyMethod: Record<string, NoReplyModeMethodCall>`**: A dynamically generated object mapping method names to
+- **`noReplyMethod: Record<string, NoReplyMethodCall>`**: A dynamically generated object mapping method names to
   callable functions that do not expect a reply.
+- **`namedMethod: Record<string, NamedMethodCall>`** / **`namedNoReplyMethod: Record<string, NamedNoReplyMethodCall>`**:
+  Like `method` and `noReplyMethod`, but each function takes one object of arguments by name, e.g.
+  `iface.namedMethod.SayHello({name: 'you'})`.
 - **`property: Record<string, PropertyOperation>`**: A dynamically generated object mapping property names to get/set
   operations with access control.
 - **`signal: DBusSignalEmitter`**: A lazily initialized signal emitter for subscribing to signals on this interface.
@@ -160,8 +166,9 @@ service.
 
 ### Key Methods
 
-- **`async run(opts: ConnectOpts): Promise<void>`**: Connects to a DBus bus using the provided options and starts the
-  service, listening for incoming method calls.
+- **`async run(opts: RunServiceOpts): Promise<RequestNameResultCode>`**: Connects to a DBus bus using the provided
+  options (the same as `DBus.connect`, plus `flags` for requesting the name), requests the service name and starts
+  answering method calls. Returns the result of requesting the name.
 - **`async stop(opts?: StopServiceOpts): Promise<void>`**: Stops the service by releasing the name and disconnecting
   from the DBus bus. By default this happens immediately, and calls still being handled cannot be answered. With
   `{graceful: true}` the service stops in two phases:
@@ -179,8 +186,8 @@ service.
   service's context and notifying the object manager if available.
 - **`removeObject(inp: LocalObject | string): boolean`**: Removes a `LocalObject` by instance or object path, notifying
   the object manager if available.
-- **`listObjects(): Record<string, LocalObject>`**: Returns a record of all objects associated with this service.
-- **`findObjectByPath<T extends LocalObject>(objectPath: string): T | undefined`**: Finds a `LocalObject` by its path.
+- **`getObjects(): LocalObject[]`**: Returns all objects of this service.
+- **`getObject<T extends LocalObject>(objectPath: string): T | undefined`**: Returns the `LocalObject` at a path.
 - **`listObjectPaths(): string[]`**: Returns an array of object paths for all objects in this service.
 
 ## Class: LocalObject
@@ -206,11 +213,9 @@ property management.
   with the object's context and notifying the service's object manager if applicable.
 - **`removeInterface(inp: LocalInterface | string): boolean`**: Removes a `LocalInterface` by instance or name,
   notifying the service's object manager if applicable.
-- **`listInterfaces(): Record<string, LocalInterface>`**: Returns a record of all interfaces associated with this
-  object.
-- **`interfaceNames(): string[]`**: Returns an array of interface names associated with this object.
-- **`findInterfaceByName<T extends LocalInterface>(name: string): T | undefined`**: Finds a `LocalInterface` by its
-  name.
+- **`getInterfaces(): LocalInterface[]`**: Returns all interfaces of this object.
+- **`listInterfaceNames(): string[]`**: Returns the names of the interfaces of this object.
+- **`getInterface<T extends LocalInterface>(name: string): T | undefined`**: Returns the `LocalInterface` with a name.
 - **`getManagedInterfaces(): Record<string, Record<string, DBusSignedValue>>`**: Returns a record of all interfaces and
   their managed properties as `DBusSignedValue` instances.
 - **`introspectNode: IntrospectNode`**: Getter for introspection data of this object, including all associated
@@ -244,7 +249,7 @@ configured.
       inputArgs: [{name: 'force', type: 'b'}],
       withContext: true,
       method: async (force: boolean, context: MethodCallContext) => {
-          if (!await isAuthorized(context.sender)) throw CreateDBusError('org.example.Error.NotAuthorized', 'Not allowed')
+          if (!await isAuthorized(context.sender)) throw createDBusError('org.example.Error.NotAuthorized', 'Not allowed')
           // ...
       }
   })
@@ -254,7 +259,7 @@ configured.
   getter/setter functions, and optional property change signal emission. The access mode follows from the functions
   given: a getter only is read-only, a setter only is write-only (left out of `GetAll` and `InterfacesAdded`).
   The setter may be `async`. `Properties.Set` waits for it before answering, and an error it throws or rejects with
-  becomes a DBus error reply. Use `CreateDBusError(name, message)` to choose the error name.
+  becomes a DBus error reply. Use `createDBusError(name, message)` to choose the error name.
   `PropertiesChanged` is emitted after the setter has completed.
 - **`removeProperty(name: string): this`**: Removes a defined property by name.
 - **`defineSignal(opts: DefineSignalOpts): this`**: Defines a custom signal with arguments and an associated
@@ -282,14 +287,15 @@ configured.
   not emit `PropertiesChanged`. `DBusObject.introspect()` returns the annotations of remote objects in the same
   `annotation` fields.
 - **
-  `async callMethod(name: string, payloadSignature: string | undefined, ...args: any[]): Promise<{signature?: string, result: any}>`
-  **: Calls a defined method with validated arguments and returns the result.
+  `async callMethod(name: string, payloadSignature: string | undefined, args?: any[], context?: MethodCallContext): Promise<{signature?: string, result: any}>`
+  **: Calls a defined method with validated arguments and returns the result; `context` is passed to methods defined
+  with `withContext`.
 - **`async setProperty(name: string, value: any): Promise<void>`**: Sets a property value if the property is writable,
   triggering change signals if configured.
 - **`async getProperty(name: string): Promise<any>`**: Gets a property value if the property is readable.
-- **`methodNames(): string[]`**: Lists names of defined methods.
-- **`propertyNames(): string[]`**: Lists names of defined properties.
-- **`signalNames(): string[]`**: Lists names of defined signals.
+- **`listMethodNames(): string[]`**: Lists names of defined methods.
+- **`listPropertyNames(): string[]`**: Lists names of defined properties.
+- **`listSignalNames(): string[]`**: Lists names of defined signals.
 
 ## Integration and Usage
 
@@ -307,7 +313,7 @@ object model. Below is an explanation of how they integrate for common use cases
 4. **Interacting with Interfaces**: Use `DBusObject` to get `DBusInterface` instances for specific interfaces on the
    object. With `DBusInterface`, you can invoke methods (`method` or `noReplyMethod`), access properties (`property`),
    and subscribe to signals (`signal`).
-5. **Handling Events**: Leverage `DBus` event listeners (e.g., `on('online', ...)` or signal emitters created via
+5. **Handling Events**: Leverage `DBus` event listeners (e.g., `on('serviceOnline', ...)` or signal emitters created via
    `createSignalEmitter`) to react to service availability changes or incoming signals.
 
 ### Server-Side Implementation (Exposing Custom Services)

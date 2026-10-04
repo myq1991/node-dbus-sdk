@@ -147,7 +147,7 @@ export class DBusObject {
      * Performs introspection to retrieve the list of interfaces and optionally caches the result.
      * @returns A Promise resolving to an array of interface names as strings.
      */
-    public async listInterfaces(): Promise<string[]> {
+    public async listInterfaceNames(): Promise<string[]> {
         const introspectResult: IntrospectNode = await this.introspect()
         if (this.#shareIntrospect) this.#shareIntrospectInterfaces = introspectResult.interface
         return introspectResult.interface.map((iface: IntrospectInterface): string => iface.name)
@@ -160,7 +160,7 @@ export class DBusObject {
      */
     public async getInterfaces(): Promise<DBusInterface[]> {
         this.#shareIntrospect = true
-        const interfaceNames: string[] = await this.listInterfaces()
+        const interfaceNames: string[] = await this.listInterfaceNames()
         const dbusInterfaces: DBusInterface[] = await Promise.all(interfaceNames.map((interfaceName: string): Promise<DBusInterface> => this.internalGetInterface(interfaceName, true)))
         this.#shareIntrospectInterfaces = []
         this.#shareIntrospect = false

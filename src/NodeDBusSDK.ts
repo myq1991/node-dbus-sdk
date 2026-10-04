@@ -43,10 +43,10 @@ export {LocalService} from './LocalService'
 
 // Utility and Low-Level Classes
 /**
- * Exports the CreateDBusError utility function for creating DBus-specific errors.
+ * Exports the createDBusError utility function for creating DBus-specific errors.
  * Used to generate errors with DBus error names and messages for protocol compliance.
  */
-export {CreateDBusError} from './lib/CreateDBusError'
+export {createDBusError} from './lib/createDBusError'
 
 /**
  * Exports the DBusBufferEncoder class for encoding data into DBus wire format.
@@ -206,22 +206,22 @@ export {DBusString} from './lib/datatypes/DBusString'
 export {DBusStruct} from './lib/datatypes/DBusStruct'
 
 /**
- * Exports the DBusUint16 class for representing a DBus 16-bit unsigned integer data type.
+ * Exports the DBusUInt16 class for representing a DBus 16-bit unsigned integer data type.
  * Encapsulates a 16-bit unsigned integer for DBus encoding and decoding with signature 'q'.
  */
-export {DBusUint16} from './lib/datatypes/DBusUint16'
+export {DBusUInt16} from './lib/datatypes/DBusUInt16'
 
 /**
- * Exports the DBusUint32 class for representing a DBus 32-bit unsigned integer data type.
+ * Exports the DBusUInt32 class for representing a DBus 32-bit unsigned integer data type.
  * Encapsulates a 32-bit unsigned integer for DBus encoding and decoding with signature 'u'.
  */
-export {DBusUint32} from './lib/datatypes/DBusUint32'
+export {DBusUInt32} from './lib/datatypes/DBusUInt32'
 
 /**
- * Exports the DBusUint64 class for representing a DBus 64-bit unsigned integer data type.
+ * Exports the DBusUInt64 class for representing a DBus 64-bit unsigned integer data type.
  * Encapsulates a 64-bit unsigned integer (bigint) for DBus encoding and decoding with signature 't'.
  */
-export {DBusUint64} from './lib/datatypes/DBusUint64'
+export {DBusUInt64} from './lib/datatypes/DBusUInt64'
 
 /**
  * Exports the DBusUnixFD class for representing a DBus Unix file descriptor data type.
@@ -293,10 +293,10 @@ export type {CreateConnectOpts} from './types/CreateConnectOpts'
 export type {CreateSignalEmitterOpts} from './types/CreateSignalEmitterOpts'
 
 /**
- * Exports the DataType and Types types for DBus data type definitions.
+ * Exports the DataType and DBusTypeCode types for DBus data type definitions.
  * Defines structures for representing DBus data types and their associated signatures.
  */
-export type {DataType, Types} from './types/DataType'
+export type {DataType, DBusTypeCode} from './types/DataType'
 
 /**
  * Exports the DBusInterfaceOpts type for DBus interface options.
@@ -329,10 +329,10 @@ export type {DBusServiceOpts} from './types/DBusServiceOpts'
 export type {DefineMethodArgumentOpts, DefineMethodOpts} from './types/DefineMethodOpts'
 
 /**
- * Exports the DefinePropertyOpts and emitPropertiesChangedOpts types for property operations.
+ * Exports the DefinePropertyOpts and EmitPropertiesChangedOpts types for property operations.
  * Defines structures for configuring DBus properties and controlling property change signal emission.
  */
-export type {DefinePropertyOpts, emitPropertiesChangedOpts} from './types/DefinePropertyOpts'
+export type {DefinePropertyOpts, EmitPropertiesChangedOpts} from './types/DefinePropertyOpts'
 
 /**
  * Exports the DefineSignalOpts type for signal definition.
@@ -424,17 +424,17 @@ export type {InvokeOpts} from './types/InvokeOpts'
 export type {MethodCallContext} from './types/MethodCallContext'
 
 /**
- * Exports the NoReplyModeMethodCall type for method calls without reply expectation.
+ * Exports the NoReplyMethodCall type for method calls without reply expectation.
  * Defines the structure for method calls that do not await or expect a response from the remote service.
  */
-export type {NoReplyModeMethodCall} from './types/NoReplyModeMethodCall'
+export type {NoReplyMethodCall} from './types/NoReplyMethodCall'
 
 /**
- * Exports the NoReplyModeParameterObjectMethodCall type for method calls without reply expectation using parameter object pattern.
+ * Exports the NamedNoReplyMethodCall type for method calls without reply expectation using parameter object pattern.
  * Defines the structure for method calls that do not await or expect a response from the remote service,
  * accepting a single parameter object for named arguments to enhance readability and avoid order errors.
  */
-export type {NoReplyModeParameterObjectMethodCall} from './types/NoReplyModeParameterObjectMethodCall'
+export type {NamedNoReplyMethodCall} from './types/NamedNoReplyMethodCall'
 
 /**
  * Exports the PropertyOperation type for property access operations.
@@ -443,29 +443,23 @@ export type {NoReplyModeParameterObjectMethodCall} from './types/NoReplyModePara
 export type {PropertyOperation} from './types/PropertyOperation'
 
 /**
- * Exports the ReplyModeMethodCall type for method calls expecting a reply.
+ * Exports the MethodCall type for method calls expecting a reply.
  * Defines the structure for method calls that await a response from the remote service with return data.
  */
-export type {ReplyModeMethodCall} from './types/ReplyModeMethodCall'
+export type {MethodCall} from './types/MethodCall'
 
 /**
- * Exports the ReplyModeParameterObjectMethodCall type for method calls expecting a reply using parameter object pattern.
+ * Exports the NamedMethodCall type for method calls expecting a reply using parameter object pattern.
  * Defines the structure for method calls that await a response from the remote service with return data,
  * accepting a single parameter object for named arguments to enhance readability and avoid order errors.
  */
-export type {ReplyModeParameterObjectMethodCall} from './types/ReplyModeParameterObjectMethodCall'
+export type {NamedMethodCall} from './types/NamedMethodCall'
 
 /**
  * Exports the ReplyOpts type for crafting replies to DBus method calls.
  * Defines options for sending a reply, including destination, serial, success data, or error information.
  */
 export type {ReplyOpts} from './types/ReplyOpts'
-
-/**
- * Exports the ServiceBasicInfo type for basic service information.
- * Defines the structure for service details, including name, status, process ID, and other metadata.
- */
-export type {ServiceBasicInfo} from './types/ServiceBasicInfo'
 
 /**
  * Exports the SetPropertyValueOpts type for setting DBus property values.

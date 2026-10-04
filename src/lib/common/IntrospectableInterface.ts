@@ -96,7 +96,7 @@ export class IntrospectableInterface extends LocalInterface {
 
         // If an exact match for the path is found, include interface details
         if (matchedObjectPath) {
-            const localObject: LocalObject = this.object!.service!.findObjectByPath(matchedObjectPath)!
+            const localObject: LocalObject = this.object!.service!.getObject(matchedObjectPath)!
             const interfaces = localObject.introspectNode.interface.map((introspectableInterface: IntrospectInterface) => {
                 // Map methods of the interface to XML structure
                 const methods = introspectableInterface.method.map((introspectMethod: IntrospectMethod) => {

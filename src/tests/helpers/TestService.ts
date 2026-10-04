@@ -2,9 +2,9 @@ import EventEmitter from 'node:events'
 import {LocalService} from '../../LocalService'
 import {LocalObject} from '../../LocalObject'
 import {LocalInterface} from '../../LocalInterface'
-import {CreateDBusError} from '../../lib/CreateDBusError'
+import {createDBusError} from '../../lib/createDBusError'
 import {MethodCallContext} from '../../types/MethodCallContext'
-import {DBusUint32} from '../../lib/datatypes/DBusUint32'
+import {DBusUInt32} from '../../lib/datatypes/DBusUInt32'
 import {DBusVariant} from '../../lib/datatypes/DBusVariant'
 
 export const TEST_OBJECT_PATH: string = '/org/example/Object'
@@ -69,12 +69,12 @@ export function createTestService(name: string): TestService {
         .defineMethod({
             name: 'TypedUint32',
             outputArgs: [{name: 'value', type: 'u'}],
-            method: (): DBusUint32 => new DBusUint32(4000000000)
+            method: (): DBusUInt32 => new DBusUInt32(4000000000)
         })
         .defineMethod({
             name: 'TypedVariant',
             outputArgs: [{name: 'value', type: 'v'}],
-            method: (): DBusVariant => new DBusVariant(new DBusUint32(7))
+            method: (): DBusVariant => new DBusVariant(new DBusUInt32(7))
         })
         .defineMethod({
             name: 'Caller',
@@ -100,7 +100,7 @@ export function createTestService(name: string): TestService {
         .defineMethod({
             name: 'Fail',
             method: (): never => {
-                throw CreateDBusError('org.example.Error.Boom', 'boom')
+                throw createDBusError('org.example.Error.Boom', 'boom')
             }
         })
         .defineProperty({
@@ -126,7 +126,7 @@ export function createTestService(name: string): TestService {
             emitPropertiesChanged: true,
             getter: (): string => state.checked,
             setter: async (value: string): Promise<void> => {
-                if (value === 'invalid') throw CreateDBusError('org.example.Error.Invalid', 'value rejected by validation')
+                if (value === 'invalid') throw createDBusError('org.example.Error.Invalid', 'value rejected by validation')
                 state.checked = value
             }
         })

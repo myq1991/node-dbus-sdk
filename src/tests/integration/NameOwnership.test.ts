@@ -65,9 +65,9 @@ describe('bus name ownership', {skip: !PrivateBus.available && 'dbus-daemon not 
             const name: string = uniqueBusName()
             await first.requestName(name)
             assert.equal(await second.requestName(name), RequestNameResultCode.DBUS_REQUEST_NAME_REPLY_IN_QUEUE)
-            const acquired: Promise<any[]> = eventFor(second, 'NameAcquired', name)
-            const replaced: Promise<any[]> = eventFor(observer, 'replaced', name)
-            const ownerChanged: Promise<any[]> = eventFor(observer, 'NameOwnerChanged', name)
+            const acquired: Promise<any[]> = eventFor(second, 'nameAcquired', name)
+            const replaced: Promise<any[]> = eventFor(observer, 'serviceReplaced', name)
+            const ownerChanged: Promise<any[]> = eventFor(observer, 'nameOwnerChanged', name)
             assert.equal(await first.releaseName(name), RELEASE_NAME_REPLY_RELEASED)
             await acquired
             await replaced
@@ -79,7 +79,7 @@ describe('bus name ownership', {skip: !PrivateBus.available && 'dbus-daemon not 
             const name: string = uniqueBusName()
             await first.requestName(name)
             assert.equal(await second.requestName(name, RequestNameFlags.DBUS_NAME_FLAG_DO_NOT_QUEUE), RequestNameResultCode.DBUS_REQUEST_NAME_REPLY_EXISTS)
-            const released: Promise<any[]> = eventFor(observer, 'offline', name)
+            const released: Promise<any[]> = eventFor(observer, 'serviceOffline', name)
             await first.releaseName(name)
             await released
             assert.equal(await observer.nameHasOwner(name), false)
@@ -88,7 +88,7 @@ describe('bus name ownership', {skip: !PrivateBus.available && 'dbus-daemon not 
         it('lets REPLACE_EXISTING take a name whose owner allows replacement', async (): Promise<void> => {
             const name: string = uniqueBusName()
             await first.requestName(name, RequestNameFlags.DBUS_NAME_FLAG_ALLOW_REPLACEMENT)
-            const lost: Promise<any[]> = eventFor(first, 'NameLost', name)
+            const lost: Promise<any[]> = eventFor(first, 'nameLost', name)
             assert.equal(await second.requestName(name, RequestNameFlags.DBUS_NAME_FLAG_REPLACE_EXISTING), RequestNameResultCode.DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER)
             await lost
             assert.equal(await observer.getNameOwner(name), second.uniqueName)
@@ -141,7 +141,7 @@ describe('bus name ownership', {skip: !PrivateBus.available && 'dbus-daemon not 
             const name: string = uniqueBusName()
             const stopped: TestService = createTestService(name)
             await withTimeout(stopped.service.run({busAddress: bus.address}), 3000, 'run')
-            const offline: Promise<any[]> = eventFor(observer, 'offline', name)
+            const offline: Promise<any[]> = eventFor(observer, 'serviceOffline', name)
             await withTimeout(stopped.service.stop(), 3000, 'stop')
             await offline
             assert.equal(await observer.nameHasOwner(name), false)
@@ -154,10 +154,10 @@ describe('bus name ownership', {skip: !PrivateBus.available && 'dbus-daemon not 
             const remote: DBusService = await observer.getService(name)
             const iface: DBusInterface = await (await remote.getObject(TEST_OBJECT_PATH)).getInterface(TEST_INTERFACE)
             iface.signal.on('Tick', (): void => undefined)
-            const offline: Promise<any[]> = eventFor(observer, 'offline', name)
+            const offline: Promise<any[]> = eventFor(observer, 'serviceOffline', name)
             await withTimeout(first.service.stop(), 3000, 'stop first')
             await offline
-            const online: Promise<any[]> = eventFor(observer, 'online', name)
+            const online: Promise<any[]> = eventFor(observer, 'serviceOnline', name)
             const second: TestService = service(name)
             await withTimeout(second.service.run({busAddress: bus.address}), 3000, 'run second')
             await online
@@ -177,7 +177,7 @@ describe('bus name ownership', {skip: !PrivateBus.available && 'dbus-daemon not 
             const remote: DBusService = await observer.getService(name)
             const iface: DBusInterface = await (await remote.getObject(TEST_OBJECT_PATH)).getInterface(TEST_INTERFACE)
             iface.signal.on('Tick', (): void => undefined)
-            const replaced: Promise<any[]> = eventFor(observer, 'replaced', name)
+            const replaced: Promise<any[]> = eventFor(observer, 'serviceReplaced', name)
             await withTimeout(original.service.stop(), 3000, 'stop original')
             await replaced
             assert.equal(remote.uniqueName, successor.service.dbus.uniqueName)

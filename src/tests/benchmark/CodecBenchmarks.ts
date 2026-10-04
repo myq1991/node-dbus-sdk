@@ -107,7 +107,7 @@ export async function codecBenchmarks(filter: (name: string) => boolean): Promis
     }
 
     if (filter('signature parsing')) {
-        const signatureSamples: number[] = await sample((): any => Signature.parseSignature('a{oa{sa{sv}}}(ia{s(xv)})as'))
+        const signatureSamples: number[] = await sample((): any => Signature.parse('a{oa{sa{sv}}}(ia{s(xv)})as'))
         outcomes.push({group: 'codec', name: 'signature parsing (a{oa{sa{sv}}}(ia{s(xv)})as)', metrics: {'parse median': us(median(signatureSamples))}})
     }
     return outcomes

@@ -358,7 +358,7 @@ export class DBusBufferEncoder {
         const length: number = Buffer.byteLength(value, 'utf8')
         // Validate signature length does not exceed 255 bytes (SIGNATURE length field is 8-bit unsigned integer)
         if (length > 255) throw new SignatureError(`DBus signature length exceeds maximum of 255 bytes: "${value}"`)
-        Signature.parseSignature(value) // Throws for anything that is not a valid signature
+        Signature.parse(value) // Throws for anything that is not a valid signature
         return this.writeSignatureBytes(value, length)
     }
 

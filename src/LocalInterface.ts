@@ -1,6 +1,6 @@
 import {DBusPropertyAccess} from './lib/enums/DBusPropertyAccess'
 import {DefineMethodArgumentOpts, DefineMethodOpts} from './types/DefineMethodOpts'
-import {DefinePropertyOpts, emitPropertiesChangedOpts} from './types/DefinePropertyOpts'
+import {DefinePropertyOpts, EmitPropertiesChangedOpts} from './types/DefinePropertyOpts'
 import {MethodCallContext} from './types/MethodCallContext'
 import {IntrospectAnnotation} from './types/IntrospectAnnotation'
 import {DefineSignalArgumentOpts, DefineSignalOpts} from './types/DefineSignalOpts'
@@ -23,7 +23,7 @@ import {DBus} from './DBus'
 import {LocalObject} from './LocalObject'
 import {IntrospectMethodArgument} from './types/IntrospectMethodArgument'
 import {DBusSignedValue} from './lib/DBusSignedValue'
-import {CreateDBusError} from './lib/CreateDBusError'
+import {createDBusError} from './lib/createDBusError'
 import {IntrospectSignalArgument} from './types/IntrospectSignalArgument'
 import {Signature} from './lib/Signature'
 import {DBusBufferEncoder} from './lib/DBusBufferEncoder'
@@ -126,11 +126,14 @@ export class LocalInterface {
         propertiesInterface.emitPropertiesChanged(this.#name, changedProperties, changedPropertyNames)
     }
 
+    #object: LocalObject | undefined
+
     /**
-     * The LocalObject instance associated with this interface, if any.
-     * Links the interface to a specific object within a DBus service for contextual operations.
+     * The LocalObject this interface was added to, if any.
      */
-    public object: LocalObject | undefined
+    public get object(): LocalObject | undefined {
+        return this.#object
+    }
 
     /**
      * Getter for the DBus instance associated with this interface's object.
@@ -342,6 +345,7 @@ export class LocalInterface {
     }
 
     /**
+     * @internal
      * Sets the LocalObject associated with this interface.
      * Links the interface to a specific object within a DBus service, providing context for operations
      * such as signal emission or property access on a specific object path.
@@ -350,7 +354,7 @@ export class LocalInterface {
      * @returns The instance of this LocalInterface for method chaining.
      */
     public setObject(localObject: LocalObject | undefined): this {
-        this.object = localObject
+        this.#object = localObject
         return this
     }
 
@@ -494,7 +498,7 @@ export class LocalInterface {
         opts.name = this.validateDBusPropertyName(opts.name)
         const getter: (() => any) | undefined = opts.getter
         const userSetter: ((value: any) => unknown) | undefined = opts.setter
-        const emitChanges: boolean | emitPropertiesChangedOpts | undefined = opts.emitPropertiesChanged
+        const emitChanges: boolean | EmitPropertiesChangedOpts | undefined = opts.emitPropertiesChanged
         // true or {emitValue: true} sends the new value; {emitValue: false} only invalidates the property
         const emitValue: boolean = typeof emitChanges === 'boolean' ? emitChanges : !!emitChanges?.emitValue
         // The setter is registered whether or not changes are announced, and is awaited so that errors (thrown or
@@ -594,35 +598,20 @@ export class LocalInterface {
      * to ensure compatibility with the defined method signature.
      *
      * @param name - The name of the method to call.
-     * @param payloadSignature - The signature of the input arguments provided (e.g., 'si' for string and integer).
-     * @param args - The arguments to pass to the method.
+     * @param payloadSignature - The signature of the arguments, checked against the method's input signature.
+     * @param args - The arguments.
+     * @param context - The call being answered, passed to methods defined with `withContext`; LocalService provides
+     *                  it, and it is undefined when the method is called directly.
      * @returns A Promise resolving to an object containing the method's output signature (if defined) and result.
      * @throws {DBusError} If the method is not found or if the input signature does not match the expected signature.
      */
-    public async callMethod(name: string, payloadSignature: string | undefined, ...args: any[]): Promise<{
+    public async callMethod(name: string, payloadSignature: string | undefined, args: any[] = [], context?: MethodCallContext): Promise<{
         signature?: string
         result: any
     }> {
-        return this.invokeMethod(name, payloadSignature, args)
-    }
-
-    /**
-     * Calls a defined method like callMethod, passing the call's context to methods defined with `withContext`.
-     *
-     * @param name - The name of the method to call.
-     * @param payloadSignature - The signature of the arguments, checked against the method's input signature.
-     * @param args - The arguments.
-     * @param context - The call being answered; undefined when the method is called directly.
-     * @returns The method's output signature and result.
-     * @throws {DBusError} If the method is not found or the argument signature does not match.
-     */
-    public async invokeMethod(name: string, payloadSignature: string | undefined, args: any[], context?: MethodCallContext): Promise<{
-        signature?: string
-        result: any
-    }> {
-        if (!this.#definedMethods[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownMethod', `Method ${name} not found`)
+        if (!this.#definedMethods[name]) throw createDBusError('org.freedesktop.DBus.Error.UnknownMethod', `Method ${name} not found`)
         const methodInfo = this.#definedMethods[name]
-        if (!Signature.areSignaturesCompatible(methodInfo.inputSignature, payloadSignature)) throw CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The input parameter signature '${payloadSignature}' does not match the expected method signature '${methodInfo.inputSignature}'.`)
+        if (!Signature.areCompatible(methodInfo.inputSignature, payloadSignature)) throw createDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The input parameter signature '${payloadSignature}' does not match the expected method signature '${methodInfo.inputSignature}'.`)
         const result: any = methodInfo.withContext ? await methodInfo.method(...args, context) : await methodInfo.method(...args)
         return {
             signature: methodInfo.outputSignature ? methodInfo.outputSignature : undefined,
@@ -642,17 +631,17 @@ export class LocalInterface {
      *                     or the property is read-only (no setter defined).
      */
     public async setProperty(name: string, value: any): Promise<void> {
-        if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
+        if (!this.#definedProperties[name]) throw createDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         try {
             // Encode and decode the value to ensure it matches the property's signature
             const encoder: DBusBufferEncoder = new DBusBufferEncoder()
             const decoder: DBusBufferDecoder = new DBusBufferDecoder(encoder.endianness, encoder.encode(this.#definedProperties[name].signature, value))
             ;[value] = decoder.decode(this.#definedProperties[name].signature, false)
         } catch (e) {
-            throw CreateDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The property signature '${this.#definedProperties[name].signature}' does not match its value.`)
+            throw createDBusError('org.freedesktop.DBus.Error.InvalidArgs', `The property signature '${this.#definedProperties[name].signature}' does not match its value.`)
         }
         const setter: ((value: any) => Promise<void>) | undefined = this.#definedProperties[name].setter
-        if (!setter) throw CreateDBusError('org.freedesktop.DBus.Error.PropertyReadOnly', `Property ${name} is read only`)
+        if (!setter) throw createDBusError('org.freedesktop.DBus.Error.PropertyReadOnly', `Property ${name} is read only`)
         await setter(value)
     }
 
@@ -665,9 +654,9 @@ export class LocalInterface {
      * @throws {DBusError} If the property is not found or is write-only (no getter defined).
      */
     public getProperty(name: string): any {
-        if (!this.#definedProperties[name]) throw CreateDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
+        if (!this.#definedProperties[name]) throw createDBusError('org.freedesktop.DBus.Error.UnknownProperty', `Property ${name} not found`)
         if (this.#definedProperties[name].getter) return this.#definedProperties[name].getter()
-        throw CreateDBusError('org.freedesktop.DBus.Error.PropertyWriteOnly', `Property ${name} is write only`)
+        throw createDBusError('org.freedesktop.DBus.Error.PropertyWriteOnly', `Property ${name} is write only`)
     }
 
     /**
@@ -693,7 +682,7 @@ export class LocalInterface {
      */
     public getManagedProperties(): Record<string, DBusSignedValue> {
         const record: Record<string, DBusSignedValue> = {}
-        for (const propertyName of this.propertyNames()) {
+        for (const propertyName of this.listPropertyNames()) {
             // Write-only properties have no value to report
             if (!this.#definedProperties[propertyName].getter) continue
             record[propertyName] = this.getPropertySignedValue(propertyName)
@@ -707,7 +696,7 @@ export class LocalInterface {
      *
      * @returns An array of method names as strings.
      */
-    public methodNames(): string[] {
+    public listMethodNames(): string[] {
         return Object.keys(this.#definedMethods)
     }
 
@@ -717,7 +706,7 @@ export class LocalInterface {
      *
      * @returns An array of property names as strings.
      */
-    public propertyNames(): string[] {
+    public listPropertyNames(): string[] {
         return Object.keys(this.#definedProperties)
     }
 
@@ -727,7 +716,7 @@ export class LocalInterface {
      *
      * @returns An array of signal names as strings.
      */
-    public signalNames(): string[] {
+    public listSignalNames(): string[] {
         return Object.keys(this.#definedSignals)
     }
 }

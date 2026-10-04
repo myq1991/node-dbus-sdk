@@ -8,6 +8,6 @@ export class DBusTypeClass extends DBusSignedValue {
     public $value: any | DBusTypeClass | DBusTypeClass[]
 
     public get value(): any {
-        return DBusSignedValue.toJSON([this])[0]
+        return DBusSignedValue.toPlain([this])[0]
     }
 }

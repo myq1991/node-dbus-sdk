@@ -126,7 +126,7 @@ describe('invalid input', (): void => {
     describe('signature parser rejects invalid signatures', (): void => {
         for (const [signature, label] of INVALID_SIGNATURES) {
             it(`'${signature}': ${label}`, (): void => {
-                assert.throws((): any => Signature.parseSignature(signature))
+                assert.throws((): any => Signature.parse(signature))
             })
         }
     })

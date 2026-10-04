@@ -5,7 +5,7 @@ import {LocalObjectPathExistsError, LocalServiceInvalidNameError} from './lib/Er
 import {IntrospectableInterface} from './lib/common/IntrospectableInterface'
 import {LocalInterface} from './LocalInterface'
 import {DBusSignedValue} from './lib/DBusSignedValue'
-import {CreateDBusError} from './lib/CreateDBusError'
+import {createDBusError} from './lib/createDBusError'
 import {RootObject} from './lib/common/RootObject'
 import {ObjectManagerInterface} from './lib/common/ObjectManagerInterface'
 import {RunServiceOpts} from './types/RunServiceOpts'
@@ -46,11 +46,14 @@ export class LocalService {
      */
     readonly #defaultIntrospectableInterface: IntrospectableInterface = new IntrospectableInterface()
 
+    #dbus: DBus
+
     /**
-     * The DBus instance associated with this service.
-     * Provides the connection to the DBus bus for communication and message handling.
+     * The DBus connection of the running service (set by run).
      */
-    public dbus: DBus
+    public get dbus(): DBus {
+        return this.#dbus
+    }
 
     /**
      * Getter for the ObjectManager interface associated with this service.
@@ -60,7 +63,7 @@ export class LocalService {
      * @returns The ObjectManagerInterface instance if found on the root object, otherwise undefined.
      */
     public get objectManager(): ObjectManagerInterface | undefined {
-        return this.findObjectByPath('/')?.findInterfaceByName('org.freedesktop.DBus.ObjectManager')
+        return this.getObject('/')?.getInterface('org.freedesktop.DBus.ObjectManager')
     }
 
     /**
@@ -102,15 +105,15 @@ export class LocalService {
         const targetInterface: string = message.header.interfaceName
         const targetMethod: string = message.header.member
         const payloadSignature: string = message.header.signature
-        const localObject: LocalObject | undefined = this.findObjectByPath(targetObjectPath)
+        const localObject: LocalObject | undefined = this.getObject(targetObjectPath)
         if (localObject) {
-            const localInterface: LocalInterface | undefined = localObject.findInterfaceByName(targetInterface)
+            const localInterface: LocalInterface | undefined = localObject.getInterface(targetInterface)
             if (localInterface) {
                 try {
                     const {
                         signature,
                         result
-                    } = await localInterface.invokeMethod(targetMethod, payloadSignature, message.body, {
+                    } = await localInterface.callMethod(targetMethod, payloadSignature, message.body, {
                         sender: message.header.sender,
                         objectPath: targetObjectPath,
                         interface: targetInterface,
@@ -151,7 +154,7 @@ export class LocalService {
         return this.dbus.reply({
             destination: message.header.sender,
             replySerial: message.header.serial,
-            data: CreateDBusError('org.freedesktop.DBus.Error.UnknownObject', `Object path ${message.header.path} not found`)
+            data: createDBusError('org.freedesktop.DBus.Error.UnknownObject', `Object path ${message.header.path} not found`)
         })
     }
 
@@ -248,7 +251,7 @@ export class LocalService {
     public async run(opts: RunServiceOpts): Promise<RequestNameResultCode> {
         const flags: RequestNameFlags = opts.flags !== undefined ? opts.flags : RequestNameFlags.DBUS_NAME_FLAG_DEFAULT
         this.#stopping = false
-        this.dbus = await DBus.connect(opts) // Connect to the DBus bus
+        this.#dbus = await DBus.connect(opts) // Connect to the DBus bus
         this.dbus.on('methodCall', this.#onMethodCall) // Register handler for incoming method calls
         return await this.dbus.requestName(this.#name, flags) // Request ownership of the service name with specified flags
     }
@@ -319,7 +322,7 @@ export class LocalService {
             this.dbus.reply({
                 destination: message.header.sender,
                 replySerial: message.header.serial,
-                data: CreateDBusError('org.freedesktop.DBus.Error.ServiceUnknown', `${this.#name} is stopping`)
+                data: createDBusError('org.freedesktop.DBus.Error.ServiceUnknown', `${this.#name} is stopping`)
             })
         } catch {
             // The connection is already closed
@@ -401,7 +404,7 @@ export class LocalService {
                 removeSuccess = this.#objectMap.delete(result[0])
             }
         }
-        const removedInterfaceNames: string[] | undefined = removedObject?.interfaceNames()
+        const removedInterfaceNames: string[] | undefined = removedObject?.listInterfaceNames()
         // If removal was successful, notify the object manager of the removed interfaces
         if (removedObject && removeSuccess) this.objectManager?.interfacesRemoved(removedObject, removedInterfaceNames ? removedInterfaceNames : [])
         return removeSuccess
@@ -414,10 +417,8 @@ export class LocalService {
      *
      * @returns A record mapping object paths to their LocalObject instances.
      */
-    public listObjects(): Record<string, LocalObject> {
-        const objects: Record<string, LocalObject> = {}
-        this.#objectMap.forEach((localObject: LocalObject, objectPath: string): LocalObject => objects[objectPath] = localObject)
-        return objects
+    public getObjects(): LocalObject[] {
+        return [...this.#objectMap.values()]
     }
 
     /**
@@ -428,7 +429,7 @@ export class LocalService {
      * @returns The LocalObject instance of the specified type if found, otherwise undefined.
      * @template T - The type of LocalObject to cast the result to (defaults to LocalObject).
      */
-    public findObjectByPath<T extends LocalObject = LocalObject>(objectPath: string): T | undefined {
+    public getObject<T extends LocalObject = LocalObject>(objectPath: string): T | undefined {
         return this.#objectMap.get(objectPath) as T
     }
 

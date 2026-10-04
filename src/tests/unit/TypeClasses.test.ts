@@ -7,11 +7,11 @@ import {DBusTypeClass} from '../../lib/DBusTypeClass'
 import {DBusByte} from '../../lib/datatypes/DBusByte'
 import {DBusBoolean} from '../../lib/datatypes/DBusBoolean'
 import {DBusInt16} from '../../lib/datatypes/DBusInt16'
-import {DBusUint16} from '../../lib/datatypes/DBusUint16'
+import {DBusUInt16} from '../../lib/datatypes/DBusUInt16'
 import {DBusInt32} from '../../lib/datatypes/DBusInt32'
-import {DBusUint32} from '../../lib/datatypes/DBusUint32'
+import {DBusUInt32} from '../../lib/datatypes/DBusUInt32'
 import {DBusInt64} from '../../lib/datatypes/DBusInt64'
-import {DBusUint64} from '../../lib/datatypes/DBusUint64'
+import {DBusUInt64} from '../../lib/datatypes/DBusUInt64'
 import {DBusDouble} from '../../lib/datatypes/DBusDouble'
 import {DBusUnixFD} from '../../lib/datatypes/DBusUnixFD'
 import {DBusString} from '../../lib/datatypes/DBusString'
@@ -51,11 +51,11 @@ const CASES: TypeClassCase[] = [
     {name: 'DBusByte', caseId: 'basic: y [byte 0xff]', create: (): DBusTypeClass => new DBusByte(255), decodedClass: DBusByte},
     {name: 'DBusBoolean', caseId: 'basic: b [true]', create: (): DBusTypeClass => new DBusBoolean(true), decodedClass: DBusBoolean},
     {name: 'DBusInt16', caseId: 'basic: n [int16 -32768]', create: (): DBusTypeClass => new DBusInt16(-32768), decodedClass: DBusInt16},
-    {name: 'DBusUint16', caseId: 'basic: q [uint16 65535]', create: (): DBusTypeClass => new DBusUint16(65535), decodedClass: DBusUint16},
+    {name: 'DBusUInt16', caseId: 'basic: q [uint16 65535]', create: (): DBusTypeClass => new DBusUInt16(65535), decodedClass: DBusUInt16},
     {name: 'DBusInt32', caseId: 'basic: i [-2147483648]', create: (): DBusTypeClass => new DBusInt32(-2147483648), decodedClass: DBusInt32},
-    {name: 'DBusUint32', caseId: 'basic: u [uint32 4294967295]', create: (): DBusTypeClass => new DBusUint32(4294967295), decodedClass: DBusUint32},
+    {name: 'DBusUInt32', caseId: 'basic: u [uint32 4294967295]', create: (): DBusTypeClass => new DBusUInt32(4294967295), decodedClass: DBusUInt32},
     {name: 'DBusInt64', caseId: 'basic: x [int64 -9223372036854775808]', create: (): DBusTypeClass => new DBusInt64(-(2n ** 63n)), decodedClass: DBusInt64},
-    {name: 'DBusUint64', caseId: 'basic: t [uint64 18446744073709551615]', create: (): DBusTypeClass => new DBusUint64(2n ** 64n - 1n), decodedClass: DBusUint64},
+    {name: 'DBusUInt64', caseId: 'basic: t [uint64 18446744073709551615]', create: (): DBusTypeClass => new DBusUInt64(2n ** 64n - 1n), decodedClass: DBusUInt64},
     {name: 'DBusDouble', caseId: 'basic: d [1.5]', create: (): DBusTypeClass => new DBusDouble(1.5), decodedClass: DBusDouble},
     {name: 'DBusUnixFD', caseId: 'basic: h [handle 3]', create: (): DBusTypeClass => new DBusUnixFD(3), decodedClass: DBusUnixFD},
     {name: 'DBusString', caseId: 'basic: s [\'hello world\']', create: (): DBusTypeClass => new DBusString('hello world'), decodedClass: DBusString},
@@ -86,8 +86,8 @@ const CASES: TypeClassCase[] = [
         name: 'DBusDictEntry',
         caseId: 'dict: a{su}',
         create: (): DBusTypeClass => new DBusArray([
-            new DBusDictEntry([new DBusString('first'), new DBusUint32(5)]),
-            new DBusDictEntry([new DBusString('second'), new DBusUint32(4294967295)])
+            new DBusDictEntry([new DBusString('first'), new DBusUInt32(5)]),
+            new DBusDictEntry([new DBusString('second'), new DBusUInt32(4294967295)])
         ]),
         decodedClass: DBusArray,
         children: (decoded: DBusTypeClass): [DBusTypeClass, TypeClassConstructor][] => decoded.$value.map((item: DBusTypeClass): [DBusTypeClass, TypeClassConstructor] => [item, DBusDictEntry])
@@ -95,9 +95,9 @@ const CASES: TypeClassCase[] = [
     {
         name: 'DBusVariant',
         caseId: 'variant: v [u]',
-        create: (): DBusTypeClass => new DBusVariant(new DBusUint32(5)),
+        create: (): DBusTypeClass => new DBusVariant(new DBusUInt32(5)),
         decodedClass: DBusVariant,
-        children: (decoded: DBusTypeClass): [DBusTypeClass, TypeClassConstructor][] => [[decoded.$value, DBusUint32]]
+        children: (decoded: DBusTypeClass): [DBusTypeClass, TypeClassConstructor][] => [[decoded.$value, DBusUInt32]]
     }
 ]
 
@@ -130,6 +130,6 @@ describe('DBusTypeClass subclasses', (): void => {
     })
 
     it('can be passed where a variant is expected', (): void => {
-        assert.equal(new DBusBufferEncoder().encode('v', new DBusUint32(5)).toString('hex'), matrixCase('variant: v [u]').le)
+        assert.equal(new DBusBufferEncoder().encode('v', new DBusUInt32(5)).toString('hex'), matrixCase('variant: v [u]').le)
     })
 })

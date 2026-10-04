@@ -30,11 +30,14 @@ export class LocalObject {
      */
     #interfaceMap: Map<string, LocalInterface> = new Map()
 
+    #service: LocalService | undefined
+
     /**
-     * The LocalService instance associated with this object, if any.
-     * Links the object to a specific service within a DBus connection for context.
+     * The LocalService this object was added to, if any.
      */
-    public service: LocalService | undefined
+    public get service(): LocalService | undefined {
+        return this.#service
+    }
 
     /**
      * Getter for the DBus instance associated with this object's service.
@@ -65,7 +68,7 @@ export class LocalObject {
      * @returns The PropertiesInterface instance for handling property-related operations.
      */
     public get propertiesInterface(): PropertiesInterface {
-        return this.findInterfaceByName<PropertiesInterface>('org.freedesktop.DBus.Properties')!
+        return this.getInterface<PropertiesInterface>('org.freedesktop.DBus.Properties')!
     }
 
     /**
@@ -76,7 +79,7 @@ export class LocalObject {
      * @returns The IntrospectableInterface instance for handling introspection operations.
      */
     public get introspectableInterface(): IntrospectableInterface {
-        return this.findInterfaceByName<IntrospectableInterface>('org.freedesktop.DBus.Introspectable')!
+        return this.getInterface<IntrospectableInterface>('org.freedesktop.DBus.Introspectable')!
     }
 
     /**
@@ -87,7 +90,7 @@ export class LocalObject {
      * @returns The PeerInterface instance for handling peer-related operations.
      */
     public get peerInterface(): PeerInterface {
-        return this.findInterfaceByName<PeerInterface>('org.freedesktop.DBus.Peer')!
+        return this.getInterface<PeerInterface>('org.freedesktop.DBus.Peer')!
     }
 
     /**
@@ -178,6 +181,7 @@ export class LocalObject {
     }
 
     /**
+     * @internal
      * Sets the LocalService associated with this object.
      * Links the object to a specific service within a DBus connection for context during operations.
      *
@@ -185,7 +189,7 @@ export class LocalObject {
      * @returns The instance of this LocalObject for method chaining.
      */
     public setService(service: LocalService | undefined): this {
-        this.service = service
+        this.#service = service
         return this
     }
 
@@ -293,10 +297,8 @@ export class LocalObject {
      *
      * @returns A record mapping interface names to their LocalInterface instances.
      */
-    public listInterfaces(): Record<string, LocalInterface> {
-        const interfaces: Record<string, LocalInterface> = {}
-        this.#interfaceMap.forEach((localInterface: LocalInterface, interfaceName: string): LocalInterface => interfaces[interfaceName] = localInterface)
-        return interfaces
+    public getInterfaces(): LocalInterface[] {
+        return [...this.#interfaceMap.values()]
     }
 
     /**
@@ -305,7 +307,7 @@ export class LocalObject {
      *
      * @returns An array of interface names as strings.
      */
-    public interfaceNames(): string[] {
+    public listInterfaceNames(): string[] {
         return [...this.#interfaceMap.keys()]
     }
 
@@ -317,7 +319,7 @@ export class LocalObject {
      * @returns The LocalInterface instance of the specified type if found, otherwise undefined.
      * @template T - The type of LocalInterface to cast the result to (defaults to LocalInterface).
      */
-    public findInterfaceByName<T extends LocalInterface = LocalInterface>(name: string): T | undefined {
+    public getInterface<T extends LocalInterface = LocalInterface>(name: string): T | undefined {
         return this.#interfaceMap.get(name) as T
     }
 
@@ -329,7 +331,7 @@ export class LocalObject {
      */
     public getManagedInterfaces(): Record<string, Record<string, DBusSignedValue>> {
         const record: Record<string, Record<string, DBusSignedValue>> = {}
-        for (const interfaceName of this.interfaceNames()) {
+        for (const interfaceName of this.listInterfaceNames()) {
             record[interfaceName] = this.#interfaceMap.get(interfaceName)!.getManagedProperties()
         }
         return record

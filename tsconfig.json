@@ -30,6 +30,7 @@
     "allowArbitraryExtensions": true,
     "isolatedModules": true,
     "declarationMap": true,
+    "stripInternal": true,
     "outDir": "build",
     "rootDir": "src",
   },

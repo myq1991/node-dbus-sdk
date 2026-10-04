@@ -7,7 +7,7 @@
  * @param message - A descriptive message explaining the cause of the error.
  * @returns An Error object with the specified name and message, representing a DBus error.
  */
-export function CreateDBusError(DBusErrorName: string, message: string): Error {
+export function createDBusError(DBusErrorName: string, message: string): Error {
     const error: Error = Error(message)
     error.name = DBusErrorName
     return error

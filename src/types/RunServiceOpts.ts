@@ -1,4 +1,4 @@
-import {ConnectOpts} from './ConnectOpts'
+import {CreateConnectOpts} from './CreateConnectOpts'
 import {RequestNameFlags} from '../lib/enums/RequestNameFlags'
 
 /**
@@ -6,7 +6,7 @@ import {RequestNameFlags} from '../lib/enums/RequestNameFlags'
  * Combines connection options for establishing a connection to a DBus bus with optional flags
  * to control the behavior of requesting the service name on the bus.
  */
-export type RunServiceOpts = ConnectOpts & {
+export type RunServiceOpts = CreateConnectOpts & {
     /**
      * Optional flags to customize the behavior of requesting the service name on the DBus bus.
      * These flags can control aspects such as whether to replace an existing service or queue

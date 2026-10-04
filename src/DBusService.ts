@@ -37,7 +37,7 @@ export class DBusService {
     /**
      * List all object paths
      */
-    public async listObjects(): Promise<string[]> {
+    public async listObjectPaths(): Promise<string[]> {
         if (!this.name) return []
         const emptyObjectPaths: string[] = []
         const getSubNodes: (objectPath?: string) => Promise<string[]> = async (objectPath: string = '/'): Promise<string[]> => {
@@ -74,7 +74,7 @@ export class DBusService {
      * Get all objects from dbus service
      */
     public async getObjects(): Promise<DBusObject[]> {
-        const objectPaths: string[] = await this.listObjects()
+        const objectPaths: string[] = await this.listObjectPaths()
         return Promise.all(objectPaths.map((objectPath: string): Promise<DBusObject> => this.getObject(objectPath)))
     }
 
