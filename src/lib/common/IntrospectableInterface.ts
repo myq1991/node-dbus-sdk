@@ -77,7 +77,9 @@ export class IntrospectableInterface extends LocalInterface {
         if (!objectPaths) return builder.buildObject({}) // Return empty XML if no object paths are available
 
         // Filter object paths that start with the given path to find relevant nodes
-        const roughlyMatchedObjectPaths: string[] = objectPaths.filter((objectPath: string): boolean => objectPath.startsWith(path))
+        // Children are the paths below this one: '/a/b' is below '/a', '/ab' is not
+        const childPrefix: string = path === '/' ? '/' : `${path}/`
+        const roughlyMatchedObjectPaths: string[] = objectPaths.filter((objectPath: string): boolean => objectPath === path || objectPath.startsWith(childPrefix))
         const matchedObjectPath: string | undefined = roughlyMatchedObjectPaths.find((roughlyMatchedObjectPath: string): boolean => roughlyMatchedObjectPath === path)
         const xmlObject: Record<string, any> = {}
 
@@ -148,7 +150,7 @@ export class IntrospectableInterface extends LocalInterface {
 
         // Extract sub-nodes (child object paths) under the current path for hierarchical representation
         const nodes = roughlyMatchedObjectPaths.map((roughlyMatchedObjectPath: string): string => {
-            const subNode: string | undefined = roughlyMatchedObjectPath.replace(path, '').split('/').find((objectNode: string): boolean => !!objectNode)
+            const subNode: string | undefined = roughlyMatchedObjectPath.substring(path.length).split('/').find((objectNode: string): boolean => !!objectNode)
             return subNode ? subNode : ''
         }).filter((subNode: string): boolean => !!subNode)
             .map(nodeName => ({$: {name: nodeName}})) // XML attribute for sub-node name

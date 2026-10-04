@@ -67,7 +67,7 @@ describe('ObjectManager', {skip: !PrivateBus.available && 'dbus-daemon not found
         assert.deepEqual(objects[`${BASE_PATH}/first`][ITEM_INTERFACE], {Value: 1})
     })
 
-    it('lists only objects below its own path', knownBug('GetManagedObjects also returns the object implementing the ObjectManager itself'), async (): Promise<void> => {
+    it('lists only objects below its own path', async (): Promise<void> => {
         const objects: Record<string, Record<string, Record<string, any>>> = await managedObjects()
         assert.ok(!('/' in objects), `unexpected entry for '/' with ${Object.keys(objects['/'] || {}).join(', ')}`)
     })

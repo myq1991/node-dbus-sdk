@@ -78,7 +78,7 @@ describe('introspection of an object tree', {skip: !PrivateBus.available && 'dbu
         })
     }
 
-    it('does not list a sibling sharing a name prefix as a child', knownBug('child nodes are found by string prefix, so /a/x... appears under /a when an object /ax exists'), async (): Promise<void> => {
+    it('does not list a sibling sharing a name prefix as a child', async (): Promise<void> => {
         assert.deepEqual((await introspect('/org/example/Tree/a')).children, ['b'])
     })
 
