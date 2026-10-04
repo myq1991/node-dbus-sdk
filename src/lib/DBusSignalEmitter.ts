@@ -111,10 +111,10 @@ export class DBusSignalEmitter extends EventEmitter {
     protected updateUniqueName(newUniqueName: string): void {
         if (this.uniqueName === '*') return
         this.#uniqueName = newUniqueName
-        for (const eventName of [...this.#rules.keys()]) {
-            this.unsubscribe(eventName)
-            this.subscribe(eventName)
-        }
+        for (const eventName of [...this.#rules.keys()]) this.unsubscribe(eventName)
+        // An empty name means the service left the bus: subscribe again once a new owner appears
+        if (!newUniqueName) return
+        for (const eventName of this.eventNames()) this.subscribe(eventName)
     }
 
     /**

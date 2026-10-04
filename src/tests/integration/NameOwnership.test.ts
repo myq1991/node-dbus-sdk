@@ -147,6 +147,27 @@ describe('bus name ownership', {skip: !PrivateBus.available && 'dbus-daemon not 
             assert.equal(await observer.nameHasOwner(name), false)
         })
 
+        it('receives signals again when a service that went offline comes back', async (): Promise<void> => {
+            const name: string = uniqueBusName()
+            const first: TestService = createTestService(name)
+            await withTimeout(first.service.run({busAddress: bus.address}), 3000, 'run first')
+            const remote: DBusService = await observer.getService(name)
+            const iface: DBusInterface = await (await remote.getObject(TEST_OBJECT_PATH)).getInterface(TEST_INTERFACE)
+            iface.signal.on('Tick', (): void => undefined)
+            const offline: Promise<any[]> = eventFor(observer, 'offline', name)
+            await withTimeout(first.service.stop(), 3000, 'stop first')
+            await offline
+            const online: Promise<any[]> = eventFor(observer, 'online', name)
+            const second: TestService = service(name)
+            await withTimeout(second.service.run({busAddress: bus.address}), 3000, 'run second')
+            await online
+            assert.equal(remote.uniqueName, second.service.dbus.uniqueName)
+            const tick: Promise<any[]> = nextEvent(iface.signal, 'Tick')
+            await observer.listNames()
+            second.signals.emit('Tick', 12)
+            assert.deepEqual(await tick, [12])
+        })
+
         it('keeps a client DBusService and its signals working when a queued service takes over the name', async (): Promise<void> => {
             const name: string = uniqueBusName()
             const original: TestService = createTestService(name)

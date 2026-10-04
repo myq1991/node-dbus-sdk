@@ -466,7 +466,12 @@ export class DBus extends EventEmitter {
         }
         const rule: string = this.formatMatchSignalRule(uniqueName, objectPath, interfaceName, signalName)
         this.#signalRulesMap.set(rules, rule)
-        this.addMatch(rule)
+        try {
+            this.addMatch(rule)
+        } catch {
+            // Disconnected: no signal can arrive any more. This also runs from bus events (e.g. a service changing
+            // owner) while the connection closes, where throwing would be an uncaught exception
+        }
         return rule
     }
 
