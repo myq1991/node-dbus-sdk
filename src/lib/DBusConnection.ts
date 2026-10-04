@@ -131,25 +131,30 @@ export class DBusConnection extends EventEmitter {
         const readLine: () => Promise<Buffer> = (): Promise<Buffer> => {
             return new Promise((resolve, reject): void => {
                 const bytes: number[] = []
+                const settle = (callback: () => void): void => {
+                    stream.removeListener('readable', readable)
+                    stream.removeListener('error', failed)
+                    stream.removeListener('end', ended)
+                    stream.removeListener('close', ended)
+                    callback()
+                }
+                // Without these, a connection reset during authentication would crash the process, and a connection
+                // closed by the bus would leave the handshake waiting forever
+                const failed = (error: Error): void => settle((): void => reject(error))
+                const ended = (): void => settle((): void => reject(new AuthError('The bus closed the connection during authentication')))
                 const readable: () => void = (): void => {
                     while (1) {
                         const buf: Buffer = stream.read(1)
                         if (!buf) return
                         const b: number = buf[0]
-                        if (b === 0x0a) { // Line feed character indicates end of response line
-                            try {
-                                resolve(Buffer.from(bytes))
-                            } catch (error) {
-                                reject(error)
-                            } finally {
-                                stream.removeListener('readable', readable)
-                            }
-                            return
-                        }
+                        if (b === 0x0a) return settle((): void => resolve(Buffer.from(bytes))) // Line feed ends the response line
                         bytes.push(b)
                     }
                 }
                 stream.on('readable', readable)
+                stream.once('error', failed)
+                stream.once('end', ended)
+                stream.once('close', ended)
             })
         }
         const successAndBegin: () => Promise<string> = async (): Promise<string> => {
@@ -337,7 +342,17 @@ export class DBusConnection extends EventEmitter {
     public static async createConnection(opts?: CreateConnectOpts): Promise<DBusConnection> {
         opts = opts ? opts : {}
         const stream: Duplex = await this.createStream(opts)
-        const [authMethod, uid, guid] = await this.handshake(stream, opts)
+        let handshake: [string, string, string]
+        try {
+            handshake = await this.handshake(stream, opts)
+        } catch (error) {
+            // Nobody will use this stream: close it, so that a late error (e.g. the bus resetting the connection) is
+            // not left without a listener, which would crash the process
+            stream.on('error', (): void => undefined)
+            stream.destroy()
+            throw error
+        }
+        const [authMethod, uid, guid] = handshake
         return new DBusConnection(stream, authMethod, uid, guid, !!opts.advancedResponse, !!opts.convertBigIntToNumber)
     }
 

@@ -128,4 +128,41 @@ describe('authentication internals', (): void => {
             }
         })
     })
+
+    describe('a connection lost during authentication', (): void => {
+        /**
+         * A bus that answers the first AUTH line by running the given action instead of replying.
+         */
+        function busThat(onAuth: (bus: Duplex) => void): Duplex {
+            const bus: Duplex = new Duplex({
+                read(): void {
+                    // Nothing to send until AUTH arrives
+                },
+                write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
+                    callback()
+                    if (chunk.toString('ascii').includes('AUTH ')) setImmediate((): void => onAuth(bus))
+                }
+            })
+            return bus
+        }
+
+        it('rejects with AuthError when the bus closes the connection, instead of waiting forever', async (): Promise<void> => {
+            const bus: Duplex = busThat((stream: Duplex): void => void stream.push(null))
+            await assert.rejects(withTimeout(DBusConnection.createConnection({stream: bus, authMethods: ['EXTERNAL']}), 2000, 'connect'), (error: unknown): boolean => error instanceof AuthError && /closed the connection/.test(error.message))
+            assert.equal(bus.destroyed, true)
+        })
+
+        it('rejects with the error when the connection fails, instead of crashing the process', async (): Promise<void> => {
+            const bus: Duplex = busThat((stream: Duplex): void => void stream.destroy(Object.assign(new Error('read ECONNRESET'), {code: 'ECONNRESET'})))
+            await assert.rejects(withTimeout(DBusConnection.createConnection({stream: bus, authMethods: ['EXTERNAL']}), 2000, 'connect'), {code: 'ECONNRESET'})
+        })
+
+        it('closes the stream after a failed handshake, so a later error cannot go unhandled', async (): Promise<void> => {
+            const bus: Duplex = busThat((): void => undefined)
+            await assert.rejects(DBusConnection.createConnection({stream: bus, authMethods: ['KERBEROS_V4']}), AuthError)
+            assert.equal(bus.destroyed, true)
+            // What a bus resetting the connection afterwards looks like; without a listener this would throw
+            assert.doesNotThrow((): boolean => bus.emit('error', new Error('read ECONNRESET')))
+        })
+    })
 })

@@ -63,8 +63,6 @@ describe('authentication', {skip: !PrivateBus.available && 'dbus-daemon not foun
             await bus.stop()
         })
 
-        // DBus.connect() is typed as taking ConnectOpts, which lacks the handshake options it actually honours,
-        // so object literals with authMethods do not compile and the options go through a CreateConnectOpts variable
         it('rejects with AuthError when no offered mechanism is accepted', async (): Promise<void> => {
             const opts: CreateConnectOpts = {busAddress: bus.unixAddress, authMethods: ['ANONYMOUS']}
             await assert.rejects(withTimeout(DBus.connect(opts), 3000, 'connect'), AuthError)
