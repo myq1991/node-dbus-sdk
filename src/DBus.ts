@@ -1241,14 +1241,30 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Retrieves all services as DBusService instances.
-     * Converts the list of service information into instantiated DBusService objects for interaction.
+     * Retrieves the running services as DBusService instances.
+     * Activatable services that are not running are left out rather than started; use getService(name) to start one.
      *
-     * @returns A Promise resolving to an array of DBusService instances representing all available services.
+     * @returns A Promise resolving to an array of DBusService instances for the services currently on the bus.
      */
     public async getServices(): Promise<DBusService[]> {
         const serviceBasicInfos: ServiceBasicInfo[] = await this.listServices()
-        return Promise.all(serviceBasicInfos.map((serviceBasicInfo: ServiceBasicInfo): Promise<DBusService> => this.getService(serviceBasicInfo.name)))
+        // Only running services: getService() would start every activatable one just for being listed
+        return serviceBasicInfos
+            .filter((serviceBasicInfo: ServiceBasicInfo): boolean => serviceBasicInfo.active && !!serviceBasicInfo.uniqueName)
+            .map((serviceBasicInfo: ServiceBasicInfo): DBusService => this.trackService(serviceBasicInfo.name, serviceBasicInfo.uniqueName!))
+    }
+
+    /**
+     * Creates a DBusService and keeps its unique name up to date when the name changes owner.
+     *
+     * @param service - The well-known name.
+     * @param uniqueName - Its current owner.
+     * @returns The service.
+     */
+    protected trackService(service: string, uniqueName: string): DBusService {
+        const dbusService: DBusService = new DBusService({dbus: this, service: service, uniqueName: uniqueName})
+        this.#weakServiceSet.add(new WeakRef(dbusService))
+        return dbusService
     }
 
     /**
@@ -1268,9 +1284,7 @@ export class DBus extends EventEmitter {
         if (activatableNames.includes(service) && !activeNames.includes(service)) await this.startServiceByName(service)
         const uniqueName: string | undefined = await this.getNameOwner(service)
         if (!uniqueName) throw new ServiceNotFoundError(`Service ${service} has not connection`)
-        const dbusService: DBusService = new DBusService({dbus: this, service: service, uniqueName: uniqueName})
-        this.#weakServiceSet.add(new WeakRef(dbusService))
-        return dbusService
+        return this.trackService(service, uniqueName)
     }
 
     /**

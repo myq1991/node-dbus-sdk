@@ -136,7 +136,7 @@ describe('bus queries and service activation', {skip: !PrivateBus.available && '
         })
 
         // Runs last: it would start every activatable service
-        it('does not start activatable services when enumerating them with getServices', knownBug('getServices() calls getService() for every listed name, which starts every activatable service'), async (): Promise<void> => {
+        it('does not start activatable services when enumerating them with getServices', async (): Promise<void> => {
             await withTimeout(client.getServices(), 10000, 'getServices')
             assert.equal(await withTimeout(client.nameHasOwner(LISTED_ONLY), 2000, 'NameHasOwner'), false)
         })
