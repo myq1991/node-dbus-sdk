@@ -224,7 +224,7 @@ describe('DBus message dispatch', (): void => {
             assert.deepEqual(reply.body, ['ok'])
         })
 
-        it('sends error replies', knownBug('the error message is dropped when no signature is given, e.g. LocalService UnknownObject replies'), async (): Promise<void> => {
+        it('sends error replies', async (): Promise<void> => {
             const error: Error = new Error('bad input')
             error.name = 'org.example.Error.Invalid'
             dbus.reply({destination: ':1.3', replySerial: 6, data: error})

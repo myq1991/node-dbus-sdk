@@ -294,7 +294,8 @@ export class DBus extends EventEmitter {
                 sender: this.#uniqueName,
                 destination: opts.destination,
                 errorName: opts.data.name,
-                signature: opts.signature ? opts.signature : undefined
+                // The body of an error reply is its message, so it is always a string
+                signature: 's'
             }, opts.data.message))
         } else {
             this.write(DBusMessage.encode({

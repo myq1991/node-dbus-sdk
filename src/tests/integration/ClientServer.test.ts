@@ -119,7 +119,7 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
             await assert.rejects(withTimeout(client.invoke({service: SERVICE_NAME, objectPath: '/missing', interface: TEST_INTERFACE, method: 'Add'}), 2000, 'unknown object'), {name: 'org.freedesktop.DBus.Error.UnknownObject'})
         })
 
-        it('explains which object is unknown', knownBug('the error message is dropped when no signature is given, e.g. LocalService UnknownObject replies'), async (): Promise<void> => {
+        it('explains which object is unknown', async (): Promise<void> => {
             await assert.rejects(withTimeout(client.invoke({service: SERVICE_NAME, objectPath: '/missing', interface: TEST_INTERFACE, method: 'Add'}), 2000, 'unknown object'), {message: /\/missing/})
         })
     })
