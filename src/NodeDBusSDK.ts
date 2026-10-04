@@ -474,6 +474,11 @@ export type {ServiceBasicInfo} from './types/ServiceBasicInfo'
 export type {SetPropertyValueOpts} from './types/SetPropertyValueOpts'
 
 /**
+ * Exports the StopServiceOpts type for stopping a LocalService, immediately or gracefully.
+ */
+export type {StopServiceOpts} from './types/StopServiceOpts'
+
+/**
  * Exports the SocketConnectOpts type for Unix socket connection options.
  * Defines options for connecting to DBus via a Unix socket path or abstract socket.
  */

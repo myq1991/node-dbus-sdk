@@ -9,6 +9,8 @@ import {CreateDBusError} from './lib/CreateDBusError'
 import {RootObject} from './lib/common/RootObject'
 import {ObjectManagerInterface} from './lib/common/ObjectManagerInterface'
 import {RunServiceOpts} from './types/RunServiceOpts'
+import {StopServiceOpts} from './types/StopServiceOpts'
+import {DBusMessageFlags} from './lib/enums/DBusMessageFlags'
 import {RequestNameFlags} from './lib/enums/RequestNameFlags'
 import {RequestNameResultCode} from './lib/enums/RequestNameResultCode'
 
@@ -245,22 +247,83 @@ export class LocalService {
      */
     public async run(opts: RunServiceOpts): Promise<RequestNameResultCode> {
         const flags: RequestNameFlags = opts.flags !== undefined ? opts.flags : RequestNameFlags.DBUS_NAME_FLAG_DEFAULT
+        this.#stopping = false
         this.dbus = await DBus.connect(opts) // Connect to the DBus bus
-        this.dbus.on('methodCall', this.#methodCallHandler) // Register handler for incoming method calls
+        this.dbus.on('methodCall', this.#onMethodCall) // Register handler for incoming method calls
         return await this.dbus.requestName(this.#name, flags) // Request ownership of the service name with specified flags
     }
 
     /**
      * Stops the service and disconnects from the DBus bus.
-     * Releases ownership of the service name to allow other services to claim it, removes the method
-     * call handler to stop processing requests, and closes the connection to the bus to clean up resources.
+     * By default the name is released and the connection closed immediately; calls still being handled cannot be
+     * answered any more. With `graceful`, new method calls are first answered with
+     * org.freedesktop.DBus.Error.ServiceUnknown while the calls being handled finish (for at most `timeout`
+     * milliseconds, if given), and only then is the name released and the connection closed.
      *
+     * @param opts - Whether to stop gracefully, and how long to wait for calls being handled.
      * @returns A Promise that resolves when the service is stopped and disconnected from the bus.
      */
-    public async stop(): Promise<void> {
+    public async stop(opts: StopServiceOpts = {}): Promise<void> {
+        if (opts.graceful) {
+            // Phase one: refuse new calls and let the ones being handled finish (within the timeout, if any)
+            this.#stopping = true
+            const finished: Promise<unknown> = Promise.allSettled([...this.#callsInProgress])
+            if (opts.timeout === undefined) {
+                await finished
+            } else {
+                let timer: NodeJS.Timeout | undefined
+                await Promise.race([finished, new Promise<void>((resolve): void => {
+                    timer = setTimeout(resolve, opts.timeout)
+                })])
+                clearTimeout(timer)
+            }
+        }
+        // Phase two (or all of an immediate stop): give up the name and the connection
         await this.dbus.releaseName(this.#name) // Release ownership of the service name
-        this.dbus.off('methodCall', this.#methodCallHandler) // Remove the method call handler
+        this.dbus.off('methodCall', this.#onMethodCall) // Remove the method call handler
         await this.dbus.disconnect() // Disconnect from the bus
+    }
+
+    /**
+     * Whether a graceful stop is in progress, during which new method calls are refused.
+     */
+    #stopping: boolean = false
+
+    /**
+     * Method calls being handled, which a graceful stop waits for.
+     */
+    readonly #callsInProgress: Set<Promise<void>> = new Set()
+
+    /**
+     * Receives every method call: refuses it while stopping, otherwise handles it and tracks it until it is answered.
+     * Errors left over after answering (e.g. the connection closed before the reply could be sent) are dropped
+     * here, as nothing can be done about them and they must not become unhandled rejections.
+     *
+     * @param message - The method call.
+     */
+    #onMethodCall: (message: DBusMessage) => void = (message: DBusMessage): void => {
+        if (this.#stopping) return this.#refuse(message)
+        const call: Promise<void> = this.#methodCallHandler(message).catch((): void => undefined)
+        this.#callsInProgress.add(call)
+        call.finally((): boolean => this.#callsInProgress.delete(call))
+    }
+
+    /**
+     * Answers a method call that arrives during a graceful stop.
+     *
+     * @param message - The method call.
+     */
+    #refuse(message: DBusMessage): void {
+        if (message.header.flags & DBusMessageFlags.NO_REPLY_EXPECTED) return
+        try {
+            this.dbus.reply({
+                destination: message.header.sender,
+                replySerial: message.header.serial,
+                data: CreateDBusError('org.freedesktop.DBus.Error.ServiceUnknown', `${this.#name} is stopping`)
+            })
+        } catch {
+            // The connection is already closed
+        }
     }
 
     /**

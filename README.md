@@ -63,7 +63,8 @@ Whether you're building a client to interact with existing DBus services or expo
 ### 6. **Local Service Implementation**
 
 - **Custom Services**: Enables the creation of local DBus services with `LocalService`, allowing developers to define
-  and expose their own DBus objects and interfaces.
+  and expose their own DBus objects and interfaces. `stop({graceful: true, timeout})` lets calls in progress finish
+  before the service gives up its name.
 - **Interface Definition**: Provides `LocalInterface` for defining custom methods, properties, and signals with strict
   validation of DBus naming conventions, including introspection annotations (e.g. `org.freedesktop.DBus.Deprecated`)
   on interfaces, methods, arguments, properties and signals.

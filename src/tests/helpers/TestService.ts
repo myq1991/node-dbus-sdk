@@ -17,7 +17,7 @@ export interface TestService {
      * Emitting `Tick` on this emitter broadcasts the Tick signal.
      */
     signals: EventEmitter
-    state: { label: string, plain: string, checked: string }
+    state: { label: string, plain: string, checked: string, sleeping: number }
 }
 
 /**
@@ -27,7 +27,7 @@ export interface TestService {
  * @returns The (not yet running) service and handles to its state.
  */
 export function createTestService(name: string): TestService {
-    const state: { label: string, plain: string, checked: string } = {label: 'initial', plain: 'initial', checked: 'initial'}
+    const state: { label: string, plain: string, checked: string, sleeping: number } = {label: 'initial', plain: 'initial', checked: 'initial', sleeping: 0}
     const signals: EventEmitter = new EventEmitter()
     const iface: LocalInterface = new LocalInterface(TEST_INTERFACE)
         .defineMethod({
@@ -82,6 +82,20 @@ export function createTestService(name: string): TestService {
             outputArgs: [{name: 'label', type: 's'}, {name: 'sender', type: 's'}, {name: 'path', type: 'o'}, {name: 'method', type: 's'}],
             withContext: true,
             method: (label: string, context: MethodCallContext): [string, string, string, string] => [label, context.sender, context.objectPath, context.method]
+        })
+        .defineMethod({
+            name: 'Sleep',
+            inputArgs: [{name: 'milliseconds', type: 'u'}],
+            outputArgs: [{name: 'milliseconds', type: 'u'}],
+            method: async (milliseconds: number): Promise<number> => {
+                state.sleeping++
+                try {
+                    await new Promise<void>((resolve): NodeJS.Timeout => setTimeout(resolve, milliseconds))
+                    return milliseconds
+                } finally {
+                    state.sleeping--
+                }
+            }
         })
         .defineMethod({
             name: 'Fail',

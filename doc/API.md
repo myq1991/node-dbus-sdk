@@ -162,7 +162,19 @@ service.
 
 - **`async run(opts: ConnectOpts): Promise<void>`**: Connects to a DBus bus using the provided options and starts the
   service, listening for incoming method calls.
-- **`async stop(): Promise<void>`**: Stops the service by releasing the name and disconnecting from the DBus bus.
+- **`async stop(opts?: StopServiceOpts): Promise<void>`**: Stops the service by releasing the name and disconnecting
+  from the DBus bus. By default this happens immediately, and calls still being handled cannot be answered. With
+  `{graceful: true}` the service stops in two phases:
+  1. New method calls are answered with `org.freedesktop.DBus.Error.ServiceUnknown`, and the calls already being
+     handled finish.
+  2. The name is released and the connection is closed.
+
+  `timeout` (milliseconds) limits how long the first phase waits. Without it, `stop` waits for every call. Set it if a
+  handler may take long:
+
+  ```typescript
+  await service.stop({graceful: true, timeout: 5000})
+  ```
 - **`addObject(localObject: LocalObject): boolean`**: Adds a `LocalObject` to the service, associating it with the
   service's context and notifying the object manager if available.
 - **`removeObject(inp: LocalObject | string): boolean`**: Removes a `LocalObject` by instance or object path, notifying

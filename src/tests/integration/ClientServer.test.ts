@@ -57,7 +57,7 @@ describe('client and LocalService over dbus-daemon', {skip: !PrivateBus.availabl
         })
 
         it('lists methods from introspection', (): void => {
-            assert.deepEqual(iface.listMethods().map((method): string => method.name).sort(), ['Add', 'Caller', 'DivMod', 'EchoBytes', 'EchoDict', 'EchoInt64Array', 'EchoVariant', 'Fail', 'TypedUint32', 'TypedVariant'])
+            assert.deepEqual(iface.listMethods().map((method): string => method.name).sort(), ['Add', 'Caller', 'DivMod', 'EchoBytes', 'EchoDict', 'EchoInt64Array', 'EchoVariant', 'Fail', 'Sleep', 'TypedUint32', 'TypedVariant'])
         })
     })
 
