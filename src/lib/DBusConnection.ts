@@ -60,7 +60,7 @@ export class DBusConnection extends EventEmitter {
      * @returns The path to the user's home directory as a string.
      */
     protected static getUserHome(): string {
-        return process.env[process.platform.match(/\$win/) ? 'USERPROFILE' : 'HOME'] as string
+        return process.env[process.platform.startsWith('win') ? 'USERPROFILE' : 'HOME'] as string
     }
 
     /**
@@ -284,29 +284,46 @@ export class DBusConnection extends EventEmitter {
         }
         const busAddress: string | undefined = opts.busAddress || process.env.DBUS_SESSION_BUS_ADDRESS
         if (!busAddress) throw new UnknownBusAddressError('Unknown bus address')
-        const addresses: string[] = busAddress.split(';')
-        const connectErrorHandler: (e: Error, isLastAddress: boolean) => void = (e: Error, isLastAddress: boolean): void => {
-            if (isLastAddress) throw e
-            console.warn(e.message)
-        }
-        for (let i: number = 0; i < addresses.length; i++) {
-            const isLastAddress: boolean = i < (addresses.length - 1)
-            const address: string = addresses[i]
-            const familyParams: string[] = address.split(':')
-            const family: string = familyParams[0].toLowerCase()
-            const params: Record<string, string> = {}
-            familyParams[1].split(',').map((param: string): string[] => param.split('=')).forEach(([key, value]): string => params[key] = value)
-            switch (family) {
-                case 'tcp':
-                    return this.createTCPStream(opts.timeout ? opts.timeout : this.defaultConnectTimeout, params.port, params.host)
-                case 'unix':
-                    if (!params.socket && !params.path) connectErrorHandler(new NotEnoughParamsError('Not enough parameters for \'unix\' connection - you need to specify \'socket\' or \'path\' parameter'), isLastAddress)
-                    return this.createUnixStream(opts.timeout ? opts.timeout : this.defaultConnectTimeout, params.socket || params.path)
-                default:
-                    connectErrorHandler(new UnknownBusTypeError(`Unknown address type: ${family}`), isLastAddress)
+        const timeout: number = opts.timeout ? opts.timeout : this.defaultConnectTimeout
+        // A bus address may list several addresses separated by ';', to be tried in order until one connects
+        let lastError: Error = new CreateStreamFailedError('Create stream failed')
+        for (const address of busAddress.split(';').filter((address: string): boolean => !!address.trim())) {
+            try {
+                return await this.createAddressStream(address, timeout)
+            } catch (error: any) {
+                lastError = error
             }
         }
-        throw new CreateStreamFailedError('Create stream failed')
+        throw lastError
+    }
+
+    /**
+     * Connects to one address of a bus address list, e.g. 'unix:path=/run/dbus/system_bus_socket' or
+     * 'tcp:host=127.0.0.1,port=12345'.
+     *
+     * @param address - A single DBus address.
+     * @param timeout - Connect timeout in milliseconds.
+     * @returns The connected stream.
+     */
+    protected static async createAddressStream(address: string, timeout: number): Promise<Duplex> {
+        const separator: number = address.indexOf(':')
+        const family: string = (separator >= 0 ? address.substring(0, separator) : address).toLowerCase()
+        const params: Record<string, string> = {}
+        if (separator >= 0) {
+            address.substring(separator + 1).split(',').filter(Boolean).forEach((param: string): void => {
+                const assignment: number = param.indexOf('=')
+                if (assignment > 0) params[param.substring(0, assignment)] = decodeURIComponent(param.substring(assignment + 1))
+            })
+        }
+        switch (family) {
+            case 'tcp':
+                return this.createTCPStream(timeout, params.port, params.host)
+            case 'unix':
+                if (!params.socket && !params.path) throw new NotEnoughParamsError('Not enough parameters for \'unix\' connection - you need to specify \'socket\' or \'path\' parameter')
+                return this.createUnixStream(timeout, params.socket || params.path)
+            default:
+                throw new UnknownBusTypeError(`Unknown address type: ${family}`)
+        }
     }
 
     /**

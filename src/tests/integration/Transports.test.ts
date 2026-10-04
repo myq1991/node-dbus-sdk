@@ -103,7 +103,7 @@ describe('transports', {skip: !PrivateBus.available && 'dbus-daemon not found', 
     })
 
     describe('address lists and failures', (): void => {
-        it('falls back to the next address when the first one fails', knownBug('only the first address of a bus address list is tried'), async (): Promise<void> => {
+        it('falls back to the next address when the first one fails', async (): Promise<void> => {
             await assertConnects((): ConnectOpts => ({busAddress: `unix:path=${bus.socketPath}.missing;${bus.unixAddress}`}))
         })
 

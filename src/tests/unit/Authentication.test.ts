@@ -111,7 +111,7 @@ describe('authentication internals', (): void => {
     })
 
     describe('home directory', (): void => {
-        it('uses USERPROFILE on Windows', knownBug('the platform check matches the literal "$win", so Windows never uses USERPROFILE'), (): void => {
+        it('uses USERPROFILE on Windows', (): void => {
             const platform: PropertyDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!
             const originalProfile: string | undefined = process.env.USERPROFILE
             Object.defineProperty(process, 'platform', {value: 'win32'})
