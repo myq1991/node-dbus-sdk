@@ -248,7 +248,7 @@ export class LocalService {
      * @param opts - Connection options for the DBus bus (e.g., socket path, TCP details) and optional flags for name request behavior.
      * @returns A Promise that resolves to a RequestNameResultCode indicating the result of the service name request.
      */
-    public async run(opts: RunServiceOpts): Promise<RequestNameResultCode> {
+    public async run(opts: RunServiceOpts = {}): Promise<RequestNameResultCode> {
         const flags: RequestNameFlags = opts.flags !== undefined ? opts.flags : RequestNameFlags.DBUS_NAME_FLAG_DEFAULT
         this.#stopping = false
         this.#dbus = await DBus.connect(opts) // Connect to the DBus bus

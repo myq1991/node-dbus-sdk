@@ -112,6 +112,67 @@ export class DBusSignedValue {
 
     /**
      * @internal
+     * The complete signature of a value, e.g. 'a{sv}' where $signature only holds the type code 'a': known directly
+     * for basic types and recorded empty arrays, otherwise rebuilt from the content.
+     *
+     * @param signedValue - The DBusSignedValue instance to build the signature for.
+     * @returns The complete signature string.
+     * @throws {SignatureError} If the signature cannot be built due to unsupported types or inconsistent structures.
+     */
+    public static completeSignature(signedValue: DBusSignedValue): string {
+        const dataType: DataType | undefined = DBusSignedValue.dataTypeOf(signedValue)
+        if (dataType && Signature.isComplete(dataType)) return Signature.stringify(dataType)
+        // Basic types return their signature directly
+        if (!'a({v'.includes(signedValue.$signature)) {
+            return signedValue.$signature
+        }
+        // Handle container types recursively
+        switch (signedValue.$signature) {
+            case 'a': {
+                const values: DBusSignedValue[] = signedValue.$value as DBusSignedValue[]
+                if (values.length === 0) {
+                    // Only a basic element type can be known from the array itself
+                    const itemSignature: string | undefined = signedValue.$arrayItemSignature
+                    if (itemSignature && !'a({'.includes(itemSignature)) return `a${itemSignature}`
+                    throw new SignatureError('Cannot build signature for empty array in variant')
+                }
+                // Get the signature of the first element
+                const firstElementSignature: string = DBusSignedValue.completeSignature(values[0])
+                // Check if all elements have the same signature
+                const isConsistent: boolean = values.every((val: DBusSignedValue): boolean => DBusSignedValue.completeSignature(val) === firstElementSignature)
+                if (isConsistent) return `a${firstElementSignature}`
+                // If inconsistent, check if it matches a dictionary structure like 'a{sv}'
+                const isDictArray: boolean = values.every((val: DBusSignedValue): boolean => val.$signature === '{')
+                if (isDictArray) {
+                    const firstDictEntry: DBusSignedValue[] = values[0].$value as DBusSignedValue[]
+                    if (firstDictEntry.length === 2) {
+                        const firstKeySignature: string = DBusSignedValue.completeSignature(firstDictEntry[0])
+                        const firstValueSignature: string = DBusSignedValue.completeSignature(firstDictEntry[1])
+                        const areKeysConsistent: boolean = values.every((val: DBusSignedValue): boolean => DBusSignedValue.completeSignature((val.$value as DBusSignedValue[])[0]) === firstKeySignature)
+                        const areValuesConsistent: boolean = values.every((val: DBusSignedValue): boolean => DBusSignedValue.completeSignature((val.$value as DBusSignedValue[])[1]) === firstValueSignature)
+                        return `a{${areKeysConsistent ? firstKeySignature : 'v'}${areValuesConsistent ? firstValueSignature : 'v'}}`
+                    }
+                }
+                throw new SignatureError('Cannot build signature for array with inconsistent element types in variant')
+            }
+            case '(': {
+                // Struct: signature is '(' followed by field signatures and ')'
+                const fieldSignedValues: DBusSignedValue[] = signedValue.$value as DBusSignedValue[]
+                return `(${fieldSignedValues.map((field: DBusSignedValue): string => DBusSignedValue.completeSignature(field)).join('')})`
+            }
+            case '{': {
+                // Dictionary entry: signature is '{' followed by key and value signatures and '}'
+                const [keySignedValue, valueSignedValue] = signedValue.$value as DBusSignedValue[]
+                return `{${DBusSignedValue.completeSignature(keySignedValue)}${DBusSignedValue.completeSignature(valueSignedValue)}}`
+            }
+            default:
+                // Variant: signature is 'v' directly, not the internal value's signature
+                return 'v'
+        }
+    }
+
+    /**
+     * @internal
      * Records the complete type of a value, e.g. when converting a decoded value into a DBusTypeClass instance.
      *
      * @param value - The value.
@@ -256,7 +317,7 @@ export class DBusSignedValue {
                     this.$value = value
                 } else {
                     // Otherwise, infer signature from value type
-                    const inferredType: string = this.inferType(value)
+                    const inferredType: string = DBusSignedValue.inferSignature(value)
                     const inferredDataType: DataType = Signature.parse(inferredType)[0]
                     this.$value = new DBusSignedValue(inferredDataType, value)
                 }
@@ -356,7 +417,7 @@ export class DBusSignedValue {
     }
 
     /**
-     * Infers the type of a plain value given for a variant ('v'):
+     * The signature a plain value given for a variant ('v') is sent with:
      * - string → 's', boolean → 'b', bigint → 'x'
      * - number → 'i' for an integer within INT32, 'x' for a larger safe integer, 'd' otherwise
      * - Buffer / Uint8Array → 'ay'; other typed arrays → the matching integer array ('an', 'aq', 'ax', 'at')
@@ -365,12 +426,17 @@ export class DBusSignedValue {
      * - any other object → 'a{sv}', each property value being inferred in turn
      * A value already wrapped in a DBusSignedValue keeps its signature.
      *
+     * @example
+     * DBusSignedValue.inferSignature({name: 'disk', size: 2 ** 40})   // 'a{sv}' (size is sent as 'x')
+     * DBusSignedValue.inferSignature([{id: 1}, {id: 2}])              // 'aa{sv}'
+     * DBusSignedValue.inferSignature([1, 'one'])                       // '(is)'
+     *
      * @param value - The plain value.
-     * @returns The inferred signature.
+     * @returns The complete signature, e.g. 'as' or '(is)'.
      * @throws {InvalidValueError} For null, undefined, functions and symbols, which have no DBus type.
      */
-    private inferType(value: any): string {
-        if (value instanceof DBusSignedValue) return value.$signature
+    public static inferSignature(value: any): string {
+        if (value instanceof DBusSignedValue) return DBusSignedValue.completeSignature(value) // type classes included
         switch (typeof value) {
             case 'string':
                 return 's'
@@ -392,7 +458,7 @@ export class DBusSignedValue {
         if (Array.isArray(value)) {
             if (!value.length) return 'ai'
             if (value.every((item: any): boolean => typeof item === 'number')) return `a${DBusSignedValue.inferNumberType(value)}`
-            const itemTypes: string[] = value.map((item: any): string => this.inferType(item))
+            const itemTypes: string[] = value.map((item: any): string => DBusSignedValue.inferSignature(item))
             if (itemTypes.every((itemType: string): boolean => itemType === itemTypes[0])) return `a${itemTypes[0]}`
             return `(${itemTypes.join('')})`
         }

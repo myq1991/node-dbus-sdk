@@ -77,6 +77,20 @@ describe('DBusBufferEncoder', (): void => {
             })
         }
 
+        it('infers the complete signature of an array of typed containers', (): void => {
+            const typed: any[] = [new DBusSignedValue('as', ['a']), new DBusSignedValue('as', ['b', 'c'])]
+            assert.equal(DBusSignedValue.inferSignature(typed), 'aas')
+            assert.equal(encode('v', typed), encode('v', new DBusSignedValue('aas', [['a'], ['b', 'c']])))
+            assert.equal(DBusSignedValue.inferSignature([new DBusSignedValue('(si)', ['a', 1])]), 'a(si)')
+        })
+
+        it('reports the signature a value is sent with', (): void => {
+            assert.deepEqual(
+                [{name: 'disk', size: 2 ** 40}, [{id: 1}], [1, 'one'], Buffer.from('x'), new DBusUInt32(1)].map((value: any): string => DBusSignedValue.inferSignature(value)),
+                ['a{sv}', 'aa{sv}', '(is)', 'ay', 'u']
+            )
+        })
+
         it('keeps every object of an array instead of merging them', (): void => {
             const body: Buffer = new DBusBufferEncoder().encode('v', [{a: 1}, {b: 2}])
             assert.deepEqual(new DBusBufferDecoder(DBusMessageEndianness.LE, body).decode('v'), [[{a: 1}, {b: 2}]])

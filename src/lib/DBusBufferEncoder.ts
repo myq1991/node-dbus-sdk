@@ -450,78 +450,8 @@ export class DBusBufferEncoder {
      */
     public writeVariant(signedValue: DBusSignedValue): this {
         // Built from the content's type, which the parser has already checked
-        this.writeSignatureBytes(this.variantSignature(signedValue))
+        this.writeSignatureBytes(DBusSignedValue.completeSignature(signedValue))
         return this.writeSignedValue(signedValue)
-    }
-
-    /**
-     * The complete signature of a variant's content: known directly for basic types and recorded empty arrays,
-     * otherwise rebuilt from the content.
-     */
-    private variantSignature(signedValue: DBusSignedValue): string {
-        const dataType: DataType | undefined = DBusSignedValue.dataTypeOf(signedValue)
-        if (dataType && Signature.isComplete(dataType)) return Signature.stringify(dataType)
-        return this.buildSignature(signedValue)
-    }
-
-    /**
-     * Reconstructs the complete signature string for a DBusSignedValue.
-     * Handles both basic types and container types (arrays, structs, dictionaries) recursively.
-     *
-     * @param signedValue - The DBusSignedValue instance to build the signature for.
-     * @returns The complete signature string.
-     * @throws {SignatureError} If the signature cannot be built due to unsupported types or inconsistent structures.
-     */
-    private buildSignature(signedValue: DBusSignedValue): string {
-        const dataType: DataType | undefined = DBusSignedValue.dataTypeOf(signedValue)
-        if (dataType && Signature.isComplete(dataType)) return Signature.stringify(dataType)
-        // Basic types return their signature directly
-        if (!'a({v'.includes(signedValue.$signature)) {
-            return signedValue.$signature
-        }
-        // Handle container types recursively
-        switch (signedValue.$signature) {
-            case 'a': {
-                const values: DBusSignedValue[] = signedValue.$value as DBusSignedValue[]
-                if (values.length === 0) {
-                    // Only a basic element type can be known from the array itself
-                    const itemSignature: string | undefined = signedValue.$arrayItemSignature
-                    if (itemSignature && !'a({'.includes(itemSignature)) return `a${itemSignature}`
-                    throw new SignatureError('Cannot build signature for empty array in variant')
-                }
-                // Get the signature of the first element
-                const firstElementSignature: string = this.buildSignature(values[0])
-                // Check if all elements have the same signature
-                const isConsistent: boolean = values.every((val: DBusSignedValue): boolean => this.buildSignature(val) === firstElementSignature)
-                if (isConsistent) return `a${firstElementSignature}`
-                // If inconsistent, check if it matches a dictionary structure like 'a{sv}'
-                const isDictArray: boolean = values.every((val: DBusSignedValue): boolean => val.$signature === '{')
-                if (isDictArray) {
-                    const firstDictEntry: DBusSignedValue[] = values[0].$value as DBusSignedValue[]
-                    if (firstDictEntry.length === 2) {
-                        const firstKeySignature: string = this.buildSignature(firstDictEntry[0])
-                        const firstValueSignature: string = this.buildSignature(firstDictEntry[1])
-                        const areKeysConsistent: boolean = values.every((val: DBusSignedValue): boolean => this.buildSignature((val.$value as DBusSignedValue[])[0]) === firstKeySignature)
-                        const areValuesConsistent: boolean = values.every((val: DBusSignedValue): boolean => this.buildSignature((val.$value as DBusSignedValue[])[1]) === firstValueSignature)
-                        return `a{${areKeysConsistent ? firstKeySignature : 'v'}${areValuesConsistent ? firstValueSignature : 'v'}}`
-                    }
-                }
-                throw new SignatureError('Cannot build signature for array with inconsistent element types in variant')
-            }
-            case '(': {
-                // Struct: signature is '(' followed by field signatures and ')'
-                const fieldSignedValues: DBusSignedValue[] = signedValue.$value as DBusSignedValue[]
-                return `(${fieldSignedValues.map((field: DBusSignedValue): string => this.buildSignature(field)).join('')})`
-            }
-            case '{': {
-                // Dictionary entry: signature is '{' followed by key and value signatures and '}'
-                const [keySignedValue, valueSignedValue] = signedValue.$value as DBusSignedValue[]
-                return `{${this.buildSignature(keySignedValue)}${this.buildSignature(valueSignedValue)}}`
-            }
-            default:
-                // Variant: signature is 'v' directly, not the internal value's signature
-                return 'v'
-        }
     }
 
     /**

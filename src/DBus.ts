@@ -143,13 +143,28 @@ export class DBus extends EventEmitter {
     }
 
     /**
-     * Static method to connect to a DBus instance.
-     * Creates a new DBus connection with the provided options and initializes it.
+     * Connects to a bus, authenticates, and registers with it (Hello), which gives the connection its unique name.
      *
-     * @param opts - Connection options (e.g., socket path, TCP details, or stream settings).
-     * @returns A Promise resolving to an initialized DBus instance ready for use.
+     * Where it connects:
+     * - no options, or no address: the session bus, from the DBUS_SESSION_BUS_ADDRESS environment variable
+     * - `{busAddress}`: a DBus address, e.g. 'unix:path=/run/dbus/system_bus_socket' for the system bus,
+     *   'tcp:host=127.0.0.1,port=12345', or a ';'-separated list tried in order
+     * - `{socket}`: the path of a Unix socket; `{host, port}`: TCP; `{stream}`: a Duplex stream you opened
+     *
+     * @example
+     * const sessionBus = await DBus.connect()
+     * const systemBus = await DBus.connect({busAddress: 'unix:path=/run/dbus/system_bus_socket'})
+     * const bus = await DBus.connect({busAddress: 'tcp:host=127.0.0.1,port=12345', callTimeout: 5000})
+     *
+     * @param opts - Where and how to connect; see above. `callTimeout` sets a default reply timeout for every call,
+     *               `authMethods` the authentication mechanisms to try (default EXTERNAL, then DBUS_COOKIE_SHA1, then
+     *               ANONYMOUS).
+     * @returns The connected DBus instance.
+     * @throws {UnknownBusAddressError} Without an address when DBUS_SESSION_BUS_ADDRESS is not set.
+     * @throws {CreateStreamFailedError | TimeoutError | AuthError} When no address can be connected to in time, or
+     *         authentication fails.
      */
-    public static async connect(opts: CreateConnectOpts): Promise<DBus> {
+    public static async connect(opts: CreateConnectOpts = {}): Promise<DBus> {
         const bus: DBus = new DBus(await DBusConnection.createConnection(opts))
         bus.callTimeout = opts.callTimeout
         return await bus.initialize()
