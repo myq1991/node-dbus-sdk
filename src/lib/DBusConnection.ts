@@ -19,7 +19,7 @@ import {HandshakeOpts} from '../types/HandshakeOpts'
 import EventEmitter from 'node:events'
 import {Socket} from 'node:net'
 import {NetConnectOpts} from 'net'
-import {DBusMessage} from './DBusMessage'
+import {DBusMessage, MAX_MESSAGE_LENGTH} from './DBusMessage'
 import {DecodeOpts} from '../types/DecodeOpts'
 import {resolveDecode, ResolvedDecodeOpts} from './resolveDecode'
 import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
@@ -419,6 +419,21 @@ export class DBusConnection extends EventEmitter {
         return this.#stream ? !this.#stream.closed : false
     }
 
+    /**
+     * Checks the fixed part of a message header before the rest is read: the byte order mark, the protocol version,
+     * and the total length, which may not exceed MAX_MESSAGE_LENGTH.
+     *
+     * @param header - The first 16 bytes of the message.
+     * @param totalLength - The message's length as its header declares it.
+     * @returns What is wrong, or undefined.
+     */
+    protected static checkFixedHeader(header: Buffer, totalLength: number): string | undefined {
+        if (header[0] !== DBusMessageEndianness.LE && header[0] !== DBusMessageEndianness.BE) return `Invalid byte order mark 0x${header[0].toString(16).padStart(2, '0')} (expected 'l' or 'B')`
+        if (header[3] !== 1) return `Unsupported protocol version ${header[3]} (expected 1)`
+        if (totalLength > MAX_MESSAGE_LENGTH) return `Message of ${totalLength} bytes exceeds the maximum message length of ${MAX_MESSAGE_LENGTH} bytes (128 MiB)`
+        return undefined
+    }
+
     readonly #decode: ResolvedDecodeOpts
 
     /**
@@ -469,8 +484,17 @@ export class DBusConnection extends EventEmitter {
                         fieldsLengthPadded = ((fieldsLength + 7) >> 3) << 3 // Padded to 8-byte boundary
                         bodyLength = bigEndian ? header.readUInt32BE(4) : header.readUInt32LE(4) // Length of message body
                         fieldsAndBodyLength = fieldsLengthPadded + bodyLength
+                        const problem: string | undefined = DBusConnection.checkFixedHeader(header, 16 + fieldsAndBodyLength)
+                        if (problem) {
+                            // The lengths that frame the following messages cannot be trusted either: give up the
+                            // connection instead of buffering whatever the peer claims is coming
+                            this.emit('error', new MessageDecodeError(`${problem}; closing the connection`))
+                            stream.destroy()
+                            return
+                        }
                     } else {
-                        fieldsAndBody = stream.read(fieldsAndBodyLength)
+                        // A message without header fields or body has nothing more to read (read(0) never returns data)
+                        fieldsAndBody = fieldsAndBodyLength ? stream.read(fieldsAndBodyLength) : Buffer.alloc(0)
                         if (!fieldsAndBody) break
                         state = false
                         let message: DBusMessage

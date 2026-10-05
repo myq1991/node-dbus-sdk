@@ -360,7 +360,14 @@ them back (NetworkManager's `GetSettings` and `Update`). Their DBus types matter
   key type; at most 32 nested arrays and 32 nested structs; at most 255 characters.
 
 Received data is checked the same way. A message with invalid UTF-8, malformed paths or signatures, non-zero padding,
-or arrays over 64 MiB is reported as an error instead of being decoded.
+or arrays over 64 MiB is reported as an error instead of being decoded. So is a message that breaks the
+specification's rules for headers: type or serial 0, a header field of the wrong type, a missing required field
+(e.g. a method call without a member), or a body without a signature.
+
+Messages are limited to 128 MiB, as the specification requires, in both directions. A received message declaring a
+larger size, an invalid byte order mark, or a protocol version other than 1 closes the connection, since the data
+that follows cannot be framed reliably. dbus-daemon applies the same rules; they matter most on TCP and other
+connections without a daemon in between.
 
 ## Errors
 
@@ -384,7 +391,8 @@ or arrays over 64 MiB is reported as an error instead of being decoded.
 - **The system bus needs its address.** Without options, `DBus.connect()` connects to the session bus only.
 - **Only `unix:path=` and `tcp:` addresses.** `unix:abstract=`, `unix:tmpdir=` and other transports are not
   supported. In a `;`-separated list, they are skipped in favour of the next address.
-- **Messages are decoded whole.** There is no streaming of large values. Received arrays over 64 MiB are rejected.
+- **Messages are decoded whole.** There is no streaming of large values; messages are limited to 128 MiB and
+  arrays to 64 MiB.
 
 ## Examples
 

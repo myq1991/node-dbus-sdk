@@ -12,6 +12,10 @@ import {MockBusStream} from '../helpers/MockBusStream'
 import {knownBug} from '../helpers/KnownBug'
 import {withTimeout} from '../helpers/Async'
 import {undecodableMessage} from '../helpers/WireMessage'
+import {MessageDecodeError} from '../../lib/Errors'
+import {DBusMessageEndianness} from '../../lib/enums/DBusMessageEndianness'
+import {DBusSignedValue} from '../../lib/DBusSignedValue'
+import {DBusBufferEncoder} from '../../lib/DBusBufferEncoder'
 
 v8.setFlagsFromString('--expose-gc')
 const gc: () => void = vm.runInNewContext('gc')
@@ -86,6 +90,17 @@ describe('DBus message dispatch', (): void => {
             assert.deepEqual(call.body, ['a', 1])
             stream.deliver(methodReturn(call.header.serial, 'su', 'b', 2))
             assert.deepEqual(await pending, ['b', 2])
+        })
+
+        it('rejects the call when its error reply breaks the specification, instead of waiting forever', async (): Promise<void> => {
+            const pending: Promise<any[]> = dbus.invoke({service: 'org.example', objectPath: '/', interface: 'org.example.I', method: 'Fail'})
+            const call: DBusMessage = await stream.nextOutgoing()
+            // An ERROR must name its error: this one only says which call it answers
+            const fields: any[] = [[5, new DBusSignedValue('u', call.header.serial)], [8, new DBusSignedValue('g', 's')]]
+            const body: Buffer = new DBusBufferEncoder().encode('s', 'no name')
+            const header: Buffer = new DBusBufferEncoder().encode('yyyyuua(yv)', [DBusMessageEndianness.LE, DBusMessageType.ERROR, DBusMessageFlags.NO_REPLY_EXPECTED, 1, body.length, 900, fields])
+            stream.deliver(Buffer.concat([header, Buffer.alloc((8 - header.length % 8) % 8), body]))
+            await assert.rejects(pending, (error: unknown): boolean => error instanceof MessageDecodeError && /errorName is missing/.test(error.message))
         })
 
         it('rejects with the DBus error name and message', async (): Promise<void> => {

@@ -576,9 +576,11 @@ export class LocalInterfaceInvalidAnnotationError extends Error implements NodeJ
 }
 
 /**
- * A received message could not be decoded. Emitted as 'connectionError' on the DBus instance; when the message
- * was a reply, the call it answers is rejected with it; when it was a method call, the caller gets an
- * org.freedesktop.DBus.Error.InvalidArgs reply.
+ * A received message could not be decoded or breaks the specification (e.g. a missing required header field).
+ * Emitted as 'connectionError' on the DBus instance; when the message was a reply, the call it answers is rejected
+ * with it; when it was a method call, the caller gets an org.freedesktop.DBus.Error.InvalidArgs reply. When the
+ * fixed part of a header cannot be trusted (an invalid byte order mark, a protocol version other than 1, or a
+ * declared size over 128 MiB), the connection is closed as well.
  */
 export class MessageDecodeError extends Error implements NodeJS.ErrnoException {
     /**

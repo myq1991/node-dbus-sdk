@@ -149,6 +149,11 @@ lost precision.
 - **Messages without a signature.** A message with arguments but no signature used to be sent without its arguments.
   Now the signature is taken from the arguments when all of them are typed, and plain arguments without a signature
   are rejected.
+- **Messages that break the specification are rejected.** Received messages with type or serial 0, header fields
+  of the wrong type, missing required header fields, or a body without a signature are reported as
+  `MessageDecodeError` instead of being delivered. A received message over 128 MiB, with an invalid byte order mark
+  or a protocol version other than 1 closes the connection; before, any declared size was buffered. Sending a
+  message over 128 MiB throws `InvalidValueError`.
 - **Library errors have names.** `error.name` is the class name (`'TimeoutError'`, `'InvalidValueError'`, …) instead
   of `'Error'`. A library error thrown in a method handler therefore reaches the caller as `<service>.<ClassName>`
   instead of `<service>.Error`.

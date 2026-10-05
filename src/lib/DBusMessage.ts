@@ -1,7 +1,7 @@
 import {DBusMessageHeader} from '../types/DBusMessageHeader'
 import {DBusMessageType} from './enums/DBusMessageType'
 import {DBusMessageFlags} from './enums/DBusMessageFlags'
-import {MessageDecodeError, SerialError, SignatureError} from './Errors'
+import {InvalidValueError, MessageDecodeError, SerialError, SignatureError} from './Errors'
 import {DBusMessageEndianness} from './enums/DBusMessageEndianness'
 import {DBusBufferEncoder} from './DBusBufferEncoder'
 import {DBusSignedValue} from './DBusSignedValue'
@@ -9,6 +9,22 @@ import {DBusBufferDecoder} from './DBusBufferDecoder'
 import {DecodeOpts} from '../types/DecodeOpts'
 import {DEFAULT_DECODE, resolveDecode, ResolvedDecodeOpts} from './resolveDecode'
 import {signedValueToTypeClassInstance} from './signedValueToTypeClassInstance'
+
+/**
+ * The maximum length of a message, header and body included: 2^27 bytes (128 MiB). Per the specification,
+ * implementations must not send or accept longer messages.
+ */
+export const MAX_MESSAGE_LENGTH: number = 2 ** 27
+
+/**
+ * The header fields each message type must have, per the specification.
+ */
+const REQUIRED_FIELDS: Record<number, string[]> = {
+    [DBusMessageType.METHOD_CALL]: ['path', 'member'],
+    [DBusMessageType.METHOD_RETURN]: ['replySerial'],
+    [DBusMessageType.ERROR]: ['errorName', 'replySerial'],
+    [DBusMessageType.SIGNAL]: ['path', 'interfaceName', 'member']
+}
 
 /**
  * A class representing a DBus message.
@@ -182,6 +198,9 @@ export class DBusMessage {
         const headerLenAligned: number = Math.ceil(totalHeaderLen / 8) * 8
         const paddingLen: number = headerLenAligned - totalHeaderLen
         const paddingBuff: Buffer = Buffer.alloc(paddingLen, 0) // Add padding bytes to align to 8-byte boundary
+        if (headerLenAligned + bodyLength > MAX_MESSAGE_LENGTH) {
+            throw new InvalidValueError(`The message would be ${headerLenAligned + bodyLength} bytes, more than the maximum message length of ${MAX_MESSAGE_LENGTH} bytes (128 MiB)`)
+        }
         return Buffer.concat([headerAndFieldsBuffer, paddingBuff, bodyBuff])
     }
 
@@ -303,12 +322,26 @@ export class DBusMessage {
             protocolVersion: protocolVersion,
             serial: serial
         }
+        let wrongType: string | undefined
         for (const field of fields.$value as DBusSignedValue[]) {
             const [code, variant] = field.$value as DBusSignedValue[]
             const headerTypeName: string | null = this.headerTypeName[code.$value]
-            if (!headerTypeName) continue
-            messageHeader[headerTypeName] = (variant.$value as DBusSignedValue).$value
+            if (!headerTypeName) continue // Unknown header fields are ignored, as the specification requires
+            const content: DBusSignedValue = variant.$value as DBusSignedValue
+            if (content.$signature !== this.fieldSignature[headerTypeName]) {
+                wrongType ??= `header field ${headerTypeName} has type '${content.$signature}' instead of '${this.fieldSignature[headerTypeName]}'`
+                continue
+            }
+            messageHeader[headerTypeName] = content.$value
         }
+        // A message the specification calls invalid is not given to anyone, but reported with its header so that, for
+        // example, the call it answers can be rejected
+        const invalid: string | undefined = wrongType
+            ?? (type === 0 ? 'message type 0 is invalid' : undefined)
+            ?? (!serial ? 'serial 0 is invalid' : undefined)
+            ?? REQUIRED_FIELDS[type]?.filter((name: string): boolean => !messageHeader[name]).map((name: string): string => `required header field ${name} is missing`)[0]
+            ?? (bodyLength && !messageHeader.signature ? 'the message has a body but no signature' : undefined)
+        if (invalid) throw new MessageDecodeError(`Invalid message: ${invalid}`, messageHeader)
         // If there is no body or no signature, return message with only header
         if (!bodyLength || !messageHeader.signature) return DBusMessage.received(messageHeader, [], decodeOpts)
         // Calculate aligned offset before body to account for padding (must align to 8-byte boundary)
