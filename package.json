@@ -1,6 +1,6 @@
 {
   "name": "dbus-sdk",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A Node.js SDK for interacting with DBus, enabling seamless service calling and exposure with TypeScript support",
   "main": "build/NodeDBusSDK.js",
   "types": "build/NodeDBusSDK.d.ts",
